@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "smol_db_common",
+    "smol_db_server",
+    "smol_db_client",
+]

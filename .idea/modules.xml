@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/smol_db.iml" filepath="$PROJECT_DIR$/smol_db.iml" />
+      <module fileurl="file://$PROJECT_DIR$/smol_db_client/smol_db_client.iml" filepath="$PROJECT_DIR$/smol_db_client/smol_db_client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/smol_db_common/smol_db_common.iml" filepath="$PROJECT_DIR$/smol_db_common/smol_db_common.iml" />
+      <module fileurl="file://$PROJECT_DIR$/smol_db_server/smol_db_server.iml" filepath="$PROJECT_DIR$/smol_db_server/smol_db_server.iml" />
+    </modules>
+  </component>
+</project>
