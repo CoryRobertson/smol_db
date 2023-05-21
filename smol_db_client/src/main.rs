@@ -1,7 +1,9 @@
+#![allow(unused_variables,dead_code)] // TODO: remove this lints
+
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
-use smol_db_common::{DBLocation, DBPacket, DBPacketInfo};
+use smol_db_common::{DBPacket};
 
 fn main() {
 
@@ -19,9 +21,11 @@ fn main() {
 
     let mut client = TcpStream::connect("localhost:8222").unwrap();
 
+
+
+    let _ = client.write(pack.as_bytes());
     let _ = client.read(&mut buf);
     println!("{:?}", from_utf8(&buf).unwrap_or_default());
-    let _ = client.write(pack.as_bytes());
 
 
     // let _ = client.read(&mut buf);

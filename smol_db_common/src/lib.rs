@@ -1,8 +1,10 @@
+
+
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 
-
-#[derive(Serialize,Deserialize,Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone, Hash, PartialEq, Eq,PartialOrd,Ord)]
 pub struct DBPacketInfo {
     dbname: String,
 }
@@ -13,14 +15,20 @@ pub struct DBLocation {
 }
 
 impl DBLocation {
-    fn new(location: &str) -> Self {
+    pub fn new(location: &str) -> Self {
         Self{ location: location.to_string() }
-    } 
+    }
+    pub fn as_key(&self) -> &str {
+        &self.location
+    }
 }
 
 impl DBPacketInfo {
-    fn new(dbname: &str) -> Self {
+    pub fn new(dbname: &str) -> Self {
         Self{ dbname: dbname.to_string() }
+    }
+    pub fn get_db_name(&self) -> &str {
+        &self.dbname
     }
 }
 
@@ -48,5 +56,26 @@ impl DBPacket {
 
     pub fn serialize_packet(&self) -> serde_json::Result<String> {
         serde_json::to_string(&self)
+    }
+}
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
+pub struct DBContent {
+    pub content: HashMap<String,String>,
+}
+
+impl DBContent {
+    pub fn read_ser_data(data: String) -> serde_json::Result<Self> {
+        serde_json::from_str(&data)
+    }
+    pub fn read_from_db(&self, key: &str) -> Option<&String> {
+        self.content.get(key)
+    }
+}
+
+#[allow(clippy::derivable_impls)] // This lint is allowed so we can later make default not simply have the default impl
+impl Default for DBContent{
+    fn default() -> Self {
+        Self{ content: HashMap::default() }
     }
 }

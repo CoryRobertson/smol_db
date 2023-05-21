@@ -1,10 +1,100 @@
+#![allow(unused_variables,dead_code)] // TODO: remove this lints
+
+use std::fs::{File};
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener};
 use std::str::from_utf8;
-use std::thread;
+use std::sync::{Arc, RwLock};
+use std::{fs, thread};
+use std::collections::HashMap;
 use std::thread::JoinHandle;
-use bson::{from_bson, to_bson};
-use smol_db_common::{DBPacket, DBPacketInfo};
+use std::time::SystemTime;
+use smol_db_common::{DBContent, DBPacket, DBPacketInfo};
+use serde::Serialize;
+use serde::Deserialize;
+
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
+struct DBList {
+    list: Vec<DBPacketInfo>, // vector of strings containing file names of the databases.
+    cache: HashMap<DBPacketInfo,DB>,
+}
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
+struct DB {
+    db_content: DBContent,
+    last_access_time: SystemTime,
+}
+
+
+// struct DBRead(String);
+
+impl DBList {
+    fn create_db(&mut self, db_name: &str) -> std::io::Result<File> {
+        let mut res = File::create(db_name);
+
+        if let Ok(file) = &mut res {
+            let db_packet_info = DBPacketInfo::new(db_name);
+            let db = DB { db_content: DBContent::default(), last_access_time: SystemTime::now() };
+            let ser = serde_json::to_string(&db.db_content).unwrap();
+            let _ = file.write(ser.as_ref()).expect("TODO: panic message");
+            self.cache.insert(db_packet_info.clone(), db);
+            self.list.push(db_packet_info);
+
+        }
+
+        res
+    }
+    fn delete_db(&mut self, db_name: &str) -> std::io::Result<()> {
+        let res = fs::remove_file(db_name);
+
+        if res.is_ok() {
+            let db_packet_info = DBPacketInfo::new(db_name);
+            self.cache.remove(&db_packet_info);
+            let index_res = self.list.binary_search(&db_packet_info);
+            if let Ok(index) = index_res {
+                self.list.remove(index);
+            }
+        }
+
+        res
+    }
+    fn read_db(&mut self, read_pack: &DBPacket) -> Result<String,()> {
+        return match read_pack {
+            DBPacket::Read(p_info, p_location) => {
+                if let Some(db) = self.cache.get_mut(p_info) {
+                    // cache was hit
+                    db.last_access_time = SystemTime::now();
+
+                    Ok(db.db_content.read_from_db(p_location.as_key()).unwrap().to_string())
+                } else if self.list.contains(p_info) {
+                    // cache was missed but the db exists on the file system
+
+                    let mut db_file = File::open(p_info.get_db_name()).unwrap();
+                    let mut db_content_string = String::new();
+                    db_file.read_to_string(&mut db_content_string).expect("TODO: panic message");
+                    let db_content: DBContent = DBContent::read_ser_data(db_content_string).unwrap();
+
+                    let return_value = db_content.read_from_db(p_location.as_key()).expect("RETURN VALUE DID NOT EXIST").clone();
+
+                    let db = DB { db_content, last_access_time: SystemTime::now() };
+                    self.cache.insert(p_info.clone(), db);
+
+
+                    Ok(return_value)
+                } else {
+                    // cache was neither hit, nor did the db exist on the file system
+                    Err(())
+                }
+            }
+            DBPacket::Write(_, _) => { Err(()) }
+            DBPacket::CreateDB(_) => { Err(()) }
+            DBPacket::DeleteDB(_) => { Err(()) }
+        };
+    }
+
+    //TODO:  finish implementing for write_db
+}
 
 fn main() {
     println!("Hello, world!");
@@ -13,6 +103,8 @@ fn main() {
     let listener = TcpListener::bind("0.0.0.0:8222").unwrap();
 
     let mut thread_vec: Vec<JoinHandle<()>> = vec![];
+
+    let db_list = Arc::new(RwLock::new(DBList{ list: vec![], cache: Default::default() }));
 
     for income in listener.incoming() {
         for i in 0..thread_vec.len() {
@@ -28,24 +120,25 @@ fn main() {
         }
 
         let handle = thread::spawn(move || {
-            let mut stream = income.expect("failed to recieve tcp stream");
+            let mut stream = income.expect("failed to receive tcp stream");
             let mut buf: [u8 ; 1024] = [0 ; 1024];
             loop {
                 // client loop
-                let write_result = stream.write("test".as_bytes());
+
                 let read_result = stream.read(&mut buf);
-                if read_result.is_err() || write_result.is_err() {
-                    break;
-                }
 
                 if let Ok(read) = read_result {
                     // println!("{:?}",buf);
                     let s = from_utf8(&buf[0..read]).unwrap();
-                    println!("this is s: [{}]",s);
+                    // println!("this is s: [{}]",s);
                     let pack: DBPacket = serde_json::from_str(s).unwrap();
                     println!("{:?}", pack);
                 }
+                let write_result = stream.write("test".as_bytes());
 
+                if read_result.is_err() || write_result.is_err() {
+                    break;
+                }
             }
         });
 
@@ -60,6 +153,6 @@ fn main() {
 
 }
 
-fn handle_client(stream: &TcpStream) -> bool {
-    true
-}
+// fn handle_client(stream: &TcpStream) -> bool {
+//     true
+// }
