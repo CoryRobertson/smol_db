@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 smol_db_common = { path = "../smol_db_common" }
+serde = "1.0.163"
+bson = "2.6.1"
+serde_json = "1.0.96"
