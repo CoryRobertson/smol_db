@@ -16,6 +16,10 @@ use serde::Deserialize;
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 struct DBList {
+    //TODO: store the cache and list in an RWLock, and eventually store each DB in the cache in an RWLock so individual databases can be read from and written to concurrently.
+    //  These should allow us to read/write from each individual database concurrently.
+    //  Something like RWLock<HashMap<DBPacketInfo,RWLock<DB>>>
+    //  And RWLock<Vec<DBPacketInfo>>
     list: Vec<DBPacketInfo>, // vector of strings containing file names of the databases.
     cache: HashMap<DBPacketInfo,DB>,
 }
