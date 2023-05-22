@@ -14,6 +14,8 @@ use serde::Serialize;
 use serde::Deserialize;
 
 
+// TODO: move these structs and impl blocks to lib.rs
+
 #[derive(Serialize,Deserialize,Debug,Clone)]
 struct DBList {
     //TODO: store the cache and list in an RWLock, and eventually store each DB in the cache in an RWLock so individual databases can be read from and written to concurrently.
