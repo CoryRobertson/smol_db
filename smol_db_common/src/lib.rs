@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 
@@ -137,5 +141,132 @@ impl Default for DBContent{
     /// Returns a default empty HashMap.
     fn default() -> Self {
         Self{ content: HashMap::default() }
+    }
+}
+
+// TODO: move these structs and impl blocks to lib.rs
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
+pub struct DBList {
+    //TODO: store the cache and list in an RWLock, and eventually store each DB in the cache in an RWLock so individual databases can be read from and written to concurrently.
+    //  These should allow us to read/write from each individual database concurrently.
+    //  Something like RWLock<HashMap<DBPacketInfo,RWLock<DB>>>
+    //  And RWLock<Vec<DBPacketInfo>>
+    pub list: Vec<DBPacketInfo>, // vector of strings containing file names of the databases.
+    pub cache: HashMap<DBPacketInfo,DB>,
+}
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
+pub struct DB {
+    pub db_content: DBContent,
+    last_access_time: SystemTime,
+}
+
+impl DBList {
+    pub fn create_db(&mut self, db_name: &str) -> std::io::Result<File> {
+        let mut res = File::create(db_name);
+
+        if let Ok(file) = &mut res {
+            let db_packet_info = DBPacketInfo::new(db_name);
+            let db = DB { db_content: DBContent::default(), last_access_time: SystemTime::now() };
+            let ser = serde_json::to_string(&db.db_content).unwrap();
+            let _ = file.write(ser.as_ref()).expect("TODO: panic message");
+            self.cache.insert(db_packet_info.clone(), db);
+            self.list.push(db_packet_info);
+
+        }
+
+        res
+    }
+    pub fn delete_db(&mut self, db_name: &str) -> std::io::Result<()> {
+        let res = fs::remove_file(db_name);
+
+        if res.is_ok() {
+            let db_packet_info = DBPacketInfo::new(db_name);
+            self.cache.remove(&db_packet_info);
+            let index_res = self.list.binary_search(&db_packet_info);
+            if let Ok(index) = index_res {
+                self.list.remove(index);
+            }
+        }
+
+        res
+    }
+    // TODO: modify these result return types to use TODO referencing DBPacketResponse
+    pub fn read_db(&mut self, read_pack: &DBPacket) -> Result<String,()> {
+        return match read_pack {
+            DBPacket::Read(p_info, p_location) => {
+                if let Some(db) = self.cache.get_mut(p_info) {
+                    // cache was hit
+                    db.last_access_time = SystemTime::now();
+
+                    Ok(db.db_content.read_from_db(p_location.as_key()).unwrap().to_string())
+                } else if self.list.contains(p_info) {
+                    // cache was missed but the db exists on the file system
+
+                    let mut db_file = File::open(p_info.get_db_name()).unwrap();
+                    let mut db_content_string = String::new();
+                    db_file.read_to_string(&mut db_content_string).expect("TODO: panic message");
+                    let db_content: DBContent = DBContent::read_ser_data(db_content_string).unwrap();
+
+                    let return_value = db_content.read_from_db(p_location.as_key()).expect("RETURN VALUE DID NOT EXIST").clone();
+
+                    let db = DB { db_content, last_access_time: SystemTime::now() };
+                    self.cache.insert(p_info.clone(), db);
+
+
+                    Ok(return_value)
+                } else {
+                    // cache was neither hit, nor did the db exist on the file system
+                    Err(())
+                }
+            }
+            DBPacket::Write(_, _, _) => { Err(()) }
+            DBPacket::CreateDB(_) => { Err(()) }
+            DBPacket::DeleteDB(_) => { Err(()) }
+        };
+    }
+
+    pub fn write_db(&mut self, write_pack: &DBPacket) -> Result<String,()> {
+        return match write_pack {
+            DBPacket::Read(_, _) => { Err(()) }
+            DBPacket::Write(db_info, db_location, db_data) => {
+                if let Some(db) = self.cache.get_mut(db_info) {
+                    // cache is hit, db is currently loaded
+                    db.last_access_time = SystemTime::now();
+                    return match db.db_content.content.insert(db_location.as_key().to_string(),db_data.get_data().to_string()) {
+                        None => {
+                            // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
+                            Ok("".to_string())
+                        }
+                        Some(updated_value) => {
+                            // if the db insertion had a previous value, return it.
+                            Ok(updated_value)
+                        }
+                    }
+                } else if self.list.contains(db_info) {
+                    // cache was missed, but the requested database did in fact exist
+                    let mut db_file = File::open(db_info.get_db_name()).unwrap();
+                    let mut db_content_string = String::new();
+                    db_file.read_to_string(&mut db_content_string).expect("TODO: panic message");
+                    let db_content: DBContent = DBContent::read_ser_data(db_content_string).unwrap();
+
+                    let mut db = DB { db_content, last_access_time: SystemTime::now() };
+                    let returned_value = match db.db_content.content.insert(db_location.as_key().to_string(),db_data.get_data().to_string()) {
+                        None => { "".to_string() }
+                        Some(updated_value) => {
+                            updated_value
+                        }
+                    };
+                    self.cache.insert(db_info.clone(), db);
+
+                    Ok(returned_value)
+                } else {
+                    Err(())
+                }
+            }
+            DBPacket::CreateDB(_) => { Err(()) }
+            DBPacket::DeleteDB(_) => { Err(()) }
+        }
     }
 }
