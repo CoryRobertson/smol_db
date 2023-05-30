@@ -67,7 +67,7 @@ impl DBPacketInfo {
 /// A packet denoting the operation from client->server that the client wishes to do.
 ///
 /// Read(db to operate on, key to read the db using)
-/// Write(db to operate on, key to write to the db using)
+/// Write(db to operate on, key to write to the db using, data to write to the key location)
 /// CreateDB(db to create)
 /// DeleteDB(db to delete)
 pub enum DBPacket {
@@ -144,8 +144,6 @@ impl Default for DBContent{
     }
 }
 
-// TODO: move these structs and impl blocks to lib.rs
-
 #[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct DBList {
     //TODO: store the cache and list in an RWLock, and eventually store each DB in the cache in an RWLock so individual databases can be read from and written to concurrently.
@@ -157,12 +155,15 @@ pub struct DBList {
 }
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
+/// A struct that represents a specific database, with content, and a recent access time.
+/// This struct is meant to be called into existence when ever a database is un-cached, and needs to be cached.
 pub struct DB {
     pub db_content: DBContent,
     last_access_time: SystemTime,
 }
 
 impl DBList {
+    /// Creates a DB given a name, the packet is not needed, only the name.
     pub fn create_db(&mut self, db_name: &str) -> std::io::Result<File> {
         let mut res = File::create(db_name);
 
@@ -178,6 +179,9 @@ impl DBList {
 
         res
     }
+
+    /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
+    /// If the file is successfully removed, the db is also removed from the cache, and list.
     pub fn delete_db(&mut self, db_name: &str) -> std::io::Result<()> {
         let res = fs::remove_file(db_name);
 
@@ -193,6 +197,8 @@ impl DBList {
         res
     }
     // TODO: modify these result return types to use TODO referencing DBPacketResponse
+
+    /// Reads a database given a packet TODO: finish this doc once the reply enum is finished.
     pub fn read_db(&mut self, read_pack: &DBPacket) -> Result<String,()> {
         return match read_pack {
             DBPacket::Read(p_info, p_location) => {
@@ -227,9 +233,9 @@ impl DBList {
         };
     }
 
+    /// Writes to a db given a DBPacket, returns the previous value in the key's location if one existed, if not returns an empty string.
     pub fn write_db(&mut self, write_pack: &DBPacket) -> Result<String,()> {
         return match write_pack {
-            DBPacket::Read(_, _) => { Err(()) }
             DBPacket::Write(db_info, db_location, db_data) => {
                 if let Some(db) = self.cache.get_mut(db_info) {
                     // cache is hit, db is currently loaded
@@ -265,6 +271,8 @@ impl DBList {
                     Err(())
                 }
             }
+            // Error on any incorrect packet types.
+            DBPacket::Read(_, _) => { Err(()) }
             DBPacket::CreateDB(_) => { Err(()) }
             DBPacket::DeleteDB(_) => { Err(()) }
         }

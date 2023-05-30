@@ -43,21 +43,24 @@ fn main() {
                 let read_result = stream.read(&mut buf);
 
                 if let Ok(read) = read_result {
-                    let s = from_utf8(&buf[0..read]).unwrap();
-                    let pack: DBPacket = serde_json::from_str(s).unwrap();
-                    println!("size: {}, packet data: {:?}",read, pack); // this is a debug print
-                    match pack {
-                        // TODO: implement these blocks
-                        DBPacket::Read(_, _) => {}
-                        DBPacket::Write(_, _, _) => {}
-                        DBPacket::CreateDB(_) => {}
-                        DBPacket::DeleteDB(_) => {}
+                    if read != 0 {
+                        println!("read size: {}", read); // this is a debug print
+                        let s = from_utf8(&buf[0..read]).unwrap();
+                        let pack: DBPacket = serde_json::from_str(s).unwrap();
+                        println!("packet data: {:?}", pack); // this is also a debug print
+                        match pack {
+                            // TODO: implement these blocks
+                            DBPacket::Read(_, _) => {}
+                            DBPacket::Write(_, _, _) => {}
+                            DBPacket::CreateDB(_) => {}
+                            DBPacket::DeleteDB(_) => {}
+                        }
                     }
-
                 }
                 let write_result = stream.write("test".as_bytes());
 
                 if read_result.is_err() || write_result.is_err() {
+                    println!("client dropped.");
                     break;
                 }
             }

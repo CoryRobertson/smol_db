@@ -16,19 +16,26 @@ fn main() {
 
     let pack = packet1.serialize_packet().unwrap();
 
-
     println!("dassad: {:?}",pack);
 
     let mut client = TcpStream::connect("localhost:8222").unwrap();
 
+    let b = pack.as_ref();
+    let bs = from_utf8(&b).unwrap();
+
+    println!("b {:?}", b);
+    println!("bs {:?}", bs);
+
+    let _ = client.write(b);
+    let read_res = client.read(&mut buf);
+    match read_res {
+        Ok(len) => {
+            println!("ok: {:?}", from_utf8(&buf[0..len]).unwrap_or_default());
+        }
+        Err(_) => {
+            println!("err: {:?}", from_utf8(&buf).unwrap_or_default());
+        }
+    }
 
 
-    let _ = client.write(pack.as_bytes());
-    let _ = client.read(&mut buf);
-    println!("{:?}", from_utf8(&buf).unwrap_or_default());
-
-
-    // let _ = client.read(&mut buf);
-    // println!("{:?}", from_utf8(&buf).unwrap_or_default());
-    // let _ = client.write("4321".as_bytes());
 }
