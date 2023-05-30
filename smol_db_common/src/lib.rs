@@ -14,6 +14,27 @@ pub struct DBLocation {
     location: String,
 }
 
+#[derive(Serialize,Deserialize,Debug,Clone)]
+/// A struct that contains the data that is to be put into a database.
+pub struct DBData {
+    data: String
+}
+
+impl DBData {
+    /// Function to create a new DBData struct for a DBPacket::Write packet.
+    pub fn new(data: String) -> Self {
+        // TODO: eventually revise this with some amount of error checking
+        Self {
+            data
+        }
+    }
+
+    /// Getter function for the data inside the DBData struct.
+    pub fn get_data(&self) -> &str {
+        &self.data
+    }
+}
+
 impl DBLocation {
     /// Function to create a new DBLocation struct from a given location.
     pub fn new(location: &str) -> Self {
@@ -47,7 +68,7 @@ impl DBPacketInfo {
 /// DeleteDB(db to delete)
 pub enum DBPacket {
     Read(DBPacketInfo, DBLocation),
-    Write(DBPacketInfo, DBLocation),
+    Write(DBPacketInfo, DBLocation, DBData),
     CreateDB(DBPacketInfo),
     DeleteDB(DBPacketInfo),
 }
@@ -71,8 +92,8 @@ impl DBPacket {
     }
 
     /// Creates a new Write DBPacket from a name of a database and location string to write to.
-    pub fn new_write(dbname: &str, location: &str) -> DBPacket {
-        DBPacket::Write(DBPacketInfo::new(dbname),DBLocation::new(location))
+    pub fn new_write(dbname: &str, location: &str, data: &str) -> DBPacket {
+        DBPacket::Write(DBPacketInfo::new(dbname),DBLocation::new(location), DBData::new(data.to_string()))
     }
 
     /// Creates a new CreateDB DBPacket from a name of a database.
@@ -108,6 +129,7 @@ impl DBContent {
     pub fn read_from_db(&self, key: &str) -> Option<&String> {
         self.content.get(key)
     }
+
 }
 
 #[allow(clippy::derivable_impls)] // This lint is allowed so we can later make default not simply have the default impl

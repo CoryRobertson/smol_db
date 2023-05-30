@@ -93,10 +93,53 @@ impl DBList {
                     Err(())
                 }
             }
-            DBPacket::Write(_, _) => { Err(()) }
+            DBPacket::Write(_, _, _) => { Err(()) }
             DBPacket::CreateDB(_) => { Err(()) }
             DBPacket::DeleteDB(_) => { Err(()) }
         };
+    }
+
+    fn write_db(&mut self, write_pack: &DBPacket) -> Result<String,()> {
+        return match write_pack {
+            DBPacket::Read(_, _) => { Err(()) }
+            DBPacket::Write(db_info, db_location, db_data) => {
+                if let Some(db) = self.cache.get_mut(db_info) {
+                    // cache is hit, db is currently loaded
+                    db.last_access_time = SystemTime::now();
+                    return match db.db_content.content.insert(db_location.as_key().to_string(),db_data.get_data().to_string()) {
+                        None => {
+                            // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
+                            Ok("".to_string())
+                        }
+                        Some(updated_value) => {
+                            // if the db insertion had a previous value, return it.
+                            Ok(updated_value)
+                        }
+                    }
+                } else if self.list.contains(db_info) {
+                    // cache was missed, but the requested database did in fact exist
+                    let mut db_file = File::open(db_info.get_db_name()).unwrap();
+                    let mut db_content_string = String::new();
+                    db_file.read_to_string(&mut db_content_string).expect("TODO: panic message");
+                    let db_content: DBContent = DBContent::read_ser_data(db_content_string).unwrap();
+
+                    let mut db = DB { db_content, last_access_time: SystemTime::now() };
+                    let returned_value = match db.db_content.content.insert(db_location.as_key().to_string(),db_data.get_data().to_string()) {
+                        None => { "".to_string() }
+                        Some(updated_value) => {
+                            updated_value
+                        }
+                    };
+                    self.cache.insert(db_info.clone(), db);
+
+                    Ok(returned_value)
+                } else {
+                    Err(())
+                }
+            }
+            DBPacket::CreateDB(_) => { Err(()) }
+            DBPacket::DeleteDB(_) => { Err(()) }
+        }
     }
 
     //TODO:  finish implementing for write_db

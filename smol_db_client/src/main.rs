@@ -12,7 +12,7 @@ fn main() {
     let packet1 = DBPacket::new_create_db("test1");
     let packet2 = DBPacket::new_delete_db("test1");
     let packet3 = DBPacket::new_read("test1", "location1");
-    let packet4 = DBPacket::new_write("test1", "location1");
+    let packet4 = DBPacket::new_write("test1", "location1", "data1");
 
     let pack = packet1.serialize_packet().unwrap();
 
