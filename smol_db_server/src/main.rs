@@ -1,25 +1,24 @@
-#![allow(unused_variables,dead_code)] // TODO: remove this lints
+#![allow(unused_variables, dead_code)] // TODO: remove this lints
 
+use smol_db_common::{DBList, DBPacket};
 use std::io::{Read, Write};
-use std::net::{TcpListener};
+use std::net::TcpListener;
 use std::str::from_utf8;
 use std::sync::{Arc, RwLock};
-use std::{thread};
+use std::thread;
 use std::thread::JoinHandle;
-use smol_db_common::{DBList, DBPacket};
-
-
-
 
 fn main() {
     println!("Hello, world!");
-
 
     let listener = TcpListener::bind("0.0.0.0:8222").unwrap();
 
     let mut thread_vec: Vec<JoinHandle<()>> = vec![];
 
-    let db_list = Arc::new(RwLock::new(DBList{ list: vec![], cache: Default::default() }));
+    let db_list = Arc::new(RwLock::new(DBList {
+        list: vec![],
+        cache: Default::default(),
+    }));
 
     for income in listener.incoming() {
         for i in 0..thread_vec.len() {
@@ -30,13 +29,12 @@ fn main() {
                         thread_vec.remove(i);
                     }
                 }
-
             }
         }
 
         let handle = thread::spawn(move || {
             let mut stream = income.expect("failed to receive tcp stream");
-            let mut buf: [u8 ; 1024] = [0 ; 1024];
+            let mut buf: [u8; 1024] = [0; 1024];
             loop {
                 // client loop
 
@@ -67,16 +65,13 @@ fn main() {
         });
 
         thread_vec.push(handle);
-        println!("connection handled. number of connections: {}", thread_vec.len());
-
+        println!(
+            "connection handled. number of connections: {}",
+            thread_vec.len()
+        );
     }
 
     for handle in thread_vec {
         handle.join().unwrap();
     }
-
 }
-
-// fn handle_client(stream: &TcpStream) -> bool {
-//     true
-// }
