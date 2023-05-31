@@ -10,3 +10,4 @@ smol_db_common = { path = "../smol_db_common" }
 serde = { version = "1.0.163", features = ["derive","rc"]}
 bson = "2.6.1"
 serde_json = "1.0.96"
+rand = "0.8.5"
