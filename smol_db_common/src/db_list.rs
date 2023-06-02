@@ -13,7 +13,7 @@ use std::io::{Read, Write};
 use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DBList {
+pub struct DBList<T> {
     //TODO: store the cache and list in an RWLock, and eventually store each DB in the cache in an RWLock so individual databases can be read from and written to concurrently.
     //  These should allow us to read/write from each individual database concurrently.
     //  Something like RWLock<HashMap<DBPacketInfo,RWLock<DB>>>
@@ -21,10 +21,12 @@ pub struct DBList {
     /// Vector of DBPacketInfo's containing file names of the databases that are available to be read from.
     pub list: Vec<DBPacketInfo>,
     /// Hashmap that takes a DBPacketInfo and returns the database corresponding to the name in the given packet.
-    pub cache: HashMap<DBPacketInfo, DB>,
+    pub cache: HashMap<DBPacketInfo, DB<T>>,
 }
 
-impl DBList {
+impl<T> DBList<T>
+    where for<'a> T: Serialize + Deserialize<'a>,
+{
     /// Creates a DB given a name, the packet is not needed, only the name.
     pub fn create_db(&mut self, db_name: &str) -> DBPacketResponse<()> {
         return match File::create(db_name) {
@@ -62,7 +64,9 @@ impl DBList {
     }
 
     /// Reads a database given a packet, returns the value if it was found.
-    pub fn read_db(&mut self, read_pack: &DBPacket) -> DBPacketResponse<String> {
+    pub fn read_db(&mut self, read_pack: &DBPacket<T>) -> DBPacketResponse<T>
+    where T: Clone,
+    {
         return match read_pack {
             DBPacket::Read(p_info, p_location) => {
                 if let Some(db) = self.cache.get_mut(p_info) {
@@ -72,8 +76,7 @@ impl DBList {
                     DBPacketResponse::SuccessReply(
                         db.db_content
                             .read_from_db(p_location.as_key())
-                            .unwrap()
-                            .to_string(),
+                            .unwrap().clone(),
                     )
                 } else if self.list.contains(p_info) {
                     // cache was missed but the db exists on the file system
@@ -91,7 +94,7 @@ impl DBList {
                     db_file
                         .read_to_string(&mut db_content_string)
                         .expect("TODO: panic message");
-                    let db_content: DBContent =
+                    let db_content: DBContent<T> =
                         DBContent::read_ser_data(db_content_string).unwrap();
 
                     let return_value = db_content
@@ -118,7 +121,9 @@ impl DBList {
     }
 
     /// Writes to a db given a DBPacket
-    pub fn write_db(&mut self, write_pack: &DBPacket) -> DBPacketResponse<String> {
+    pub fn write_db(&mut self, write_pack: &DBPacket<T>) -> DBPacketResponse<T>
+    where T: Clone,
+    {
         return match write_pack {
             DBPacket::Write(db_info, db_location, db_data) => {
                 if let Some(db) = self.cache.get_mut(db_info) {
@@ -126,7 +131,7 @@ impl DBList {
                     db.last_access_time = SystemTime::now();
                     return match db.db_content.content.insert(
                         db_location.as_key().to_string(),
-                        db_data.get_data().to_string(),
+                        db_data.get_data().clone(),
                     ) {
                         None => {
                             // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
@@ -144,7 +149,7 @@ impl DBList {
                     db_file
                         .read_to_string(&mut db_content_string)
                         .expect("TODO: panic message");
-                    let db_content: DBContent =
+                    let db_content: DBContent<T> =
                         DBContent::read_ser_data(db_content_string).unwrap();
 
                     let mut db = DB {
@@ -153,7 +158,7 @@ impl DBList {
                     };
                     let returned_value = db.db_content.content.insert(
                         db_location.as_key().to_string(),
-                        db_data.get_data().to_string(),
+                        db_data.get_data().clone(),
                     );
                     self.cache.insert(db_info.clone(), db);
 

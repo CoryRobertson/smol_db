@@ -8,13 +8,16 @@ use std::net::TcpListener;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
+use serde::{Deserialize, Serialize};
+
+trait NewTrait<'a>: Serialize + Deserialize<'a> {}
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8222").unwrap();
 
     let mut thread_vec: Vec<JoinHandle<()>> = vec![];
 
-    let db_list = Arc::new(RwLock::new(DBList {
+    let db_list = Arc::new(RwLock::new(DBList::<Box<dyn NewTrait>> {
         list: vec![],
         cache: Default::default(),
     }));

@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
-pub enum DBPacket {
+pub enum DBPacket<T> {
     /// Read(db to operate on, key to read the db using)
     Read(DBPacketInfo, DBLocation),
     /// Write(db to operate on, key to write to the db using, data to write to the key location)
-    Write(DBPacketInfo, DBLocation, DBData),
+    Write(DBPacketInfo, DBLocation, DBData<T>),
     /// CreateDB(db to create)
     CreateDB(DBPacketInfo),
     /// DeleteDB(db to delete)
@@ -19,28 +19,30 @@ pub enum DBPacket {
     //TODO: ListContents of db packet type too maybe? returns the entire hashmap serialized?
 }
 
-impl DBPacket {
+impl<T> DBPacket<T>
+    where for<'a> T: Serialize + Deserialize<'a>,
+{
     /// Creates a new Read DBPacket from a name of a database and location string to read from.
-    pub fn new_read(dbname: &str, location: &str) -> DBPacket {
+    pub fn new_read(dbname: &str, location: &str) -> DBPacket<T> {
         DBPacket::Read(DBPacketInfo::new(dbname), DBLocation::new(location))
     }
 
     /// Creates a new Write DBPacket from a name of a database and location string to write to.
-    pub fn new_write(dbname: &str, location: &str, data: &str) -> DBPacket {
+    pub fn new_write(dbname: &str, location: &str, data: T) -> DBPacket<T> {
         DBPacket::Write(
             DBPacketInfo::new(dbname),
             DBLocation::new(location),
-            DBData::new(data.to_string()),
+            DBData::new(data),
         )
     }
 
     /// Creates a new CreateDB DBPacket from a name of a database.
-    pub fn new_create_db(dbname: &str) -> DBPacket {
+    pub fn new_create_db(dbname: &str) -> DBPacket<T> {
         DBPacket::CreateDB(DBPacketInfo::new(dbname))
     }
 
     /// Creates a new DeleteDB DBPacket from a name of a database.
-    pub fn new_delete_db(dbname: &str) -> DBPacket {
+    pub fn new_delete_db(dbname: &str) -> DBPacket<T> {
         DBPacket::DeleteDB(DBPacketInfo::new(dbname))
     }
 

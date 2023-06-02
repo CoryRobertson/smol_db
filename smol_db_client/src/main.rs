@@ -4,6 +4,8 @@ use smol_db_common::db_packets::db_packet::DBPacket;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
+#[cfg(debug_assertions)]
+use std::time::Instant;
 
 fn main() {
     let mut buf: [u8; 1024] = [0; 1024];
@@ -26,11 +28,17 @@ fn main() {
         // test a bunch of packet types just for testing.
         let pack = pack_res.unwrap();
         let pack_bytes = pack.as_bytes();
+        #[cfg(debug_assertions)]
+        let start = Instant::now();
         let _ = client.write(pack_bytes);
         let read_res = client.read(&mut buf);
+        #[cfg(debug_assertions)]
+        let end = Instant::now();
         match read_res {
             Ok(len) => {
                 println!("ok: {:?}", from_utf8(&buf[0..len]).unwrap_or_default());
+                #[cfg(debug_assertions)]
+                println!("rtt: {} micros",end.duration_since(start).as_micros());
             }
             Err(_) => {
                 println!("err: {:?}", from_utf8(&buf).unwrap_or_default());
