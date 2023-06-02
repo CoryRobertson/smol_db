@@ -88,13 +88,6 @@ impl DBList {
                     .expect("Unable to read db_list.ser to string");
                 let db_list: Self =
                     serde_json::from_str(&ser).expect("Unable to deserialize db_list.ser");
-                // for db_name in db_list.list.read().unwrap().iter() {
-                //     let mut db_file = File::open(db_name.get_db_name()).expect(&format!("Unable to find db: {} as a file.", db_name.get_db_name()));
-                //     let mut file_data = String::new();
-                //     db_file.read_to_string(&mut file_data).expect(&format!("Unable to read db: {} as a file.", db_name.get_db_name()));
-                //     let db: DB = serde_json::from_str(&file_data).expect(&format!("Unable to deserialize db: {} from file.", db_name.get_db_name()));
-                //     // db_list
-                // }
                 db_list
             }
             Err(_) => {
@@ -107,30 +100,44 @@ impl DBList {
         }
     }
 
+    fn db_name_exists(&self, db_name: &str) -> bool {
+        self.list
+            .read()
+            .unwrap()
+            .contains(&DBPacketInfo::new(db_name))
+    }
+
     /// Creates a DB given a name, the packet is not needed, only the name.
     pub fn create_db(&self, db_name: &str) -> DBPacketResponse<String> {
+        if self.db_name_exists(db_name) {
+            return DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists);
+        }
+
+        let mut list_write_lock = self.list.write().unwrap();
+
         return match File::open(db_name) {
             Ok(_) => {
                 // db file was found and should not have been, because this db already exists
 
-                DBPacketResponse::Error(DBPacketResponseError::DBFileSystemError)
+                DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists)
             }
             Err(_) => {
                 // db file was not found
                 match File::create(db_name) {
                     Ok(mut file) => {
+                        let mut cache_write_lock = self.cache.write().unwrap();
                         let db_packet_info = DBPacketInfo::new(db_name);
                         let db = DB {
                             db_content: DBContent::default(),
                             last_access_time: SystemTime::now(),
                         };
                         let ser = serde_json::to_string(&db.db_content).unwrap();
-                        let _ = file.write(ser.as_ref()).expect("TODO: panic message");
-                        self.cache
-                            .write()
-                            .unwrap()
+                        let _ = file
+                            .write(ser.as_ref())
+                            .expect(&format!("Unable to write db to file. {}", db_name));
+                        cache_write_lock
                             .insert(db_packet_info.clone(), Arc::from(RwLock::from(db)));
-                        self.list.write().unwrap().push(db_packet_info);
+                        list_write_lock.push(db_packet_info);
                         DBPacketResponse::SuccessNoData
                     }
                     Err(_) => {
@@ -145,11 +152,18 @@ impl DBList {
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
     pub fn delete_db(&self, db_name: &str) -> DBPacketResponse<String> {
+        if !self.db_name_exists(db_name) {
+            return DBPacketResponse::Error(DBPacketResponseError::DBNotFound);
+        }
+
+        let mut list_lock = self.list.write().unwrap();
+
+        let mut cache_lock = self.cache.write().unwrap();
+
         match fs::remove_file(db_name) {
             Ok(_) => {
                 let db_packet_info = DBPacketInfo::new(db_name);
-                self.cache.write().unwrap().remove(&db_packet_info);
-                let mut list_lock = self.list.write().unwrap();
+                cache_lock.remove(&db_packet_info);
                 let index_res = list_lock.binary_search(&db_packet_info);
                 if let Ok(index) = index_res {
                     list_lock.remove(index);
@@ -168,8 +182,6 @@ impl DBList {
     ) -> DBPacketResponse<String> {
         let list_lock = self.list.read().unwrap();
 
-        // let db_cache_option = { self.cache.read().unwrap().get(&p_info) };
-
         if let Some(db) = self.cache.read().unwrap().get(&p_info) {
             // cache was hit
             db.write().unwrap().last_access_time = SystemTime::now();
@@ -183,6 +195,7 @@ impl DBList {
                     .to_string(),
             );
         }
+
         if list_lock.contains(&p_info) {
             // cache was missed but the db exists on the file system
 
@@ -227,7 +240,10 @@ impl DBList {
         db_location: &DBLocation,
         db_data: DBData,
     ) -> DBPacketResponse<String> {
-        if let Some(db) = self.cache.read().unwrap().get(db_info) {
+        let list_lock = self.list.read().unwrap();
+        let cache_lock = self.cache.read().unwrap();
+
+        if let Some(db) = cache_lock.get(db_info) {
             // cache is hit, db is currently loaded
 
             let mut db_lock = db.write().unwrap();
@@ -248,8 +264,10 @@ impl DBList {
             };
         }
 
-        if self.list.read().unwrap().contains(db_info) {
+        if list_lock.contains(db_info) {
             // cache was missed, but the requested database did in fact exist
+            let mut cache_lock = self.cache.write().unwrap();
+
             let mut db_file = File::open(db_info.get_db_name()).unwrap();
             let mut db_content_string = String::new();
             db_file
@@ -265,10 +283,7 @@ impl DBList {
                 db_data.get_data().to_string(),
             );
 
-            self.cache
-                .write()
-                .unwrap()
-                .insert(db_info.clone(), Arc::from(RwLock::from(db)));
+            cache_lock.insert(db_info.clone(), Arc::from(RwLock::from(db)));
 
             match returned_value {
                 None => DBPacketResponse::SuccessNoData,

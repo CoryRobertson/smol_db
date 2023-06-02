@@ -22,4 +22,6 @@ pub enum DBPacketResponseError {
     DBFileSystemError,
     /// ValueNotFound represents when a given value in a database does not exist.
     ValueNotFound,
+    /// DBAlreadyExists represents when attempting to create a database fails because that database already exists either as a file or in the db list.
+    DBAlreadyExists,
 }

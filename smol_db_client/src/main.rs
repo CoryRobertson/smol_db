@@ -1,10 +1,11 @@
 #![allow(unused_variables, dead_code)] // TODO: remove this lints
 
 use smol_db_common::db_packets::db_packet::DBPacket;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use std::time::Instant;
 
 fn main() {
     let mut buf: [u8; 1024] = [0; 1024];
@@ -30,20 +31,24 @@ fn main() {
     // let pack_bytes = packet2.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
-
-    let pack_bytes = packet3.serialize_packet().unwrap();
-    let _ = client.write(pack_bytes.as_bytes());
-    let read_res = client.read(&mut buf);
-    match read_res {
-        Ok(len) => {
-            let pack_data = from_utf8(&buf[0..len]).unwrap_or_default();
-            println!("ok: {:?}", pack_data);
-            let response: DBPacketResponse<String> = serde_json::from_slice(&buf[0..len]).unwrap();
-            println!("{:?}", response);
+    for _ in 0..10 {
+        let pack_bytes = packet3.serialize_packet().unwrap();
+        let start = Instant::now();
+        let _ = client.write(pack_bytes.as_bytes());
+        let read_res = client.read(&mut buf);
+        let end = Instant::now();
+        match read_res {
+            Ok(len) => {
+                let pack_data = from_utf8(&buf[0..len]).unwrap_or_default();
+                println!("ok: {:?}", pack_data);
+                let response: DBPacketResponse<String> =
+                    serde_json::from_slice(&buf[0..len]).unwrap();
+                println!("{:?}", response);
+                println!("rtt: {}", end.duration_since(start).as_micros());
+            }
+            Err(_) => {}
         }
-        Err(_) => {}
     }
-
 
     // for pack_res in packs {
     //     // test a bunch of packet types just for testing.

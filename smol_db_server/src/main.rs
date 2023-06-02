@@ -113,6 +113,5 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
             println!("Client dropped. Unable to read socket data.");
             break;
         }
-
     }
 }
