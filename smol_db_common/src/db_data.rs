@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 /// A struct that contains the data that is to be put into a database.
 pub struct DBData {
     data: String,
-    // TODO: the data field should really be a generic that implements Serialize and Deserialize
 }
 
 impl DBData {
