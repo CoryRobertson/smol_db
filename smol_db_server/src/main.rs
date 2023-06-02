@@ -2,6 +2,7 @@ use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::str::from_utf8;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
@@ -51,15 +52,31 @@ fn main() {
 
 fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
     let mut buf: [u8; 1024] = [0; 1024];
+    let mut received: Vec<u8> = vec![];
     loop {
         // client loop
 
-        let read_result = stream.read(&mut buf);
+        let read_result = loop {
+            let bytes_read = stream.read(&mut buf);
+
+            match bytes_read {
+                Ok(read_count) => {
+                    received.extend_from_slice(&buf[..read_count]);
+                    println!("ada");
+                    if read_count <= 1024 {
+                        break Ok(received.len());
+                    }
+                }
+                Err(err) => {
+                    break Err(err);
+                }
+            }
+        };
 
         if let Ok(read) = read_result {
             if read != 0 {
                 println!("read size: {}", read); // this is a debug print
-                let response = match DBPacket::deserialize_packet(&buf[0..read]) {
+                let response = match DBPacket::deserialize_packet(&received[0..read]) {
                     Ok(pack) => {
                         println!("packet data: {:?}", pack); // this is also a debug print
                         match pack {
@@ -67,6 +84,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(db_name, db_location);
                                 println!("{:?}", resp);
+                                received.clear();
                                 resp
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
@@ -74,6 +92,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp = lock.write_db(&db_name, &db_location, db_write_value);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_specific_db(&db_name);
+                                received.clear();
                                 resp
                             }
                             DBPacket::CreateDB(db_name) => {
@@ -81,6 +100,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp = lock.create_db(db_name.get_db_name());
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
+                                received.clear();
                                 resp
                             }
                             DBPacket::DeleteDB(db_name) => {
@@ -88,26 +108,29 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp = lock.delete_db(db_name.get_db_name());
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
+                                received.clear();
                                 resp
                             }
                         }
+
                     }
                     Err(err) => {
+                        println!("{:?}", received);
                         println!("packet serialization error: {}", err);
                         continue;
                     }
                 };
 
                 let ser = serde_json::to_string(&response).unwrap();
-                // let rand_num: u32 = rand::thread_rng().gen_range(0..100);
-                // let reply_test = format!("test{}", rand_num);
-                // let reply_bytes = reply_test.as_bytes();
                 let write_result = stream.write(ser.as_bytes());
 
                 if write_result.is_err() {
                     println!("Client dropped. Unable to write socket data.");
                     break;
                 }
+            } else {
+                println!("Client dropped. Unable to read 0 bytes");
+                break;
             }
         } else {
             println!("Client dropped. Unable to read socket data.");

@@ -2,7 +2,7 @@
 
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
-use std::io::{Read, Write};
+use std::io::{Read, stdin, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
 use std::time::Instant;
