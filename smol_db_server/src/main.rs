@@ -2,6 +2,7 @@ use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::process::exit;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
@@ -15,9 +16,18 @@ fn main() {
 
     let db_list: DBListThreadSafe = Arc::new(RwLock::new(DBList::load_db_list()));
 
-    // TODO: remove databases from cache when time exceeds a number in the struct.
+    let db_list_clone_ctrl_c = Arc::clone(&db_list);
+    ctrlc::set_handler(move || {
+        println!("Received CTRL+C, gracefully shutting down program.");
+        let lock = db_list_clone_ctrl_c.read().unwrap();
+        lock.save_db_list();
+        lock.save_all_db();
+        println!("Saved all db files and db list.");
+        exit(0);
+    })
+    .unwrap();
 
-    // TODO: save databases on program shutdown.
+    // TODO: remove databases from cache when time exceeds a number in the struct.
 
     for income in listener.incoming() {
         for i in 0..thread_vec.len() {
@@ -108,6 +118,9 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                     println!("Client dropped. Unable to write socket data.");
                     break;
                 }
+            } else {
+                println!("Client dropped. Read 0 bytes from socket.");
+                break;
             }
         } else {
             println!("Client dropped. Unable to read socket data.");
