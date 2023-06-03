@@ -4,7 +4,7 @@ use crate::ClientError::{
     PacketDeserializationError, PacketSerializationError, SocketWriteError, UnableToConnect,
 };
 use smol_db_common::db_packets::db_packet::DBPacket;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use std::io::{Error, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
@@ -52,7 +52,15 @@ impl Client {
                                 match serde_json::from_slice::<DBPacketResponse<String>>(
                                     &buf[0..read_size],
                                 ) {
-                                    Ok(response) => Ok(response),
+                                    Ok(response) => {
+                                        match &response {
+                                            DBPacketResponse::SuccessNoData => { Ok(response)}
+                                            DBPacketResponse::SuccessReply(_) => { Ok(response)}
+                                            DBPacketResponse::Error(db_response_error) => {
+                                                Err(ClientError::DBResponseError(db_response_error.clone()))
+                                            }
+                                        }
+                                    },
                                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
                                 }
                             }
@@ -72,4 +80,5 @@ pub enum ClientError {
     PacketSerializationError(Error),
     SocketWriteError(Error),
     PacketDeserializationError(Error),
+    DBResponseError(DBPacketResponseError)
 }

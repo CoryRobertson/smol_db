@@ -11,7 +11,7 @@ pub enum DBPacketResponse<T> {
     Error(DBPacketResponseError),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 /// This enum represents the various types of errors that can occur when an error is returned in a db packet response
 pub enum DBPacketResponseError {
     /// BadPacket represents a packet that was improperly handled, these should be reported immediately and should never happen under proper circumstances.
