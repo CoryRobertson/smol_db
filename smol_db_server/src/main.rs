@@ -6,6 +6,7 @@ use std::process::exit;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -16,6 +17,7 @@ fn main() {
 
     let db_list: DBListThreadSafe = Arc::new(RwLock::new(DBList::load_db_list()));
 
+    // control-c handler for saving things before the server shuts down.
     let db_list_clone_ctrl_c = Arc::clone(&db_list);
     ctrlc::set_handler(move || {
         println!("Received CTRL+C, gracefully shutting down program.");
@@ -27,7 +29,30 @@ fn main() {
     })
     .unwrap();
 
-    // TODO: remove databases from cache when time exceeds a number in the struct.
+    // thread that continuously checks if caches need to be removed from cache when they get old.
+    let cache_invalidator_thread_db_list = Arc::clone(&db_list);
+    let cache_invalidator_thread = thread::spawn(move || loop {
+        let invalidated_caches = cache_invalidator_thread_db_list
+            .read()
+            .unwrap()
+            .invalidate_caches();
+
+        if invalidated_caches > 0 {
+            let number_of_caches_remaining = cache_invalidator_thread_db_list
+                .read()
+                .unwrap()
+                .cache
+                .read()
+                .unwrap()
+                .len() as u32;
+            println!(
+                "Invalidated caches: {}, {} caches remain in cache.",
+                invalidated_caches, number_of_caches_remaining
+            );
+        }
+
+        thread::sleep(Duration::from_secs(10));
+    });
 
     for income in listener.incoming() {
         for i in 0..thread_vec.len() {
@@ -57,6 +82,7 @@ fn main() {
     for handle in thread_vec {
         handle.join().unwrap();
     }
+    cache_invalidator_thread.join().unwrap();
 }
 
 fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
@@ -75,7 +101,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.read_db(db_name, db_location);
+                                let resp = lock.read_db(&db_name, &db_location);
                                 println!("{:?}", resp);
                                 resp
                             }
@@ -86,9 +112,9 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 db_list.read().unwrap().save_specific_db(&db_name);
                                 resp
                             }
-                            DBPacket::CreateDB(db_name) => {
+                            DBPacket::CreateDB(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.create_db(db_name.get_db_name());
+                                let resp = lock.create_db(db_name.get_db_name(), db_settings);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
                                 resp

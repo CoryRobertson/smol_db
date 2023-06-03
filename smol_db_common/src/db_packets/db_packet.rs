@@ -1,7 +1,9 @@
 use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
+use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
@@ -11,12 +13,14 @@ pub enum DBPacket {
     /// Write(db to operate on, key to write to the db using, data to write to the key location)
     Write(DBPacketInfo, DBLocation, DBData),
     /// CreateDB(db to create)
-    CreateDB(DBPacketInfo),
+    CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
     DeleteDB(DBPacketInfo),
     //TODO: ListDB packet type? probably has no information inside since it will need to be non-specific?
 
     //TODO: ListContents of db packet type too maybe? returns the entire hashmap serialized?
+
+    //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
 }
 
 impl DBPacket {
@@ -35,8 +39,11 @@ impl DBPacket {
     }
 
     /// Creates a new CreateDB DBPacket from a name of a database.
-    pub fn new_create_db(dbname: &str) -> DBPacket {
-        DBPacket::CreateDB(DBPacketInfo::new(dbname))
+    pub fn new_create_db(dbname: &str, invalidation_time: Duration) -> DBPacket {
+        DBPacket::CreateDB(
+            DBPacketInfo::new(dbname),
+            DBSettings::new(invalidation_time),
+        )
     }
 
     /// Creates a new DeleteDB DBPacket from a name of a database.

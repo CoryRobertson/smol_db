@@ -6,12 +6,13 @@ use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
+use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::sync::{Arc, RwLock};
+use std::sync::{RwLock};
 use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -21,10 +22,47 @@ pub struct DBList {
 
     /// Hashmap that takes a DBPacketInfo and returns the database corresponding to the name in the given packet.
     #[serde(skip)]
-    pub cache: RwLock<HashMap<DBPacketInfo, Arc<RwLock<DB>>>>,
+    pub cache: RwLock<HashMap<DBPacketInfo, RwLock<DB>>>,
 }
 
 impl DBList {
+
+    /// Removes all caches which last access time exceeds their invalidation time.
+    /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
+    /// Returns the number of caches removed.
+    pub fn invalidate_caches(&self) -> usize {
+        // prepare a list of invalid caches
+        let invalid_cache_names: Vec<DBPacketInfo> = {
+            let read_lock = self.cache.read().unwrap();
+            read_lock
+                .iter()
+                // filter to keep only caches that have a last access duration greater than their invalidation time.
+                .filter(|(_, db)| {
+                    let db_lock = db.read().unwrap();
+                    let last_access_time = db_lock.last_access_time;
+                    let invalidation_time = db_lock.db_settings.get_invalidation_time();
+
+                    match SystemTime::now().duration_since(last_access_time) {
+                        // invalidate them based on their duration since access and invalidation time
+                        Ok(duration_since_access) => duration_since_access >= invalidation_time,
+                        // if there is some sort of duration error, simply don't invalidate them
+                        Err(_) => false,
+                    }
+                })
+                .map(|(db_name, _)| db_name.clone()) // there has to be a way to get rid of this clone -_-
+                .collect()
+        };
+
+        if !invalid_cache_names.is_empty() {
+            // only write lock the cache if we have caches to remove.
+            let mut write_lock = self.cache.write().unwrap();
+            for invalid_cache_name in &invalid_cache_names {
+                write_lock.remove(invalid_cache_name);
+            }
+        }
+        invalid_cache_names.len()
+    }
+
     /// Saves all db instances to a file.
     pub fn save_all_db(&self) {
         let list = self.cache.read().unwrap();
@@ -45,6 +83,8 @@ impl DBList {
         }
     }
 
+    /// Saves a specific db by name to file.
+    /// Read locks the cache.
     pub fn save_specific_db(&self, db_name: &DBPacketInfo) {
         let list = self.cache.read().unwrap();
         match list.get(db_name) {
@@ -108,7 +148,7 @@ impl DBList {
     }
 
     /// Creates a DB given a name, the packet is not needed, only the name.
-    pub fn create_db(&self, db_name: &str) -> DBPacketResponse<String> {
+    pub fn create_db(&self, db_name: &str, db_settings: DBSettings) -> DBPacketResponse<String> {
         if self.db_name_exists(db_name) {
             return DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists);
         }
@@ -130,13 +170,14 @@ impl DBList {
                         let db = DB {
                             db_content: DBContent::default(),
                             last_access_time: SystemTime::now(),
+                            db_settings,
                         };
                         let ser = serde_json::to_string(&db.db_content).unwrap();
                         let _ = file
                             .write(ser.as_ref())
                             .expect(&format!("Unable to write db to file. {}", db_name));
                         cache_write_lock
-                            .insert(db_packet_info.clone(), Arc::from(RwLock::from(db)));
+                            .insert(db_packet_info.clone(), RwLock::from(db));
                         list_write_lock.push(db_packet_info);
                         DBPacketResponse::SuccessNoData
                     }
@@ -177,26 +218,30 @@ impl DBList {
     /// Reads a database given a packet, returns the value if it was found.
     pub fn read_db(
         &self,
-        p_info: DBPacketInfo,
-        p_location: DBLocation,
+        p_info: &DBPacketInfo,
+        p_location: &DBLocation,
     ) -> DBPacketResponse<String> {
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(&p_info) {
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
             db.write().unwrap().last_access_time = SystemTime::now();
 
-            return DBPacketResponse::SuccessReply(
-                db.read()
-                    .unwrap()
-                    .db_content
-                    .read_from_db(p_location.as_key())
-                    .unwrap()
-                    .to_string(),
-            );
+            let db_lock = db.read().unwrap();
+
+            let db_read = db_lock.db_content.read_from_db(p_location.as_key());
+
+            return match db_read {
+                None => {
+                    DBPacketResponse::Error(DBPacketResponseError::ValueNotFound)
+                }
+                Some(value) => {
+                    DBPacketResponse::SuccessReply(value.to_string())
+                }
+            };
         }
 
-        if list_lock.contains(&p_info) {
+        if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
             let mut db_file = match File::open(p_info.get_db_name()) {
@@ -224,7 +269,7 @@ impl DBList {
             self.cache
                 .write()
                 .unwrap()
-                .insert(p_info, Arc::from(RwLock::from(db)));
+                .insert(p_info.clone(), RwLock::from(db));
 
             DBPacketResponse::SuccessReply(return_value)
         } else {
@@ -241,31 +286,35 @@ impl DBList {
         db_data: DBData,
     ) -> DBPacketResponse<String> {
         let list_lock = self.list.read().unwrap();
-        let cache_lock = self.cache.read().unwrap();
 
-        if let Some(db) = cache_lock.get(db_info) {
-            // cache is hit, db is currently loaded
+        { // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
+            let cache_lock = self.cache.read().unwrap();
 
-            let mut db_lock = db.write().unwrap();
+            if let Some(db) = cache_lock.get(db_info) {
+                // cache is hit, db is currently loaded
 
-            db_lock.last_access_time = SystemTime::now();
-            return match db_lock.db_content.content.insert(
-                db_location.as_key().to_string(),
-                db_data.get_data().to_string(),
-            ) {
-                None => {
-                    // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
-                    DBPacketResponse::SuccessNoData
-                }
-                Some(updated_value) => {
-                    // if the db insertion had a previous value, return it.
-                    DBPacketResponse::SuccessReply(updated_value)
-                }
-            };
+                let mut db_lock = db.write().unwrap();
+
+                db_lock.last_access_time = SystemTime::now();
+                return match db_lock.db_content.content.insert(
+                    db_location.as_key().to_string(),
+                    db_data.get_data().to_string(),
+                ) {
+                    None => {
+                        // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
+                        DBPacketResponse::SuccessNoData
+                    }
+                    Some(updated_value) => {
+                        // if the db insertion had a previous value, return it.
+                        DBPacketResponse::SuccessReply(updated_value)
+                    }
+                };
+            }
         }
 
         if list_lock.contains(db_info) {
             // cache was missed, but the requested database did in fact exist
+
             let mut cache_lock = self.cache.write().unwrap();
 
             let mut db_file = File::open(db_info.get_db_name()).unwrap();
@@ -283,7 +332,7 @@ impl DBList {
                 db_data.get_data().to_string(),
             );
 
-            cache_lock.insert(db_info.clone(), Arc::from(RwLock::from(db)));
+            cache_lock.insert(db_info.clone(), RwLock::from(db));
 
             match returned_value {
                 None => DBPacketResponse::SuccessNoData,

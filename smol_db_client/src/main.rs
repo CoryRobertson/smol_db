@@ -5,12 +5,12 @@ use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 fn main() {
     let mut buf: [u8; 1024] = [0; 1024];
 
-    let packet1 = DBPacket::new_create_db("test1");
+    let packet1 = DBPacket::new_create_db("test1", Duration::from_secs(30));
     let packet2 = DBPacket::new_write("test1", "location1", "data12");
     let packet3 = DBPacket::new_read("test1", "location1");
     let packet4 = DBPacket::new_delete_db("test1");
@@ -27,10 +27,15 @@ fn main() {
     // let pack_bytes = packet1.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
-
+    //
     // let pack_bytes = packet2.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
+    //
+    // let pack_bytes = packet3.serialize_packet().unwrap();
+    // let _ = client.write(pack_bytes.as_bytes());
+    // let read_res = client.read(&mut buf);
+
     for _ in 0..10 {
         let pack_bytes = packet3.serialize_packet().unwrap();
         let start = Instant::now();

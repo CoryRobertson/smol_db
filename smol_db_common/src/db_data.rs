@@ -10,7 +10,6 @@ pub struct DBData {
 impl DBData {
     /// Function to create a new DBData struct for a DBPacket::Write packet.
     pub fn new(data: String) -> Self {
-        // TODO: eventually revise this with some amount of error checking
         Self { data }
     }
 
