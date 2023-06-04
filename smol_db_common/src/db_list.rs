@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::sync::{RwLock};
+use std::sync::RwLock;
 use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,7 +26,6 @@ pub struct DBList {
 }
 
 impl DBList {
-
     /// Removes all caches which last access time exceeds their invalidation time.
     /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
     /// Returns the number of caches removed.
@@ -176,8 +175,7 @@ impl DBList {
                         let _ = file
                             .write(ser.as_ref())
                             .expect(&format!("Unable to write db to file. {}", db_name));
-                        cache_write_lock
-                            .insert(db_packet_info.clone(), RwLock::from(db));
+                        cache_write_lock.insert(db_packet_info.clone(), RwLock::from(db));
                         list_write_lock.push(db_packet_info);
                         DBPacketResponse::SuccessNoData
                     }
@@ -232,12 +230,8 @@ impl DBList {
             let db_read = db_lock.db_content.read_from_db(p_location.as_key());
 
             return match db_read {
-                None => {
-                    DBPacketResponse::Error(DBPacketResponseError::ValueNotFound)
-                }
-                Some(value) => {
-                    DBPacketResponse::SuccessReply(value.to_string())
-                }
+                None => DBPacketResponse::Error(DBPacketResponseError::ValueNotFound),
+                Some(value) => DBPacketResponse::SuccessReply(value.to_string()),
             };
         }
 
@@ -287,7 +281,8 @@ impl DBList {
     ) -> DBPacketResponse<String> {
         let list_lock = self.list.read().unwrap();
 
-        { // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
+        {
+            // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
             let cache_lock = self.cache.read().unwrap();
 
             if let Some(db) = cache_lock.get(db_info) {
