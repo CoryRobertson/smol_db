@@ -7,14 +7,6 @@ use std::io::{Error, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
-//TODO: write a smol_db_client struct that facilitates all actions, as abstract as possible. It should be created using a factory function that takes in the desired ip address.
-//  The struct should contain a tcp socket, the previously input ip address. These should all be non-public, and everything relating to these objects should be fully wrapped.
-//  It should maintain the connection, and allow for abstract functions like:
-//  create_db()
-//  delete_db()
-//  write_db()
-//  read_db()
-
 pub struct Client {
     socket: TcpStream,
 }
@@ -30,11 +22,7 @@ impl Client {
     }
 
     /// Creates a db through the client with the given name.
-    pub fn create_db(
-        &mut self,
-        db_name: &str,
-        invalidation_time: Duration,
-    ) -> Result<DBPacketResponse<String>, ClientError> {
+    pub fn create_db(&mut self, db_name: &str, invalidation_time: Duration, ) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_create_db(db_name, invalidation_time);
         return match packet1.serialize_packet() {
@@ -70,6 +58,8 @@ impl Client {
         };
     }
 
+    /// Writes to a db at the location specified, with the data given as a string.
+    /// Returns the data in the location that was over written if there was any.
     pub fn write_db(&mut self, db_name: &str, db_location: &str, data: &str) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8 ; 1024] = [0; 1024];
         let packet = DBPacket::new_write(db_name,db_location,data);
@@ -102,9 +92,10 @@ impl Client {
                 Err(PacketSerializationError(Error::from(err)))
             }
         }
-
     }
 
+    /// Reads from a db at the location specific.
+    /// Returns an error if there is no data in the location.
     pub fn read_db(&mut self, db_name: &str, db_location: &str) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8 ; 1024] = [0; 1024];
         let packet = DBPacket::new_read(db_name,db_location);
@@ -139,6 +130,7 @@ impl Client {
         }
     }
 
+    /// Deletes the given db by name.
     pub fn delete_db(&mut self, db_name: &str) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8 ; 1024] = [0; 1024];
         let packet = DBPacket::new_delete_db(db_name);
@@ -172,6 +164,8 @@ impl Client {
             }
         }
     }
+
+    // TODO: use generic serialization to write anything to db, and read anything from db?
 }
 
 #[derive(Debug)]
