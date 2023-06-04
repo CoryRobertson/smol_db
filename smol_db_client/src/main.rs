@@ -27,11 +27,11 @@ fn main() {
     // let pack_bytes = packet1.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
-    //
+
     // let pack_bytes = packet2.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
-    //
+
     // let pack_bytes = packet3.serialize_packet().unwrap();
     // let _ = client.write(pack_bytes.as_bytes());
     // let read_res = client.read(&mut buf);
