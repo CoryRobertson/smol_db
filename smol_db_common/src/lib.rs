@@ -7,6 +7,7 @@ pub mod db_list;
 pub mod db_packets;
 
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use std::fs;
     use std::path::Path;
@@ -14,6 +15,7 @@ mod tests {
     use crate::db_data::DBData;
     use crate::db_list::DBList;
     use crate::db_packets::db_location::DBLocation;
+    use crate::db_packets::db_packet::DBPacket;
     use crate::db_packets::db_packet_info::DBPacketInfo;
     use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
     use crate::db_packets::db_settings::DBSettings;
@@ -144,4 +146,6 @@ mod tests {
         fs::remove_file(db_path).unwrap(); // clean up tests
         fs::remove_file("db_list.ser").unwrap(); // clean up tests
     }
+
+
 }

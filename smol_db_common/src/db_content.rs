@@ -10,8 +10,8 @@ pub struct DBContent {
 
 impl DBContent {
     /// Reads serialized version of a DBContent struct from a string (read from a file most likely) into a DBContent struct itself.
-    pub fn read_ser_data(data: String) -> serde_json::Result<Self> {
-        serde_json::from_str(&data)
+    pub fn read_ser_data(data: String) -> Result<Self, rmp_serde::decode::Error> {
+        rmp_serde::from_slice(data.as_bytes())
     }
 
     /// Reads from the db using the key, returning an optional of either the retrieved content, or nothing.

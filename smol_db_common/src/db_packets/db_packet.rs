@@ -4,6 +4,7 @@ use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use rmp_serde::encode::Error;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
@@ -51,12 +52,12 @@ impl DBPacket {
         DBPacket::DeleteDB(DBPacketInfo::new(dbname))
     }
 
-    /// Serializes a DBPacket into a string to be sent over the internet.
-    pub fn serialize_packet(&self) -> serde_json::Result<String> {
-        serde_json::to_string(&self)
+    /// Serializes a DBPacket into a vector to be sent over the internet.
+    pub fn serialize_packet(&self) -> Result<Vec<u8>, Error> {
+        rmp_serde::to_vec(&self)
     }
 
-    pub fn deserialize_packet(buf: &[u8]) -> serde_json::Result<Self> {
-        serde_json::from_slice(buf)
+    pub fn deserialize_packet(buf: &[u8]) -> Result<Self, rmp_serde::decode::Error> {
+        rmp_serde::from_slice(buf)
     }
 }

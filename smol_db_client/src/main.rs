@@ -25,21 +25,21 @@ fn main() {
     let mut client = TcpStream::connect("localhost:8222").unwrap();
 
     // let pack_bytes = packet1.serialize_packet().unwrap();
-    // let _ = client.write(pack_bytes.as_bytes());
+    // let _ = client.write(&pack_bytes);
     // let read_res = client.read(&mut buf);
     //
     // let pack_bytes = packet2.serialize_packet().unwrap();
-    // let _ = client.write(pack_bytes.as_bytes());
+    // let _ = client.write(&pack_bytes);
     // let read_res = client.read(&mut buf);
     //
     // let pack_bytes = packet3.serialize_packet().unwrap();
-    // let _ = client.write(pack_bytes.as_bytes());
+    // let _ = client.write(&pack_bytes);
     // let read_res = client.read(&mut buf);
 
     for _ in 0..10 {
         let pack_bytes = packet3.serialize_packet().unwrap();
         let start = Instant::now();
-        let _ = client.write(pack_bytes.as_bytes());
+        let _ = client.write(&pack_bytes);
         let read_res = client.read(&mut buf);
         let end = Instant::now();
         match read_res {
@@ -47,9 +47,10 @@ fn main() {
                 let pack_data = from_utf8(&buf[0..len]).unwrap_or_default();
                 println!("ok: {:?}", pack_data);
                 let response: DBPacketResponse<String> =
-                    serde_json::from_slice(&buf[0..len]).unwrap();
+                DBPacketResponse::deserialize_packet(&buf[0..len]).unwrap();
                 println!("{:?}", response);
                 println!("rtt: {}", end.duration_since(start).as_micros());
+                println!("read size: {}", len);
             }
             Err(_) => {}
         }

@@ -43,42 +43,49 @@ impl Client {
 
         return match packet1.serialize_packet() {
             Ok(pack_bytes) => {
-                let write_result = self.socket.write(pack_bytes.as_bytes());
+                let write_result = self.socket.write(&pack_bytes);
                 match write_result {
                     Ok(_) => {
                         let read_result = self.socket.read(&mut buf);
                         match read_result {
                             Ok(read_size) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(
-                                    &buf[0..read_size],
-                                ) {
+                                match DBPacketResponse::deserialize_packet(&buf[0..read_size]) {
                                     Ok(response) => {
                                         match &response {
+
                                             DBPacketResponse::SuccessNoData => { Ok(response)}
+
                                             DBPacketResponse::SuccessReply(_) => { Ok(response)}
+
                                             DBPacketResponse::Error(db_response_error) => {
                                                 Err(ClientError::DBResponseError(db_response_error.clone()))
                                             }
                                         }
                                     },
-                                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
+                                    Err(err) => Err(PacketDeserializationError(err)),
                                 }
                             }
-                            Err(err) => Err(SocketWriteError(Error::from(err))),
+                            Err(err) => Err(SocketWriteError(err)),
                         }
                     }
-                    Err(err) => Err(SocketWriteError(Error::from(err))),
+                    Err(err) => Err(SocketWriteError(err)),
                 }
             }
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
+            Err(err) => Err(PacketSerializationError(err)),
         };
     }
 }
 
+
 pub enum ClientError {
     UnableToConnect(Error),
-    PacketSerializationError(Error),
+    PacketSerializationError(rmp_serde::encode::Error),
     SocketWriteError(Error),
-    PacketDeserializationError(Error),
+    PacketDeserializationError(rmp_serde::decode::Error),
     DBResponseError(DBPacketResponseError)
+}
+
+#[cfg(test)]
+mod tests {
+
 }

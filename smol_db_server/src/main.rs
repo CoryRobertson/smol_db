@@ -136,11 +136,11 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                     }
                 };
 
-                let ser = serde_json::to_string(&response).unwrap();
+                let ser = response.serialize_packet().unwrap();
                 // let rand_num: u32 = rand::thread_rng().gen_range(0..100);
                 // let reply_test = format!("test{}", rand_num);
                 // let reply_bytes = reply_test.as_bytes();
-                let write_result = stream.write(ser.as_bytes());
+                let write_result = stream.write(&ser);
 
                 if write_result.is_err() {
                     println!("Client dropped. Unable to write socket data.");

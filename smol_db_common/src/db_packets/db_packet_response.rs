@@ -1,3 +1,4 @@
+use rmp_serde::encode::Error;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -9,6 +10,15 @@ pub enum DBPacketResponse<T> {
     SuccessReply(T),
     /// Error represents any issue when interacting with a database in general, it contains a further description of the error inside.
     Error(DBPacketResponseError),
+}
+
+impl<'a, String: Serialize + Deserialize<'a>> DBPacketResponse<String> {
+    pub fn serialize_packet(&self) -> Result<Vec<u8>, Error> {
+        rmp_serde::to_vec(self)
+    }
+    pub fn deserialize_packet(data: &'a [u8]) -> Result<Self, rmp_serde::decode::Error> {
+        rmp_serde::from_slice(data)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]

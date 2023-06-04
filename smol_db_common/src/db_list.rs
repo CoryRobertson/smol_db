@@ -72,11 +72,11 @@ impl DBList {
                 db_name.get_db_name()
             ));
             let db_lock = db.read().unwrap();
-            let ser = serde_json::to_string(&db_lock.clone()).expect(&format!(
+            let ser = db_lock.serialize_db().expect(&format!(
                 "Unable to serialize db file: {}",
                 db_name.get_db_name()
             ));
-            let _ = db_file.write(ser.as_bytes()).expect(&format!(
+            let _ = db_file.write(&ser).expect(&format!(
                 "Unable to write to db file: {}",
                 db_name.get_db_name()
             ));
@@ -94,8 +94,8 @@ impl DBList {
                     db_name.get_db_name()
                 ));
                 let db_clone = db_lock.read().unwrap().clone();
-                let ser = serde_json::to_string(&db_clone).unwrap();
-                let _ = db_file.write(ser.as_bytes()).expect(&format!(
+                let ser = db_clone.serialize_db().unwrap();
+                let _ = db_file.write(&ser).expect(&format!(
                     "Unable to write to db file: {}",
                     db_name.get_db_name()
                 ));
@@ -112,9 +112,9 @@ impl DBList {
     /// Saves all db names to a file.
     pub fn save_db_list(&self) {
         let mut db_list_file = File::create("db_list.ser").expect("Unable to save db_list.ser");
-        let ser_data = serde_json::to_string(&self).expect("Unable to serialize self.");
+        let ser_data = rmp_serde::to_vec(self).expect("Unable to serialize self.");
         let _ = db_list_file
-            .write(ser_data.as_bytes())
+            .write(&ser_data)
             .expect("Unable to write bytes to db_list.ser");
     }
 
@@ -123,11 +123,11 @@ impl DBList {
         match File::open("db_list.ser") {
             Ok(mut f) => {
                 // file found, load from file data
-                let mut ser = String::new();
-                f.read_to_string(&mut ser)
+                let mut ser = vec![];
+                f.read_to_end(&mut ser)
                     .expect("Unable to read db_list.ser to string");
                 let db_list: Self =
-                    serde_json::from_str(&ser).expect("Unable to deserialize db_list.ser");
+                    rmp_serde::from_slice(&ser).expect("Unable to deserialize db_list.ser");
                 db_list
             }
             Err(_) => {
@@ -172,9 +172,9 @@ impl DBList {
                             last_access_time: SystemTime::now(),
                             db_settings,
                         };
-                        let ser = serde_json::to_string(&db.db_content).unwrap();
+                        let ser = rmp_serde::to_vec(&db.db_content).unwrap();
                         let _ = file
-                            .write(ser.as_ref())
+                            .write(&ser)
                             .expect(&format!("Unable to write db to file. {}", db_name));
                         cache_write_lock
                             .insert(db_packet_info.clone(), RwLock::from(db));
@@ -252,11 +252,11 @@ impl DBList {
                 }
             };
 
-            let mut db_content_string = String::new();
+            let mut db_content_string = vec![];
             db_file
-                .read_to_string(&mut db_content_string)
+                .read_to_end(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = rmp_serde::from_slice(db_content_string.as_ref()).unwrap();
 
             db.last_access_time = SystemTime::now();
 
@@ -318,12 +318,12 @@ impl DBList {
             let mut cache_lock = self.cache.write().unwrap();
 
             let mut db_file = File::open(db_info.get_db_name()).unwrap();
-            let mut db_content_string = String::new();
+            let mut db_content_string = vec![];
             db_file
-                .read_to_string(&mut db_content_string)
+                .read_to_end(&mut db_content_string)
                 .expect("TODO: panic message");
 
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = rmp_serde::from_slice(db_content_string.as_ref()).unwrap();
 
             db.last_access_time = SystemTime::now();
 
