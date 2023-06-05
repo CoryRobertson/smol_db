@@ -21,6 +21,8 @@ pub enum DBPacket {
     //TODO: ListContents of db packet type too maybe? returns the entire hashmap serialized?
 
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
+
+    //TODO: set access key sets the users access key, a hash of their password that is hashed from the client and sent to the server.
 }
 
 impl DBPacket {

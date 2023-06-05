@@ -87,6 +87,7 @@ fn main() {
 
 fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
     let mut buf: [u8; 1024] = [0; 1024];
+    //TODO: store the users access key here, it should be empty quotes when no key is sent.
     loop {
         // client loop
 
@@ -98,6 +99,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
                     Ok(pack) => {
                         println!("packet data: {:?}", pack); // this is also a debug print
+                        // TODO: restrict the types of packets allowed depending on the access key. CreateDB and DeleteDB should be restricted to admins
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();

@@ -23,9 +23,14 @@ pub struct DBList {
     /// Hashmap that takes a DBPacketInfo and returns the database corresponding to the name in the given packet.
     #[serde(skip)]
     pub cache: RwLock<HashMap<DBPacketInfo, RwLock<DB>>>,
+
+    // TODO: a rwlock vec here contains the list of super admin access key hashes.
 }
 
 impl DBList {
+
+    // TODO: packet handler functions createdb, deletedb, readdb, writedb, should all begin taking in an access key hash in their function inputs.
+
     /// Removes all caches which last access time exceeds their invalidation time.
     /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
     /// Returns the number of caches removed.

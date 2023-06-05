@@ -4,3 +4,6 @@ members = [
     "smol_db_server",
     "smol_db_client",
 ]
+
+# TODO: make a dockerfile for the server that exposes the databases to a volume.
+# TODO: add another project to this repo called smol_db_client_gui that is an egui tool that lets the user look through the smol_db that is given as an address
