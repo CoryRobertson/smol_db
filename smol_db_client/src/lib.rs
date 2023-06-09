@@ -149,6 +149,7 @@ impl Client {
         };
     }
 
+    /// Lists all the current databases available by name from the server
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db();
@@ -191,6 +192,7 @@ impl Client {
         };
     }
 
+    /// Get the hashmap of the contents of a database. Contents are always String:String for the hashmap.
     pub fn list_db_contents(&mut self, db_name: &str) -> Result<HashMap<String, String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db_contents(db_name);
@@ -300,13 +302,14 @@ pub enum ClientError {
     PacketDeserializationError(Error),
     /// Client was successful in contacting the database, but the database returned an error, check the given error inside.
     DBResponseError(DBPacketResponseError),
-
+    /// Client received the incorrect packet from a response, this should not happen.
     BadPacket,
 }
 
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
+    use std::thread;
     use crate::{Client, ClientError};
     use serde::{Deserialize, Serialize};
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
@@ -523,6 +526,98 @@ mod tests {
                 panic!("Unable to delete db 2");
             }
         }
+
+    }
+
+    #[test]
+    fn test_empty_db_list() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        loop {
+            // continue looping indefinitely until we manage to read an empty list db, verifying that serialization works even when the list would be empty.
+            let list = client.list_db().unwrap();
+            let len = list.len();
+            thread::sleep(Duration::from_millis(1)); // wait a small amount of time between lists so we dont dominate the thread pool on the server.
+            if len == 0 {
+                // if we find a 0 length return, then we have clearly not panicked and can stop looping, allowing the test to be successful
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn test_list_db_contents() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_name = "test_db_contents1";
+
+        let create_db_response1 = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+
+        match create_db_response1 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+            _ => {}
+        }
+
+        let write_response1 = client.write_db(db_name,"location1", "123").unwrap();
+        match write_response1 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+            _ => {}
+        }
+
+        let write_response2 = client.write_db(db_name,"location2", "456").unwrap();
+        match write_response2 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+            _ => {}
+        }
+
+        let list_db_contents_response = client.list_db_contents(db_name).unwrap();
+
+        assert_eq!(list_db_contents_response.get("location1").unwrap(),"123");
+        assert_eq!(list_db_contents_response.get("location2").unwrap(),"456");
+
+        let delete_db_response = client.delete_db(db_name).unwrap();
+
+        match delete_db_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Unable to delete db");
+            }
+        }
+
+
+    }
+
+    #[test]
+    fn test_list_db_contents_empty() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_name = "test_db_contents_empty1";
+
+        let create_db_response1 = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+
+        match create_db_response1 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+            _ => {}
+        }
+
+        let contents = client.list_db_contents(db_name).unwrap();
+
+        assert_eq!(contents.is_empty(), true); // contents should be empty as no write operations occurred.
+
+        let delete_db_response = client.delete_db(db_name).unwrap();
+
+        match delete_db_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Unable to delete db");
+            }
+        }
+
 
     }
 }
