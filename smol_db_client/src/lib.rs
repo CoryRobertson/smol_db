@@ -7,11 +7,14 @@ use crate::ClientError::{
 use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
+use smol_db_common::db_packets::db_packet_response::{DBPacketResponse};
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::Duration;
+use crate::client_error::ClientError;
+
+pub mod client_error;
 
 /// Client struct used for communicating to the database.
 pub struct Client {
@@ -278,25 +281,6 @@ impl Client {
             Err(err) => Err(err),
         }
     }
-}
-
-#[derive(Debug)]
-/// Enum that represents the possible outcomes of using the client
-pub enum ClientError {
-    /// Client was not able to connect to the database.
-    UnableToConnect(Error),
-    /// Client was unable to serialize the given data to be sent to the database.
-    PacketSerializationError(Error),
-    /// Client was unable to write to the socket, connection might be faulty.
-    SocketWriteError(Error),
-    /// Client was unable to read from the socket, connection might be faulty.
-    SocketReadError(Error),
-    /// Client was unable to deserialize the data from the server, the server might have stored a different type of data at the given location than was expected.
-    PacketDeserializationError(Error),
-    /// Client was successful in contacting the database, but the database returned an error, check the given error inside.
-    DBResponseError(DBPacketResponseError),
-    /// Client received the incorrect packet from a response, this should not happen.
-    BadPacket,
 }
 
 #[cfg(test)]
