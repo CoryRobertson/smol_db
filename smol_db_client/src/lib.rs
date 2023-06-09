@@ -1,14 +1,17 @@
 //! Library contain the structs that manage the client to connect to smol_db
 
-use std::collections::HashMap;
-use crate::ClientError::{BadPacket, PacketDeserializationError, PacketSerializationError, SocketReadError, SocketWriteError, UnableToConnect};
+use crate::ClientError::{
+    BadPacket, PacketDeserializationError, PacketSerializationError, SocketReadError,
+    SocketWriteError, UnableToConnect,
+};
 use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
+use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
 use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
+use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::Duration;
-use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
 
 /// Client struct used for communicating to the database.
 pub struct Client {
@@ -155,80 +158,73 @@ impl Client {
         let packet = DBPacket::new_list_db();
 
         return match packet.serialize_packet() {
-            Ok(ser) => {
-                match self.socket.write(ser.as_bytes()) {
-                    Ok(_) => {
-                        match self.socket.read(&mut buf) {
-                            Ok(read_len) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len]) {
-                                    Ok(response) => {
-                                        match response {
-                                            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
-                                            DBPacketResponse::SuccessReply(data) => {
-                                                match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
-                                                    Ok(thing) => { Ok(thing) }
-                                                    Err(err) => { Err(PacketDeserializationError(Error::from(err))) }
-                                                }
-                                            }
-                                            DBPacketResponse::Error(err) => { Err(ClientError::DBResponseError(err)) }
+            Ok(ser) => match self.socket.write(ser.as_bytes()) {
+                Ok(_) => match self.socket.read(&mut buf) {
+                    Ok(read_len) => {
+                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
+                        {
+                            Ok(response) => match response {
+                                DBPacketResponse::SuccessNoData => Err(BadPacket),
+                                DBPacketResponse::SuccessReply(data) => {
+                                    match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
+                                        Ok(thing) => Ok(thing),
+                                        Err(err) => {
+                                            Err(PacketDeserializationError(Error::from(err)))
                                         }
-                                    },
-                                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
+                                    }
                                 }
-                            }
-                            Err(err) => {
-                                Err(SocketReadError(err))
-                            }
+                                DBPacketResponse::Error(err) => {
+                                    Err(ClientError::DBResponseError(err))
+                                }
+                            },
+                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
-                    Err(err) => {
-                        Err(SocketWriteError(err))
-                    }
-                }
-            }
-            Err(err) => {
-                Err(PacketSerializationError(Error::from(err)))
-            }
+                    Err(err) => Err(SocketReadError(err)),
+                },
+                Err(err) => Err(SocketWriteError(err)),
+            },
+            Err(err) => Err(PacketSerializationError(Error::from(err))),
         };
     }
 
     /// Get the hashmap of the contents of a database. Contents are always String:String for the hashmap.
-    pub fn list_db_contents(&mut self, db_name: &str) -> Result<HashMap<String, String>, ClientError> {
+    pub fn list_db_contents(
+        &mut self,
+        db_name: &str,
+    ) -> Result<HashMap<String, String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db_contents(db_name);
 
         return match packet.serialize_packet() {
-            Ok(ser) => {
-                match self.socket.write(ser.as_bytes()) {
-                    Ok(_) => {
-                        match self.socket.read(&mut buf) {
-                            Ok(read_len) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len]) {
-                                    Ok(resp) => {
-                                        match resp {
-                                            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
-                                            DBPacketResponse::SuccessReply(data) => {
-                                                match serde_json::from_str::<HashMap<String, String>>(&data) {
-                                                    Ok(thing) => { Ok(thing) }
-                                                    Err(err) => { Err(PacketDeserializationError(Error::from(err))) }
-                                                }
-                                            }
-                                            DBPacketResponse::Error(err) => { Err(ClientError::DBResponseError(err)) }
+            Ok(ser) => match self.socket.write(ser.as_bytes()) {
+                Ok(_) => match self.socket.read(&mut buf) {
+                    Ok(read_len) => {
+                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
+                        {
+                            Ok(resp) => match resp {
+                                DBPacketResponse::SuccessNoData => Err(BadPacket),
+                                DBPacketResponse::SuccessReply(data) => {
+                                    match serde_json::from_str::<HashMap<String, String>>(&data) {
+                                        Ok(thing) => Ok(thing),
+                                        Err(err) => {
+                                            Err(PacketDeserializationError(Error::from(err)))
                                         }
                                     }
-                                    Err(err) => {
-                                        Err(PacketDeserializationError(Error::from(err)))
-                                    }
                                 }
-                            }
-                            Err(err) => { Err(SocketReadError(err)) }
+                                DBPacketResponse::Error(err) => {
+                                    Err(ClientError::DBResponseError(err))
+                                }
+                            },
+                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
-                    Err(err) => { Err(SocketWriteError(err)) }
-                }
-            }
-            Err(err) => {Err(PacketSerializationError(Error::from(err)))}
-        }
+                    Err(err) => Err(SocketReadError(err)),
+                },
+                Err(err) => Err(SocketWriteError(err)),
+            },
+            Err(err) => Err(PacketSerializationError(Error::from(err))),
+        };
     }
 
     /// Writes to the db while serializing the given data, returning the data at the location given and deserialized to the same type.
@@ -282,9 +278,6 @@ impl Client {
             Err(err) => Err(err),
         }
     }
-
-
-
 }
 
 #[derive(Debug)]
@@ -309,12 +302,12 @@ pub enum ClientError {
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
-    use std::thread;
     use crate::{Client, ClientError};
     use serde::{Deserialize, Serialize};
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
-    use std::time::Duration;
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_client() {
@@ -477,14 +470,15 @@ mod tests {
                 panic!("Unable to delete db");
             }
         }
-
     }
 
     #[test]
     fn test_list_db() {
         let mut client = Client::new("localhost:8222").unwrap();
 
-        let create_db_response1 = client.create_db("test_db_1",Duration::from_secs(30)).unwrap();
+        let create_db_response1 = client
+            .create_db("test_db_1", Duration::from_secs(30))
+            .unwrap();
 
         match create_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -493,7 +487,9 @@ mod tests {
             _ => {}
         }
 
-        let create_db_response2 = client.create_db("test_db_2",Duration::from_secs(30)).unwrap();
+        let create_db_response2 = client
+            .create_db("test_db_2", Duration::from_secs(30))
+            .unwrap();
 
         match create_db_response2 {
             DBPacketResponse::Error(err) => {
@@ -526,7 +522,6 @@ mod tests {
                 panic!("Unable to delete db 2");
             }
         }
-
     }
 
     #[test]
@@ -549,7 +544,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
         let db_name = "test_db_contents1";
 
-        let create_db_response1 = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+        let create_db_response1 = client.create_db(db_name, Duration::from_secs(30)).unwrap();
 
         match create_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -558,7 +553,7 @@ mod tests {
             _ => {}
         }
 
-        let write_response1 = client.write_db(db_name,"location1", "123").unwrap();
+        let write_response1 = client.write_db(db_name, "location1", "123").unwrap();
         match write_response1 {
             DBPacketResponse::Error(err) => {
                 panic!("{:?}", err);
@@ -566,7 +561,7 @@ mod tests {
             _ => {}
         }
 
-        let write_response2 = client.write_db(db_name,"location2", "456").unwrap();
+        let write_response2 = client.write_db(db_name, "location2", "456").unwrap();
         match write_response2 {
             DBPacketResponse::Error(err) => {
                 panic!("{:?}", err);
@@ -576,8 +571,8 @@ mod tests {
 
         let list_db_contents_response = client.list_db_contents(db_name).unwrap();
 
-        assert_eq!(list_db_contents_response.get("location1").unwrap(),"123");
-        assert_eq!(list_db_contents_response.get("location2").unwrap(),"456");
+        assert_eq!(list_db_contents_response.get("location1").unwrap(), "123");
+        assert_eq!(list_db_contents_response.get("location2").unwrap(), "456");
 
         let delete_db_response = client.delete_db(db_name).unwrap();
 
@@ -587,8 +582,6 @@ mod tests {
                 panic!("Unable to delete db");
             }
         }
-
-
     }
 
     #[test]
@@ -596,7 +589,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
         let db_name = "test_db_contents_empty1";
 
-        let create_db_response1 = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+        let create_db_response1 = client.create_db(db_name, Duration::from_secs(30)).unwrap();
 
         match create_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -617,7 +610,5 @@ mod tests {
                 panic!("Unable to delete db");
             }
         }
-
-
     }
 }

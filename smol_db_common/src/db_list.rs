@@ -5,6 +5,10 @@ use crate::db_content::DBContent;
 use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
+use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{
+    DBNotFound, SerializationError,
+};
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
@@ -14,8 +18,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
-use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
-use crate::db_packets::db_packet_response::DBPacketResponseError::{DBNotFound, SerializationError};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBList {
@@ -25,12 +27,10 @@ pub struct DBList {
     /// Hashmap that takes a DBPacketInfo and returns the database corresponding to the name in the given packet.
     #[serde(skip)]
     pub cache: RwLock<HashMap<DBPacketInfo, RwLock<DB>>>,
-
     // TODO: a rwlock vec here contains the list of super admin access key hashes.
 }
 
 impl DBList {
-
     // TODO: packet handler functions createdb, deletedb, readdb, writedb, should all begin taking in an access key hash in their function inputs.
 
     /// Removes all caches which last access time exceeds their invalidation time.
@@ -117,7 +117,6 @@ impl DBList {
 
     /// Saves all db names to a file.
     pub fn save_db_list(&self) {
-
         let mut db_list_file = File::create("db_list.ser").expect("Unable to save db_list.ser");
         let ser_data = serde_json::to_string(&self).expect("Unable to serialize self.");
         let _ = db_list_file
@@ -214,14 +213,15 @@ impl DBList {
 
                 let mut removed = false;
                 let it = list_lock.clone();
-                for (index,item) in it.into_iter().enumerate() {
+                for (index, item) in it.into_iter().enumerate() {
                     if db_packet_info.get_db_name() == item.get_db_name() {
                         list_lock.remove(index);
                         removed = true;
                     }
                 }
 
-                if removed == false { // if no db was removed from the list, then we should tell the user that this deletion failed in some way.
+                if !removed {
+                    // if no db was removed from the list, then we should tell the user that this deletion failed in some way.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
 
@@ -260,7 +260,7 @@ impl DBList {
                 Ok(f) => f,
                 Err(_) => {
                     // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
-                    return DBPacketResponse::Error(DBPacketResponseError::DBFileSystemError);
+                    return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
 
@@ -283,7 +283,7 @@ impl DBList {
                 .unwrap()
                 .insert(p_info.clone(), RwLock::from(db));
 
-            DBPacketResponse::SuccessReply(return_value)
+            SuccessReply(return_value)
         } else {
             // cache was neither hit, nor did the db exist on the file system
             Error(DBNotFound)
@@ -348,8 +348,8 @@ impl DBList {
             cache_lock.insert(db_info.clone(), RwLock::from(db));
 
             match returned_value {
-                None => DBPacketResponse::SuccessNoData,
-                Some(updated_value) => DBPacketResponse::SuccessReply(updated_value),
+                None => SuccessNoData,
+                Some(updated_value) => SuccessReply(updated_value),
             }
         } else {
             Error(DBNotFound)
@@ -359,19 +359,14 @@ impl DBList {
     /// Returns the db list in a serialized form of Vec<DBPacketInfo>
     pub fn list_db(&self) -> DBPacketResponse<String> {
         let list = self.list.read().unwrap();
-        return match serde_json::to_string(&list.clone()) {
-            Ok(thing) => {
-                SuccessReply(thing)
-            }
-            Err(_) => {
-                Error(SerializationError)
-            }
-        };
+        match serde_json::to_string(&list.clone()) {
+            Ok(thing) => SuccessReply(thing),
+            Err(_) => Error(SerializationError),
+        }
     }
 
     /// Returns the db contents in a serialized form of HashMap<String, String>
     pub fn list_db_contents(&self, db_info: &DBPacketInfo) -> DBPacketResponse<String> {
-
         if !self.db_name_exists(db_info.get_db_name()) {
             return Error(DBNotFound);
         }
@@ -390,12 +385,8 @@ impl DBList {
                 db_lock.last_access_time = SystemTime::now();
 
                 return match serde_json::to_string(&db_lock.db_content.content) {
-                    Ok(thing) => {
-                        SuccessReply(thing)
-                    }
-                    Err(_) => {
-                        Error(SerializationError)
-                    }
+                    Ok(thing) => SuccessReply(thing),
+                    Err(_) => Error(SerializationError),
                 };
             }
         }
@@ -418,12 +409,8 @@ impl DBList {
             let returned_value = &db.db_content.content;
 
             let output_response = match serde_json::to_string(returned_value) {
-                Ok(thing) => {
-                    SuccessReply(thing)
-                }
-                Err(_) => {
-                    Error(SerializationError)
-                }
+                Ok(thing) => SuccessReply(thing),
+                Err(_) => Error(SerializationError),
             };
             cache_lock.insert(db_info.clone(), RwLock::from(db));
 

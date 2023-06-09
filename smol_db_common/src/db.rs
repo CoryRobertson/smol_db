@@ -11,7 +11,6 @@ pub struct DB {
     pub db_content: DBContent,
     pub last_access_time: SystemTime,
     pub db_settings: DBSettings,
-
     // TODO: a vec of access key hashes here should contain a list of admins for this given db
 
     // TODO: a vec of access key hashes here should contain a list of users for this given db
@@ -32,4 +31,3 @@ pub struct DB {
 // TODO: permissions struct should be a function implementation on DB that checks if a given user can do a given action.
 //  e.g. to write_db, after checking cache, or after loading to cache, the db uses the PermissionState enum impl to determine what type of user the input is comming from.
 //  after determining the enum, we can bar specific actions from that user.
-
