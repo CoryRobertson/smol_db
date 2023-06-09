@@ -12,7 +12,7 @@ use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
-use std::time::Duration;
+use smol_db_common::db_packets::db_settings::DBSettings;
 
 pub mod client_error;
 
@@ -40,10 +40,10 @@ impl Client {
     pub fn create_db(
         &mut self,
         db_name: &str,
-        invalidation_time: Duration,
+        db_settings: DBSettings,
     ) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_create_db(db_name, invalidation_time);
+        let packet1 = DBPacket::new_create_db(db_name, db_settings);
         return match packet1.serialize_packet() {
             Ok(pack_bytes) => {
                 let write_result = self.socket.write(pack_bytes.as_bytes());
@@ -314,12 +314,13 @@ mod tests {
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
     use std::thread;
     use std::time::Duration;
+    use smol_db_common::db_packets::db_settings::DBSettings;
 
     #[test]
     fn test_client() {
         let mut client = Client::new("localhost:8222").unwrap();
 
-        let create_response = client.create_db("test2", Duration::from_secs(30)).unwrap();
+        let create_response = client.create_db("test2", DBSettings::default()).unwrap();
 
         match create_response {
             DBPacketResponse::SuccessNoData => {}
@@ -408,7 +409,7 @@ mod tests {
         };
 
         let create_db_response = client
-            .create_db("test_generics", Duration::from_secs(30))
+            .create_db("test_generics", DBSettings::default())
             .unwrap();
 
         match create_db_response {
@@ -483,7 +484,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let create_db_response1 = client
-            .create_db("test_db_1", Duration::from_secs(30))
+            .create_db("test_db_1", DBSettings::default())
             .unwrap();
 
         match create_db_response1 {
@@ -494,7 +495,7 @@ mod tests {
         }
 
         let create_db_response2 = client
-            .create_db("test_db_2", Duration::from_secs(30))
+            .create_db("test_db_2", DBSettings::default())
             .unwrap();
 
         match create_db_response2 {
@@ -550,7 +551,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
         let db_name = "test_db_contents1";
 
-        let create_db_response1 = client.create_db(db_name, Duration::from_secs(30)).unwrap();
+        let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
 
         match create_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -595,7 +596,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
         let db_name = "test_db_contents_empty1";
 
-        let create_db_response1 = client.create_db(db_name, Duration::from_secs(30)).unwrap();
+        let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
 
         match create_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -636,7 +637,7 @@ mod tests {
             d: "123_test_data".to_string(),
         };
 
-        let create_response = client.create_db(db_name, Duration::from_secs(30)).unwrap();
+        let create_response = client.create_db(db_name, DBSettings::default()).unwrap();
         match create_response {
             DBPacketResponse::Error(err) => {
                 panic!("{:?}", err);

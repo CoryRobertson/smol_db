@@ -25,6 +25,65 @@ pub struct DB {
     //  Admins can always read, write, list, and delete.
 }
 
+impl DB {
+    /// Returns true if the given key has list permissions
+    pub fn has_list_permissions(&self, client_key: &String) -> bool {
+        if self.db_settings.is_admin(client_key) {
+            true
+        } else if self.db_settings.is_user(client_key) {
+            if self.db_settings.get_user_rwx().2 {
+                true
+            } else {
+                false
+            }
+        } else {
+            if self.db_settings.get_other_rwx().2 {
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    /// Returns true if the given key has read permissions
+    pub fn has_read_permissions(&self, client_key: &String) -> bool {
+        if self.db_settings.is_admin(client_key) {
+            true
+        } else if self.db_settings.is_user(client_key) {
+            if self.db_settings.get_user_rwx().0 {
+                true
+            } else {
+                false
+            }
+        } else {
+            if self.db_settings.get_other_rwx().0 {
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    /// Returns true if the given key has write permissions
+    pub fn has_write_permissions(&self, client_key: &String) -> bool {
+        if self.db_settings.is_admin(client_key) {
+            true
+        } else if self.db_settings.is_user(client_key) {
+            if self.db_settings.get_user_rwx().1 {
+                true
+            } else {
+                false
+            }
+        } else {
+            if self.db_settings.get_other_rwx().1 {
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
 // TODO enum PermissionState that has the following states: isAdmin, isUser: isOther
 //  impl block that checks the db vecs for if the users hash is in the user hash list, or the admin hash list, or neither.
 

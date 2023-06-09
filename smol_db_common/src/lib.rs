@@ -16,7 +16,6 @@ mod tests {
     use crate::db_packets::db_settings::DBSettings;
     use std::fs;
     use std::path::Path;
-    use std::time::Duration;
 
     #[test]
     /// Tests the following:
@@ -38,7 +37,7 @@ mod tests {
 
         assert!(!db_path.exists()); // verify the db is not already there
 
-        db_list.create_db(db_name, DBSettings::new(Duration::from_secs(30)));
+        db_list.create_db(db_name, DBSettings::default(), );
 
         assert!(db_path.exists()); // verify the db exists after creation
 
@@ -47,7 +46,7 @@ mod tests {
             resp_value_not_found == DBPacketResponse::Error(DBPacketResponseError::ValueNotFound)
         );
 
-        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone());
+        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone(), );
 
         assert!(resp_write_value == DBPacketResponse::SuccessNoData);
 
@@ -58,18 +57,18 @@ mod tests {
             DBPacketResponse::SuccessReply(db_data1.get_data().to_string())
         );
 
-        let resp_value_write2 = db_list.write_db(&db_packet, &data_location, db_data2.clone());
+        let resp_value_write2 = db_list.write_db(&db_packet, &data_location, db_data2.clone(), );
 
         assert_eq!(
             resp_value_write2,
             DBPacketResponse::SuccessReply(db_data1.get_data().to_string())
         );
 
-        let resp_delete_db = db_list.delete_db(db_name);
+        let resp_delete_db = db_list.delete_db(db_name, );
 
         assert_eq!(resp_delete_db, DBPacketResponse::SuccessNoData);
 
-        let resp_delete_db2 = db_list.delete_db(db_name);
+        let resp_delete_db2 = db_list.delete_db(db_name, );
 
         assert_eq!(
             resp_delete_db2,
@@ -92,12 +91,12 @@ mod tests {
 
         let expected = DBPacketResponse::SuccessNoData;
         let successful_db_creation =
-            db_list.create_db(db_name, DBSettings::new(Duration::from_secs(30)));
+            db_list.create_db(db_name, DBSettings::default(), );
         assert_eq!(successful_db_creation, expected);
 
         let expected = DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists);
         let failed_db_creation =
-            db_list.create_db(db_name, DBSettings::new(Duration::from_secs(30)));
+            db_list.create_db(db_name, DBSettings::default(), );
         assert_eq!(failed_db_creation, expected);
 
         let expected = DBPacketResponse::Error(DBPacketResponseError::DBNotFound);
@@ -124,10 +123,10 @@ mod tests {
 
         let expected = DBPacketResponse::SuccessNoData;
         let successful_db_creation =
-            db_list.create_db(db_name, DBSettings::new(Duration::from_secs(30)));
+            db_list.create_db(db_name, DBSettings::default(), );
         assert_eq!(successful_db_creation, expected);
 
-        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone());
+        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone(), );
         assert!(resp_write_value == DBPacketResponse::SuccessNoData);
 
         db_list.save_db_list();
@@ -148,7 +147,7 @@ mod tests {
 
         assert_eq!(db_list.cache.read().unwrap().len(), 0);
 
-        let resp_write_value2 = db_list.write_db(&db_packet, &data_location, db_data2.clone());
+        let resp_write_value2 = db_list.write_db(&db_packet, &data_location, db_data2.clone(), );
         assert_eq!(
             resp_write_value2,
             DBPacketResponse::SuccessReply(db_data1.get_data().to_string())

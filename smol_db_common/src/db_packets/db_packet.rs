@@ -3,7 +3,6 @@ use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
@@ -20,6 +19,12 @@ pub enum DBPacket {
     ListDB,
     /// ListDBContents(db to read from)
     ListDBContents(DBPacketInfo),
+
+    AddAdmin(DBPacketInfo,String),
+
+    AddUser(DBPacketInfo,String),
+
+    SetKey(String),
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
 
     //TODO: SetAccessKey(hash string) sets the users access key, a hash of their password that is hashed from the client and sent to the server.
@@ -41,10 +46,10 @@ impl DBPacket {
     }
 
     /// Creates a new CreateDB DBPacket from a name of a database.
-    pub fn new_create_db(dbname: &str, invalidation_time: Duration) -> DBPacket {
+    pub fn new_create_db(dbname: &str, db_settings: DBSettings) -> DBPacket {
         DBPacket::CreateDB(
             DBPacketInfo::new(dbname),
-            DBSettings::new(invalidation_time),
+            db_settings,
         )
     }
 

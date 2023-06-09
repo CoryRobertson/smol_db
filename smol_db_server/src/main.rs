@@ -7,6 +7,9 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponse::Error;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::InvalidPermissions;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -88,6 +91,7 @@ fn main() {
 
 fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
     let mut buf: [u8; 1024] = [0; 1024];
+    let mut client_key = String::new();
     //TODO: store the users access key here, it should be empty quotes when no key is sent.
     loop {
         // client loop
@@ -104,27 +108,32 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
+
                                 let resp = lock.read_db(&db_name, &db_location);
                                 println!("{:?}", resp);
                                 resp
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.write_db(&db_name, &db_location, db_write_value);
+                                let resp = lock.write_db(&db_name, &db_location, db_write_value,&client_key);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_specific_db(&db_name);
                                 resp
                             }
                             DBPacket::CreateDB(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.create_db(db_name.get_db_name(), db_settings);
+
+                                let resp = lock.create_db(db_name.get_db_name(), db_settings, &client_key);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
                                 resp
+
                             }
                             DBPacket::DeleteDB(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.delete_db(db_name.get_db_name());
+
+                                // only allow db deletion when key is super admin
+                                let resp = lock.delete_db(db_name.get_db_name(), &client_key);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
                                 resp
@@ -137,8 +146,28 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::ListDBContents(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.list_db_contents(&db_name);
+                                let resp = lock.list_db_contents(&db_name, &client_key);
                                 resp
+                            }
+                            DBPacket::AddAdmin(db_name, admin_hash) => {
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.add_admin(&db_name, admin_hash, &client_key);
+                                resp
+                            }
+                            DBPacket::AddUser(db_name, user_hash) => {
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.add_user(&db_name,user_hash,&client_key);
+                                resp
+                            }
+                            DBPacket::SetKey(key) => {
+                                let lock = db_list.read().unwrap();
+                                if lock.super_admin_hash_list.read().unwrap().is_empty() {
+                                    // if there are no super admins, the first person to log in is the super admin.
+                                    let mut super_admin_list_lock = lock.super_admin_hash_list.write().unwrap();
+                                    super_admin_list_lock.push(key.clone());
+                                }
+                                client_key = key;
+                                DBPacketResponse::SuccessNoData
                             }
                         }
                     }

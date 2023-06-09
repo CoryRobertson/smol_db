@@ -26,11 +26,22 @@ pub enum DBPacketResponseError {
     DBAlreadyExists,
     /// An error occurred during serialization, specifically not during deserialization, but during serialization. This should never happen.
     SerializationError,
+
+    InvalidPermissions,
 }
 
 impl<T> DBPacketResponse<T> {
     /// Convert the response from the database to a result
     pub fn as_result(&self) -> Result<Option<&T>, &DBPacketResponseError> {
+        match self {
+            DBPacketResponse::SuccessNoData => Ok(None),
+            DBPacketResponse::SuccessReply(data) => Ok(Some(data)),
+            DBPacketResponse::Error(err) => Err(err),
+        }
+    }
+
+    /// Consume the response and convert into a result
+    pub fn into_result(self) -> Result<Option<T>, DBPacketResponseError> {
         match self {
             DBPacketResponse::SuccessNoData => Ok(None),
             DBPacketResponse::SuccessReply(data) => Ok(Some(data)),
