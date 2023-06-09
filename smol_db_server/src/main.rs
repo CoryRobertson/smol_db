@@ -22,6 +22,7 @@ fn main() {
     ctrlc::set_handler(move || {
         println!("Received CTRL+C, gracefully shutting down program.");
         let lock = db_list_clone_ctrl_c.read().unwrap();
+        println!("{:?}", lock.list.read().unwrap());
         lock.save_db_list();
         lock.save_all_db();
         println!("Saved all db files and db list.");
@@ -126,6 +127,17 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp = lock.delete_db(db_name.get_db_name());
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
+                                resp
+                            }
+                            DBPacket::ListDB => {
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.list_db();
+                                println!("{:?}", resp);
+                                resp
+                            }
+                            DBPacket::ListDBContents(db_name) => {
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.list_db_contents(&db_name);
                                 resp
                             }
                         }

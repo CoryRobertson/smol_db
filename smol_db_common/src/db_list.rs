@@ -14,6 +14,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
+use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{DBNotFound, SerializationError};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBList {
@@ -115,6 +117,7 @@ impl DBList {
 
     /// Saves all db names to a file.
     pub fn save_db_list(&self) {
+
         let mut db_list_file = File::create("db_list.ser").expect("Unable to save db_list.ser");
         let ser_data = serde_json::to_string(&self).expect("Unable to serialize self.");
         let _ = db_list_file
@@ -154,7 +157,7 @@ impl DBList {
     /// Creates a DB given a name, the packet is not needed, only the name.
     pub fn create_db(&self, db_name: &str, db_settings: DBSettings) -> DBPacketResponse<String> {
         if self.db_name_exists(db_name) {
-            return DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists);
+            return Error(DBPacketResponseError::DBAlreadyExists);
         }
 
         let mut list_write_lock = self.list.write().unwrap();
@@ -163,7 +166,7 @@ impl DBList {
             Ok(_) => {
                 // db file was found and should not have been, because this db already exists
 
-                DBPacketResponse::Error(DBPacketResponseError::DBAlreadyExists)
+                Error(DBPacketResponseError::DBAlreadyExists)
             }
             Err(_) => {
                 // db file was not found
@@ -182,11 +185,11 @@ impl DBList {
                             .expect(&format!("Unable to write db to file. {}", db_name));
                         cache_write_lock.insert(db_packet_info.clone(), RwLock::from(db));
                         list_write_lock.push(db_packet_info);
-                        DBPacketResponse::SuccessNoData
+                        SuccessNoData
                     }
                     Err(_) => {
                         // db file was unable to be created
-                        DBPacketResponse::Error(DBPacketResponseError::DBFileSystemError)
+                        Error(DBPacketResponseError::DBFileSystemError)
                     }
                 }
             }
@@ -197,7 +200,7 @@ impl DBList {
     /// If the file is successfully removed, the db is also removed from the cache, and list.
     pub fn delete_db(&self, db_name: &str) -> DBPacketResponse<String> {
         if !self.db_name_exists(db_name) {
-            return DBPacketResponse::Error(DBPacketResponseError::DBNotFound);
+            return Error(DBNotFound);
         }
 
         let mut list_lock = self.list.write().unwrap();
@@ -208,13 +211,23 @@ impl DBList {
             Ok(_) => {
                 let db_packet_info = DBPacketInfo::new(db_name);
                 cache_lock.remove(&db_packet_info);
-                let index_res = list_lock.binary_search(&db_packet_info);
-                if let Ok(index) = index_res {
-                    list_lock.remove(index);
+
+                let mut removed = false;
+                let it = list_lock.clone();
+                for (index,item) in it.into_iter().enumerate() {
+                    if db_packet_info.get_db_name() == item.get_db_name() {
+                        list_lock.remove(index);
+                        removed = true;
+                    }
                 }
-                DBPacketResponse::SuccessNoData
+
+                if removed == false { // if no db was removed from the list, then we should tell the user that this deletion failed in some way.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+
+                SuccessNoData
             }
-            Err(_) => DBPacketResponse::Error(DBPacketResponseError::DBFileSystemError),
+            Err(_) => Error(DBPacketResponseError::DBFileSystemError),
         }
     }
 
@@ -235,8 +248,8 @@ impl DBList {
             let db_read = db_lock.db_content.read_from_db(p_location.as_key());
 
             return match db_read {
-                None => DBPacketResponse::Error(DBPacketResponseError::ValueNotFound),
-                Some(value) => DBPacketResponse::SuccessReply(value.to_string()),
+                None => Error(DBPacketResponseError::ValueNotFound),
+                Some(value) => SuccessReply(value.to_string()),
             };
         }
 
@@ -273,7 +286,7 @@ impl DBList {
             DBPacketResponse::SuccessReply(return_value)
         } else {
             // cache was neither hit, nor did the db exist on the file system
-            DBPacketResponse::Error(DBPacketResponseError::DBNotFound)
+            Error(DBNotFound)
         }
     }
 
@@ -302,11 +315,11 @@ impl DBList {
                 ) {
                     None => {
                         // if the db insertion had no previous value, simply return an empty string, this could be updated later possibly.
-                        DBPacketResponse::SuccessNoData
+                        SuccessNoData
                     }
                     Some(updated_value) => {
                         // if the db insertion had a previous value, return it.
-                        DBPacketResponse::SuccessReply(updated_value)
+                        SuccessReply(updated_value)
                     }
                 };
             }
@@ -339,7 +352,84 @@ impl DBList {
                 Some(updated_value) => DBPacketResponse::SuccessReply(updated_value),
             }
         } else {
-            DBPacketResponse::Error(DBPacketResponseError::DBNotFound)
+            Error(DBNotFound)
+        }
+    }
+
+    /// Returns the db list in a serialized form of Vec<DBPacketInfo>
+    pub fn list_db(&self) -> DBPacketResponse<String> {
+        let list = self.list.read().unwrap();
+        return match serde_json::to_string(&list.clone()) {
+            Ok(thing) => {
+                SuccessReply(thing)
+            }
+            Err(_) => {
+                Error(SerializationError)
+            }
+        };
+    }
+
+    /// Returns the db contents in a serialized form of HashMap<String, String>
+    pub fn list_db_contents(&self, db_info: &DBPacketInfo) -> DBPacketResponse<String> {
+
+        if !self.db_name_exists(db_info.get_db_name()) {
+            return Error(DBNotFound);
+        }
+
+        let list_lock = self.list.read().unwrap();
+
+        {
+            // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
+            let cache_lock = self.cache.read().unwrap();
+
+            if let Some(db) = cache_lock.get(db_info) {
+                // cache is hit, db is currently loaded
+
+                let mut db_lock = db.write().unwrap();
+
+                db_lock.last_access_time = SystemTime::now();
+
+                return match serde_json::to_string(&db_lock.db_content.content) {
+                    Ok(thing) => {
+                        SuccessReply(thing)
+                    }
+                    Err(_) => {
+                        Error(SerializationError)
+                    }
+                };
+            }
+        }
+
+        if list_lock.contains(db_info) {
+            // cache was missed, but the requested database did in fact exist
+
+            let mut cache_lock = self.cache.write().unwrap();
+
+            let mut db_file = File::open(db_info.get_db_name()).unwrap();
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+            let returned_value = &db.db_content.content;
+
+            let output_response = match serde_json::to_string(returned_value) {
+                Ok(thing) => {
+                    SuccessReply(thing)
+                }
+                Err(_) => {
+                    Error(SerializationError)
+                }
+            };
+            cache_lock.insert(db_info.clone(), RwLock::from(db));
+
+            output_response
+        } else {
+            Error(DBNotFound)
         }
     }
 }

@@ -24,4 +24,6 @@ pub enum DBPacketResponseError {
     ValueNotFound,
     /// DBAlreadyExists represents when attempting to create a database fails because that database already exists either as a file or in the db list.
     DBAlreadyExists,
+
+    SerializationError,
 }

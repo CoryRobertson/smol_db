@@ -16,9 +16,11 @@ pub enum DBPacket {
     CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
     DeleteDB(DBPacketInfo),
-    //TODO: ListDB packet type? probably has no information inside since it will need to be non-specific?
+
+    ListDB,
 
     //TODO: ListContents of db packet type too maybe? returns the entire hashmap serialized?
+    ListDBContents(DBPacketInfo),
 
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
 
@@ -51,6 +53,14 @@ impl DBPacket {
     /// Creates a new DeleteDB DBPacket from a name of a database.
     pub fn new_delete_db(dbname: &str) -> DBPacket {
         DBPacket::DeleteDB(DBPacketInfo::new(dbname))
+    }
+
+    pub fn new_list_db() -> DBPacket {
+        DBPacket::ListDB
+    }
+
+    pub fn new_list_db_contents(db_name: &str) -> DBPacket {
+        DBPacket::ListDBContents(DBPacketInfo::new(db_name))
     }
 
     /// Serializes a DBPacket into a string to be sent over the internet.
