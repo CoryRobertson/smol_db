@@ -1,5 +1,6 @@
 //! Library contain the structs that manage the client to connect to smol_db
 
+use crate::client_error::ClientError;
 use crate::ClientError::{
     BadPacket, PacketDeserializationError, PacketSerializationError, SocketReadError,
     SocketWriteError, UnableToConnect,
@@ -7,12 +8,11 @@ use crate::ClientError::{
 use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-use smol_db_common::db_packets::db_packet_response::{DBPacketResponse};
+use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::Duration;
-use crate::client_error::ClientError;
 
 pub mod client_error;
 
@@ -230,19 +230,23 @@ impl Client {
         };
     }
 
-    pub fn list_db_contents_generic<T>(&mut self,db_name: &str) -> Result<HashMap<String, T>, ClientError>
-        where for<'a> T: Serialize + Deserialize<'a>,
+    pub fn list_db_contents_generic<T>(
+        &mut self,
+        db_name: &str,
+    ) -> Result<HashMap<String, T>, ClientError>
+    where
+        for<'a> T: Serialize + Deserialize<'a>,
     {
         let contents = self.list_db_contents(db_name)?;
         let mut converted_contents: HashMap<String, T> = HashMap::new();
-        for (key,value) in contents {
+        for (key, value) in contents {
             match serde_json::from_str::<T>(&value) {
                 Ok(thing) => {
-                    converted_contents.insert(key,thing);
-                },
+                    converted_contents.insert(key, thing);
+                }
                 Err(err) => {
                     return Err(PacketDeserializationError(Error::from(err)));
-                },
+                }
             }
         }
         Ok(converted_contents)
@@ -632,44 +636,49 @@ mod tests {
             d: "123_test_data".to_string(),
         };
 
-        let create_response = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+        let create_response = client.create_db(db_name, Duration::from_secs(30)).unwrap();
         match create_response {
             DBPacketResponse::Error(err) => {
-                panic!("{:?}",err);
+                panic!("{:?}", err);
             }
             _ => {}
         }
 
-        let write_response1 = client.write_db_generic(db_name,"location1",test_data1.clone()).unwrap();
+        let write_response1 = client
+            .write_db_generic(db_name, "location1", test_data1.clone())
+            .unwrap();
         match write_response1 {
             DBPacketResponse::Error(err) => {
-                panic!("{:?}",err);
+                panic!("{:?}", err);
             }
             _ => {}
         }
 
-        let write_response2 = client.write_db_generic(db_name,"location2",test_data2.clone()).unwrap();
+        let write_response2 = client
+            .write_db_generic(db_name, "location2", test_data2.clone())
+            .unwrap();
         match write_response2 {
             DBPacketResponse::Error(err) => {
-                panic!("{:?}",err);
+                panic!("{:?}", err);
             }
             _ => {}
         }
 
-        let list = client.list_db_contents_generic::<TestStruct>(db_name).unwrap();
+        let list = client
+            .list_db_contents_generic::<TestStruct>(db_name)
+            .unwrap();
 
-        assert_eq!(list.len(),2);
+        assert_eq!(list.len(), 2);
 
-        assert_eq!(list.get("location1").unwrap().clone(),test_data1);
-        assert_eq!(list.get("location2").unwrap().clone(),test_data2);
+        assert_eq!(list.get("location1").unwrap().clone(), test_data1);
+        assert_eq!(list.get("location2").unwrap().clone(), test_data2);
 
         let delete_response = client.delete_db(db_name).unwrap();
         match delete_response {
             DBPacketResponse::Error(err) => {
-                panic!("{:?}",err);
+                panic!("{:?}", err);
             }
             _ => {}
         }
-
     }
 }

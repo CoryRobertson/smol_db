@@ -32,9 +32,9 @@ impl<T> DBPacketResponse<T> {
     /// Convert the response from the database to a result
     pub fn as_result(&self) -> Result<Option<&T>, &DBPacketResponseError> {
         match self {
-            DBPacketResponse::SuccessNoData => { Ok(None) }
-            DBPacketResponse::SuccessReply(data) => { Ok(Some(data)) }
-            DBPacketResponse::Error(err) => { Err(err) }
+            DBPacketResponse::SuccessNoData => Ok(None),
+            DBPacketResponse::SuccessReply(data) => Ok(Some(data)),
+            DBPacketResponse::Error(err) => Err(err),
         }
     }
 }

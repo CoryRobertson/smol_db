@@ -1,6 +1,5 @@
-use std::io::{Error};
-use smol_db_common::db_packets::db_packet_response::{DBPacketResponseError};
-
+use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
+use std::io::Error;
 
 #[derive(Debug)]
 /// Enum that represents the possible outcomes of using the client
