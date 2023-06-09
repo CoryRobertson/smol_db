@@ -16,14 +16,14 @@ pub enum DBPacket {
     CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
     DeleteDB(DBPacketInfo),
-
+    /// ListDB
     ListDB,
-
-    //TODO: ListContents of db packet type too maybe? returns the entire hashmap serialized?
+    /// ListDBContents(db to read from)
     ListDBContents(DBPacketInfo),
+
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
 
-    //TODO: set access key sets the users access key, a hash of their password that is hashed from the client and sent to the server.
+    //TODO: SetAccessKey(hash string) sets the users access key, a hash of their password that is hashed from the client and sent to the server.
 }
 
 impl DBPacket {
