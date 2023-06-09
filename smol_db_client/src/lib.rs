@@ -230,6 +230,24 @@ impl Client {
         };
     }
 
+    pub fn list_db_contents_generic<T>(&mut self,db_name: &str) -> Result<HashMap<String, T>, ClientError>
+        where for<'a> T: Serialize + Deserialize<'a>,
+    {
+        let contents = self.list_db_contents(db_name)?;
+        let mut converted_contents: HashMap<String, T> = HashMap::new();
+        for (key,value) in contents {
+            match serde_json::from_str::<T>(&value) {
+                Ok(thing) => {
+                    converted_contents.insert(key,thing);
+                },
+                Err(err) => {
+                    return Err(PacketDeserializationError(Error::from(err)));
+                },
+            }
+        }
+        Ok(converted_contents)
+    }
+
     /// Writes to the db while serializing the given data, returning the data at the location given and deserialized to the same type.
     pub fn write_db_generic<T>(
         &mut self,
@@ -594,5 +612,64 @@ mod tests {
                 panic!("Unable to delete db");
             }
         }
+    }
+
+    #[test]
+    fn test_list_db_contents_generic() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_name = "test_list_db_contents_generic1";
+        let test_data1 = TestStruct {
+            a: 10,
+            b: false,
+            c: -500,
+            d: "test_data123".to_string(),
+        };
+
+        let test_data2 = TestStruct {
+            a: 15,
+            b: true,
+            c: 495,
+            d: "123_test_data".to_string(),
+        };
+
+        let create_response = client.create_db(db_name,Duration::from_secs(30)).unwrap();
+        match create_response {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}",err);
+            }
+            _ => {}
+        }
+
+        let write_response1 = client.write_db_generic(db_name,"location1",test_data1.clone()).unwrap();
+        match write_response1 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}",err);
+            }
+            _ => {}
+        }
+
+        let write_response2 = client.write_db_generic(db_name,"location2",test_data2.clone()).unwrap();
+        match write_response2 {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}",err);
+            }
+            _ => {}
+        }
+
+        let list = client.list_db_contents_generic::<TestStruct>(db_name).unwrap();
+
+        assert_eq!(list.len(),2);
+
+        assert_eq!(list.get("location1").unwrap().clone(),test_data1);
+        assert_eq!(list.get("location2").unwrap().clone(),test_data2);
+
+        let delete_response = client.delete_db(db_name).unwrap();
+        match delete_response {
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}",err);
+            }
+            _ => {}
+        }
+
     }
 }

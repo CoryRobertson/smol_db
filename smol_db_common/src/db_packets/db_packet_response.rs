@@ -24,6 +24,17 @@ pub enum DBPacketResponseError {
     ValueNotFound,
     /// DBAlreadyExists represents when attempting to create a database fails because that database already exists either as a file or in the db list.
     DBAlreadyExists,
-
+    /// An error occurred during serialization, specifically not during deserialization, but during serialization. This should never happen.
     SerializationError,
+}
+
+impl<T> DBPacketResponse<T> {
+    /// Convert the response from the database to a result
+    pub fn as_result(&self) -> Result<Option<&T>, &DBPacketResponseError> {
+        match self {
+            DBPacketResponse::SuccessNoData => { Ok(None) }
+            DBPacketResponse::SuccessReply(data) => { Ok(Some(data)) }
+            DBPacketResponse::Error(err) => { Err(err) }
+        }
+    }
 }
