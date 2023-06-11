@@ -26,8 +26,6 @@ pub enum DBPacket {
 
     SetKey(String),
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
-
-    //TODO: SetAccessKey(hash string) sets the users access key, a hash of their password that is hashed from the client and sent to the server.
 }
 
 impl DBPacket {

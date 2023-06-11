@@ -7,7 +7,7 @@ use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::DBPacketResponseError::{
-    DBNotFound, InvalidPermissions, SerializationError,
+    DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
 };
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use crate::db_packets::db_settings::DBSettings;
@@ -33,12 +33,12 @@ pub struct DBList {
 }
 
 impl DBList {
-    // TODO: packet handler functions createdb, deletedb, readdb, writedb, should all begin taking in an access key hash in their function inputs.
-
+    /// Returns true if the given hash is a super admin hash
     pub fn is_super_admin(&self, hash: &String) -> bool {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
+    /// Adds a user to a given DB, requires admin privileges
     pub fn add_user(
         &self,
         p_info: &DBPacketInfo,
@@ -99,6 +99,138 @@ impl DBList {
         };
     }
 
+    /// Removes a user from a given DB, requires admin privileges
+    pub fn remove_user(
+        &self,
+        p_info: &DBPacketInfo,
+        removed_key: String,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
+        let list_lock = self.list.read().unwrap();
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            return if db_lock.db_settings.is_admin(client_key) || self.is_super_admin(client_key) {
+                db_lock.last_access_time = SystemTime::now();
+
+                if db_lock.db_settings.remove_user(&removed_key) {
+                    SuccessNoData
+                } else {
+                    Error(UserNotFound)
+                }
+            } else {
+                Error(InvalidPermissions)
+            };
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+            let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key)
+            {
+                if db.db_settings.remove_user(&removed_key) {
+                    SuccessNoData
+                } else {
+                    Error(UserNotFound)
+                }
+            } else {
+                Error(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
+    }
+
+    /// Remove an admin from given DB, requires super admin permissions.
+    pub fn remove_admin(
+        &self,
+        p_info: &DBPacketInfo,
+        removed_key: String,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
+        if !self.is_super_admin(client_key) {
+            return Error(InvalidPermissions);
+        }
+
+        let list_lock = self.list.read().unwrap();
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            db_lock.last_access_time = SystemTime::now();
+
+            return if db_lock.db_settings.remove_admin(&removed_key) {
+                SuccessNoData
+            } else {
+                Error(UserNotFound)
+            };
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+            let response = {
+                if db.db_settings.remove_admin(&removed_key) {
+                    SuccessNoData
+                } else {
+                    Error(UserNotFound)
+                }
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
+    }
+
+    /// Adds an admin to a given database, requires super admin permissions to perform.
     pub fn add_admin(
         &self,
         p_info: &DBPacketInfo,
@@ -266,6 +398,7 @@ impl DBList {
         }
     }
 
+    /// Returns true if the given db exists.
     fn db_name_exists(&self, db_name: &str) -> bool {
         self.list
             .read()
@@ -359,7 +492,6 @@ impl DBList {
                     // if no db was removed from the list, then we should tell the user that this deletion failed in some way.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
-
                 SuccessNoData
             }
             Err(_) => Error(DBPacketResponseError::DBFileSystemError),
@@ -513,7 +645,7 @@ impl DBList {
         }
     }
 
-    /// Returns the db list in a serialized form of Vec<DBPacketInfo>
+    /// Returns the db list in a serialized form of Vec : DBPacketInfo
     pub fn list_db(&self) -> DBPacketResponse<String> {
         let list = self.list.read().unwrap();
         match serde_json::to_string(&list.clone()) {
@@ -593,5 +725,582 @@ impl DBList {
         } else {
             Error(DBNotFound)
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(unused_imports)]
+mod tests {
+
+    use crate::db_data::DBData;
+    use crate::db_list::DBList;
+    use crate::db_packets::db_location::DBLocation;
+    use crate::db_packets::db_packet_info::DBPacketInfo;
+    use crate::db_packets::db_packet_response::DBPacketResponse;
+    use crate::db_packets::db_packet_response::DBPacketResponseError::{
+        DBAlreadyExists, DBNotFound, InvalidPermissions, UserNotFound,
+    };
+    use crate::db_packets::db_settings::DBSettings;
+    use std::collections::HashMap;
+    use std::fs::File;
+    use std::hash::Hash;
+    use std::sync::RwLock;
+    use std::time::Duration;
+    use std::{fs, thread};
+
+    static TEST_SUPER_ADMIN_KEY: &str = "test_admin_key";
+    static TEST_USER_KEY: &str = "test_user_key";
+
+    fn get_db_test_settings() -> DBSettings {
+        DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, false),
+            (true, true, true),
+            vec![TEST_SUPER_ADMIN_KEY.to_string()],
+            vec![TEST_USER_KEY.to_string()],
+        )
+    }
+
+    fn get_db_list_for_testing() -> DBList {
+        DBList {
+            list: RwLock::new(vec![]),
+            cache: RwLock::new(HashMap::new()),
+            super_admin_hash_list: RwLock::new(vec![]),
+        }
+    }
+
+    #[test]
+    fn test_is_super_admin() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+        assert_eq!(
+            db_list.is_super_admin(&"probably not an admin key".to_string()),
+            false
+        );
+    }
+
+    #[test]
+    fn test_create_db() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_create";
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        let create_response_db_already_exists = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(
+            create_response_db_already_exists,
+            DBPacketResponse::Error(DBAlreadyExists)
+        );
+
+        let create_response_db_invalid_perms = db_list.create_db(
+            "other_db",
+            get_db_test_settings(),
+            &"this is not an admin key".to_string(),
+        );
+
+        assert_eq!(
+            create_response_db_invalid_perms,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+
+        // clean up unit test files
+        fs::remove_file("test_dblist_1_create").unwrap();
+    }
+
+    #[test]
+    fn test_delete_db() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_delete";
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        let invalid_perms_delete_response =
+            db_list.delete_db(db_name, &"not a working admin key".to_string());
+        assert_eq!(
+            invalid_perms_delete_response,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+
+        match File::open(db_name) {
+            Ok(f) => {
+                panic!("db not deleted {:?}", f)
+            }
+            Err(_) => {}
+        }
+
+        let delete_response_not_listed =
+            db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(
+            delete_response_not_listed,
+            DBPacketResponse::Error(DBNotFound)
+        );
+    }
+
+    #[test]
+    fn test_write_and_read_db() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_read_write";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        let write_invalid_perms = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &"not a working client key".to_string(),
+        );
+        assert_eq!(
+            write_invalid_perms,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+
+        let write_response = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(write_response, DBPacketResponse::SuccessNoData);
+
+        let write_response2 = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(
+            write_response2,
+            DBPacketResponse::SuccessReply(db_data.get_data().to_string())
+        );
+
+        let read_response = db_list.read_db(
+            &db_pack_info,
+            &db_location,
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(
+            read_response,
+            DBPacketResponse::SuccessReply(db_data.get_data().to_string())
+        );
+
+        let read_user_perms_response =
+            db_list.read_db(&db_pack_info, &db_location, &TEST_USER_KEY.to_string());
+        assert_eq!(
+            read_user_perms_response,
+            DBPacketResponse::SuccessReply(db_data.get_data().to_string())
+        );
+
+        let read_invalid_perms_response = db_list.read_db(
+            &db_pack_info,
+            &db_location,
+            &"not a user key or an admin key".to_string(),
+        );
+        assert_eq!(
+            read_invalid_perms_response,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_add_and_remove_user() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_add_remove_user";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+        let new_user_key = "new user key that gets added".to_string();
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        // add user without perms, and with perms, and the test users key
+        let add_user_invalid_perms1 = db_list.add_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &TEST_USER_KEY.to_string(),
+        );
+        assert_eq!(
+            add_user_invalid_perms1,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let add_user_invalid_perms2 = db_list.add_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &"not a working key".to_string(),
+        );
+        assert_eq!(
+            add_user_invalid_perms2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let add_user_response = db_list.add_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(add_user_response, DBPacketResponse::SuccessNoData);
+
+        // try writing data to the db with the perms of the new user
+        let write_with_new_user_response = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &new_user_key.to_string(),
+        );
+        assert_eq!(
+            write_with_new_user_response,
+            DBPacketResponse::SuccessNoData
+        );
+        let read_with_new_user_response =
+            db_list.read_db(&db_pack_info, &db_location, &new_user_key.to_string());
+        assert_eq!(
+            read_with_new_user_response,
+            DBPacketResponse::SuccessReply(db_data.clone().get_data().to_string())
+        );
+
+        // remove user with invalid perms, then eventually remove the user with an admin perm, and try removing the user again and note that the user is not found
+        let remove_user_invalid_perms1 = db_list.remove_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &TEST_USER_KEY.to_string(),
+        );
+        assert_eq!(
+            remove_user_invalid_perms1,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let remove_user_invalid_perms2 = db_list.remove_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &"not a working key".to_string(),
+        );
+        assert_eq!(
+            remove_user_invalid_perms2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let remove_user_response1 = db_list.remove_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(remove_user_response1, DBPacketResponse::SuccessNoData);
+        let remove_user_response2 = db_list.remove_user(
+            &db_pack_info,
+            new_user_key.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(remove_user_response2, DBPacketResponse::Error(UserNotFound));
+
+        // write to the db with invalid perms of the added user, who was removed, also attempt to read using the removed users key
+        let write_with_new_user_response2 = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &new_user_key.to_string(),
+        );
+        assert_eq!(
+            write_with_new_user_response2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let read_with_new_user_response2 =
+            db_list.read_db(&db_pack_info, &db_location, &new_user_key.to_string());
+        assert_eq!(
+            read_with_new_user_response2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_add_and_remove_admin() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_add_remove_admin";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+        let new_admin_key = "new admin key that gets added".to_string();
+        let new_user_key = "new user key that gets added".to_string();
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        let add_admin_without_perms1 = db_list.add_admin(
+            &db_pack_info,
+            new_admin_key.clone(),
+            &"this is not a working key".to_string(),
+        );
+        assert_eq!(
+            add_admin_without_perms1,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let add_admin_without_perms2 = db_list.add_admin(
+            &db_pack_info,
+            new_admin_key.clone(),
+            &TEST_USER_KEY.to_string(),
+        );
+        assert_eq!(
+            add_admin_without_perms2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let add_admin_with_perms = db_list.add_admin(
+            &db_pack_info,
+            new_admin_key.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(add_admin_with_perms, DBPacketResponse::SuccessNoData);
+
+        let new_admin_add_user =
+            db_list.add_user(&db_pack_info, new_user_key.clone(), &new_admin_key.clone());
+        assert_eq!(new_admin_add_user, DBPacketResponse::SuccessNoData);
+
+        let remove_admin_without_perms1 = db_list.remove_admin(
+            &db_pack_info,
+            new_admin_key.clone(),
+            &"this is not a working key".to_string(),
+        );
+        assert_eq!(
+            remove_admin_without_perms1,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let remove_admin_without_perms2 =
+            db_list.remove_admin(&db_pack_info, new_admin_key.clone(), &new_admin_key.clone());
+        assert_eq!(
+            remove_admin_without_perms2,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let remove_admin_success_response = db_list.remove_admin(
+            &db_pack_info,
+            new_admin_key.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(
+            remove_admin_success_response,
+            DBPacketResponse::SuccessNoData
+        );
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_list_db() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_db_list1";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+
+        {
+            let db_list_response = db_list.list_db();
+            match db_list_response {
+                DBPacketResponse::SuccessNoData => {}
+                DBPacketResponse::SuccessReply(data) => {
+                    let v = serde_json::from_str::<Vec<DBPacketInfo>>(&data).unwrap();
+                    assert_eq!(v.len(), 0);
+                }
+                DBPacketResponse::Error(_) => {}
+            }
+        }
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        {
+            let db_list_response = db_list.list_db();
+            match db_list_response {
+                DBPacketResponse::SuccessNoData => {}
+                DBPacketResponse::SuccessReply(data) => {
+                    let v = serde_json::from_str::<Vec<DBPacketInfo>>(&data).unwrap();
+                    assert_eq!(v.len(), 1);
+                }
+                DBPacketResponse::Error(_) => {}
+            }
+        }
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_list_db_contents() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_dblist_1_list_db";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+
+        let create_response = db_list.create_db(
+            db_name,
+            get_db_test_settings(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+
+        let _ = create_response.as_result().expect("Create response failed");
+
+        let list_db_contents_invalid_perms1 =
+            db_list.list_db_contents(&db_pack_info, &"not a valid key most likely".to_string());
+        assert_eq!(
+            list_db_contents_invalid_perms1,
+            DBPacketResponse::Error(InvalidPermissions)
+        );
+        let list_db_contents_invalid_perms2 =
+            db_list.list_db_contents(&db_pack_info, &TEST_USER_KEY.to_string());
+        match list_db_contents_invalid_perms2 {
+            DBPacketResponse::SuccessNoData => {
+                panic!("No data received from db contents? Bad packet possibly?");
+            }
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<HashMap<String, String>>(&data) {
+                    Ok(thing) => {
+                        assert_eq!(thing.len(), 0);
+                    }
+                    Err(err) => {
+                        panic!("{:?}", err);
+                    }
+                }
+            }
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+        }
+        let list_db_contents_valid_perms =
+            db_list.list_db_contents(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
+        match list_db_contents_valid_perms {
+            DBPacketResponse::SuccessNoData => {
+                panic!("No data received from db contents? Bad packet possibly?");
+            }
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<HashMap<String, String>>(&data) {
+                    Ok(thing) => {
+                        assert_eq!(thing.len(), 0);
+                    }
+                    Err(err) => {
+                        panic!("{:?}", err);
+                    }
+                }
+            }
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+        }
+
+        let write_response = db_list.write_db(
+            &db_pack_info,
+            &db_location,
+            db_data.clone(),
+            &TEST_SUPER_ADMIN_KEY.to_string(),
+        );
+        assert_eq!(write_response, DBPacketResponse::SuccessNoData);
+        let list_db_contents_valid_perms =
+            db_list.list_db_contents(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
+        match list_db_contents_valid_perms {
+            DBPacketResponse::SuccessNoData => {
+                panic!("No data received from db contents? Bad packet possibly?");
+            }
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<HashMap<String, String>>(&data) {
+                    Ok(thing) => {
+                        assert_eq!(thing.len(), 1);
+                    }
+                    Err(err) => {
+                        panic!("{:?}", err);
+                    }
+                }
+            }
+            DBPacketResponse::Error(err) => {
+                panic!("{:?}", err);
+            }
+        }
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
     }
 }

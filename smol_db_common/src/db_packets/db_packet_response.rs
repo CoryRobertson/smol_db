@@ -28,6 +28,8 @@ pub enum DBPacketResponseError {
     SerializationError,
 
     InvalidPermissions,
+
+    UserNotFound,
 }
 
 impl<T> DBPacketResponse<T> {
