@@ -2,16 +2,25 @@
 
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_settings::DBSettings;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
 use std::time::{Duration, Instant};
-use smol_db_common::db_packets::db_settings::DBSettings;
 
 fn main() {
     let mut buf: [u8; 1024] = [0; 1024];
 
-    let packet1 = DBPacket::new_create_db("test1", DBSettings::new(Duration::from_secs(30),(false,false,false),(true,true,true),vec![],vec![]));
+    let packet1 = DBPacket::new_create_db(
+        "test1",
+        DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, false),
+            (true, true, true),
+            vec![],
+            vec![],
+        ),
+    );
     let packet2 = DBPacket::new_write("test1", "location1", "data12");
     let packet3 = DBPacket::new_read("test1", "location1");
     let packet4 = DBPacket::new_delete_db("test1");

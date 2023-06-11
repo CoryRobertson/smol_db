@@ -31,17 +31,9 @@ impl DB {
         if self.db_settings.is_admin(client_key) {
             true
         } else if self.db_settings.is_user(client_key) {
-            if self.db_settings.get_user_rwx().2 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_user_rwx().2
         } else {
-            if self.db_settings.get_other_rwx().2 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_other_rwx().2
         }
     }
 
@@ -50,17 +42,9 @@ impl DB {
         if self.db_settings.is_admin(client_key) {
             true
         } else if self.db_settings.is_user(client_key) {
-            if self.db_settings.get_user_rwx().0 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_user_rwx().0
         } else {
-            if self.db_settings.get_other_rwx().0 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_other_rwx().0
         }
     }
 
@@ -69,17 +53,9 @@ impl DB {
         if self.db_settings.is_admin(client_key) {
             true
         } else if self.db_settings.is_user(client_key) {
-            if self.db_settings.get_user_rwx().1 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_user_rwx().1
         } else {
-            if self.db_settings.get_other_rwx().1 {
-                true
-            } else {
-                false
-            }
+            self.db_settings.get_other_rwx().1
         }
     }
 }

@@ -7,9 +7,9 @@ pub struct DBSettings {
     /// The duration to wait before removing the given db from the cache.
     invalidation_time: Duration,
     /// Triple of the permissions others have to (read,write,list)
-    can_others_rwx: (bool,bool,bool),
+    can_others_rwx: (bool, bool, bool),
     /// Triple of the permissions users have to (read,write,list)
-    can_users_rwx: (bool,bool,bool),
+    can_users_rwx: (bool, bool, bool),
     /// Admin list of hashes
     admins: Vec<String>,
     /// User list of hashes
@@ -18,13 +18,20 @@ pub struct DBSettings {
 
 impl DBSettings {
     /// Returns a new DBSettings given a duration
-    pub fn new(invalidation_time: Duration,
-               can_others_rwx: (bool,bool,bool),
-               can_users_rwx: (bool,bool,bool),
-               admins: Vec<String>,
-               users: Vec<String>
+    pub fn new(
+        invalidation_time: Duration,
+        can_others_rwx: (bool, bool, bool),
+        can_users_rwx: (bool, bool, bool),
+        admins: Vec<String>,
+        users: Vec<String>,
     ) -> Self {
-        Self { invalidation_time, can_others_rwx, can_users_rwx, admins, users }
+        Self {
+            invalidation_time,
+            can_others_rwx,
+            can_users_rwx,
+            admins,
+            users,
+        }
     }
 
     pub fn add_admin(&mut self, hash: String) {
@@ -59,10 +66,10 @@ impl DBSettings {
 
 impl Default for DBSettings {
     fn default() -> Self {
-        Self{
+        Self {
             invalidation_time: Duration::from_secs(30),
             can_others_rwx: (false, false, false),
-            can_users_rwx: (true,true,true),
+            can_users_rwx: (true, true, true),
             admins: vec![],
             users: vec![],
         }

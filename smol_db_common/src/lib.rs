@@ -36,12 +36,13 @@ mod tests {
         let db_data2 = DBData::new("123test_data".to_string());
         let super_admin_key = "test_key_123".to_string();
 
-
         assert!(!db_path.exists()); // verify the db is not already there
 
-
-
-        db_list.super_admin_hash_list.write().unwrap().push(super_admin_key.clone());
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(super_admin_key.clone());
 
         db_list.create_db(db_name, DBSettings::default(), &super_admin_key);
 
@@ -52,7 +53,12 @@ mod tests {
             resp_value_not_found == DBPacketResponse::Error(DBPacketResponseError::ValueNotFound)
         );
 
-        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone(), &super_admin_key);
+        let resp_write_value = db_list.write_db(
+            &db_packet,
+            &data_location,
+            db_data1.clone(),
+            &super_admin_key,
+        );
 
         assert!(resp_write_value == DBPacketResponse::SuccessNoData);
 
@@ -63,7 +69,12 @@ mod tests {
             DBPacketResponse::SuccessReply(db_data1.get_data().to_string())
         );
 
-        let resp_value_write2 = db_list.write_db(&db_packet, &data_location, db_data2.clone(), &super_admin_key);
+        let resp_value_write2 = db_list.write_db(
+            &db_packet,
+            &data_location,
+            db_data2.clone(),
+            &super_admin_key,
+        );
 
         assert_eq!(
             resp_value_write2,
@@ -95,7 +106,11 @@ mod tests {
 
         let super_admin_key = "test_key_123".to_string();
 
-        db_list.super_admin_hash_list.write().unwrap().push(super_admin_key.clone());
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(super_admin_key.clone());
 
         assert!(!db_path.exists()); // verify the db is not already there
 
@@ -110,8 +125,11 @@ mod tests {
         assert_eq!(failed_db_creation, expected);
 
         let expected = DBPacketResponse::Error(DBPacketResponseError::DBNotFound);
-        let db_not_found_resp =
-            db_list.read_db(&DBPacketInfo::new("not_a_real_db"), &data_location, &super_admin_key);
+        let db_not_found_resp = db_list.read_db(
+            &DBPacketInfo::new("not_a_real_db"),
+            &data_location,
+            &super_admin_key,
+        );
         assert_eq!(db_not_found_resp, expected);
 
         fs::remove_file(db_path).unwrap(); // clean up tests
@@ -129,8 +147,11 @@ mod tests {
         let db_data2 = DBData::new("123test_data".to_string());
         let super_admin_key = "test_key_123".to_string();
 
-        db_list.super_admin_hash_list.write().unwrap().push(super_admin_key.clone());
-
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(super_admin_key.clone());
 
         assert!(!db_path.exists()); // verify the db is not already there
         assert!(!Path::new("./db_list.ser").exists()); // verify the db is not already there
@@ -140,7 +161,12 @@ mod tests {
             db_list.create_db(db_name, DBSettings::default(), &super_admin_key);
         assert_eq!(successful_db_creation, expected);
 
-        let resp_write_value = db_list.write_db(&db_packet, &data_location, db_data1.clone(), &super_admin_key);
+        let resp_write_value = db_list.write_db(
+            &db_packet,
+            &data_location,
+            db_data1.clone(),
+            &super_admin_key,
+        );
         assert!(resp_write_value == DBPacketResponse::SuccessNoData);
 
         db_list.save_db_list();
@@ -161,7 +187,12 @@ mod tests {
 
         assert_eq!(db_list.cache.read().unwrap().len(), 0);
 
-        let resp_write_value2 = db_list.write_db(&db_packet, &data_location, db_data2.clone(), &super_admin_key);
+        let resp_write_value2 = db_list.write_db(
+            &db_packet,
+            &data_location,
+            db_data2.clone(),
+            &super_admin_key,
+        );
         assert_eq!(
             resp_write_value2,
             DBPacketResponse::SuccessReply(db_data1.get_data().to_string())

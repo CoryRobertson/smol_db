@@ -6,7 +6,9 @@ use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
-use crate::db_packets::db_packet_response::DBPacketResponseError::{DBNotFound, InvalidPermissions, SerializationError};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{
+    DBNotFound, InvalidPermissions, SerializationError,
+};
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
@@ -37,7 +39,12 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
-    pub fn add_user(&self, p_info: &DBPacketInfo, new_key: String, client_key: &String) -> DBPacketResponse<String> {
+    pub fn add_user(
+        &self,
+        p_info: &DBPacketInfo,
+        new_key: String,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
@@ -72,7 +79,8 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-            let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key) {
+            let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key)
+            {
                 db.db_settings.add_admin(new_key);
                 SuccessNoData
             } else {
@@ -88,11 +96,15 @@ impl DBList {
         } else {
             // cache was neither hit, nor did the db exist on the file system
             Error(DBNotFound)
-        }
+        };
     }
 
-    pub fn add_admin(&self, p_info: &DBPacketInfo, hash: String, client_key: &String) -> DBPacketResponse<String> {
-
+    pub fn add_admin(
+        &self,
+        p_info: &DBPacketInfo,
+        hash: String,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
         if !self.is_super_admin(client_key) {
             // to add an admin, you must be a super admin first, else you have invalid permissions
             return Error(InvalidPermissions);
@@ -103,7 +115,6 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
             db_lock.last_access_time = SystemTime::now();
-
 
             db_lock.db_settings.add_admin(hash);
             return SuccessNoData;
@@ -138,7 +149,7 @@ impl DBList {
         } else {
             // cache was neither hit, nor did the db exist on the file system
             Error(DBNotFound)
-        }
+        };
     }
 
     /// Removes all caches which last access time exceeds their invalidation time.
@@ -263,8 +274,12 @@ impl DBList {
     }
 
     /// Creates a DB given a name, the packet is not needed, only the name.
-    pub fn create_db(&self, db_name: &str, db_settings: DBSettings, client_key: &String) -> DBPacketResponse<String> {
-
+    pub fn create_db(
+        &self,
+        db_name: &str,
+        db_settings: DBSettings,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
         if !self.is_super_admin(client_key) {
             // to create a db you must be a super admin
             return Error(InvalidPermissions);
@@ -313,7 +328,6 @@ impl DBList {
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
     pub fn delete_db(&self, db_name: &str, client_key: &String) -> DBPacketResponse<String> {
-
         if !self.is_super_admin(client_key) {
             // to delete a db, you must be a super admin no matter what.
             return Error(InvalidPermissions);
@@ -359,7 +373,6 @@ impl DBList {
         p_location: &DBLocation,
         client_key: &String,
     ) -> DBPacketResponse<String> {
-
         let list_lock = self.list.read().unwrap();
 
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
@@ -376,7 +389,7 @@ impl DBList {
                 }
             } else {
                 Error(InvalidPermissions)
-            }
+            };
         }
 
         if list_lock.contains(p_info) {
@@ -398,7 +411,8 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-            let response = if db.has_read_permissions(client_key) || self.is_super_admin(client_key) {
+            let response = if db.has_read_permissions(client_key) || self.is_super_admin(client_key)
+            {
                 let return_value = db
                     .db_content
                     .read_from_db(p_location.as_key())
@@ -440,7 +454,9 @@ impl DBList {
 
                 let mut db_lock = db.write().unwrap();
 
-                return if db_lock.has_write_permissions(client_key) || self.is_super_admin(client_key) {
+                return if db_lock.has_write_permissions(client_key)
+                    || self.is_super_admin(client_key)
+                {
                     db_lock.last_access_time = SystemTime::now();
                     match db_lock.db_content.content.insert(
                         db_location.as_key().to_string(),
@@ -457,7 +473,7 @@ impl DBList {
                     }
                 } else {
                     Error(InvalidPermissions)
-                }
+                };
             }
         }
 
@@ -492,8 +508,6 @@ impl DBList {
                 cache_lock.insert(db_info.clone(), RwLock::from(db));
                 Error(InvalidPermissions)
             }
-
-
         } else {
             Error(DBNotFound)
         }
@@ -509,7 +523,11 @@ impl DBList {
     }
 
     /// Returns the db contents in a serialized form of HashMap<String, String>
-    pub fn list_db_contents(&self, db_info: &DBPacketInfo, client_key: &String) -> DBPacketResponse<String> {
+    pub fn list_db_contents(
+        &self,
+        db_info: &DBPacketInfo,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
         if !self.db_name_exists(db_info.get_db_name()) {
             return Error(DBNotFound);
         }
@@ -525,7 +543,9 @@ impl DBList {
 
                 let mut db_lock = db.write().unwrap();
 
-                return if db_lock.has_list_permissions(client_key) || self.is_super_admin(client_key) {
+                return if db_lock.has_list_permissions(client_key)
+                    || self.is_super_admin(client_key)
+                {
                     db_lock.last_access_time = SystemTime::now();
 
                     match serde_json::to_string(&db_lock.db_content.content) {
@@ -534,7 +554,7 @@ impl DBList {
                     }
                 } else {
                     Error(InvalidPermissions)
-                }
+                };
             }
         }
 

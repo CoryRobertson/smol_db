@@ -20,9 +20,9 @@ pub enum DBPacket {
     /// ListDBContents(db to read from)
     ListDBContents(DBPacketInfo),
 
-    AddAdmin(DBPacketInfo,String),
+    AddAdmin(DBPacketInfo, String),
 
-    AddUser(DBPacketInfo,String),
+    AddUser(DBPacketInfo, String),
 
     SetKey(String),
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
@@ -52,10 +52,7 @@ impl DBPacket {
 
     /// Creates a new CreateDB DBPacket from a name of a database.
     pub fn new_create_db(dbname: &str, db_settings: DBSettings) -> DBPacket {
-        DBPacket::CreateDB(
-            DBPacketInfo::new(dbname),
-            db_settings,
-        )
+        DBPacket::CreateDB(DBPacketInfo::new(dbname), db_settings)
     }
 
     /// Creates a new DeleteDB DBPacket from a name of a database.

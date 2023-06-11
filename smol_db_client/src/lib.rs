@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_settings::DBSettings;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
-use smol_db_common::db_packets::db_settings::DBSettings;
 
 pub mod client_error;
 
@@ -36,37 +36,24 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
-    pub fn set_access_key(&mut self, key: String) -> Result<DBPacketResponse<String>,ClientError> {
+    pub fn set_access_key(&mut self, key: String) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_set_key(key);
         return match packet1.serialize_packet() {
-            Ok(packet_ser) => {
-                match self.socket.write(packet_ser.as_bytes()) {
-                    Ok(_) => {
-                        match self.socket.read(&mut buf) {
-                            Ok(read_len) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len]) {
-                                    Ok(packet_response) => {
-                                        Ok(packet_response)
-                                    }
-                                    Err(err) => {
-                                        Err(PacketDeserializationError(Error::from(err)))
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                Err(SocketReadError(err))
-                            }
+            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
+                Ok(_) => match self.socket.read(&mut buf) {
+                    Ok(read_len) => {
+                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
+                        {
+                            Ok(packet_response) => Ok(packet_response),
+                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
-                    Err(err) => {
-                        Err(SocketWriteError(err))
-                    }
-                }
-            }
-            Err(err) => {
-                Err(PacketSerializationError(Error::from(err)))
-            }
+                    Err(err) => Err(SocketReadError(err)),
+                },
+                Err(err) => Err(SocketWriteError(err)),
+            },
+            Err(err) => Err(PacketSerializationError(Error::from(err))),
         };
     }
 
@@ -346,9 +333,9 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+    use smol_db_common::db_packets::db_settings::DBSettings;
     use std::thread;
     use std::time::Duration;
-    use smol_db_common::db_packets::db_settings::DBSettings;
 
     #[test]
     fn test_client() {
@@ -470,7 +457,9 @@ mod tests {
             _ => {}
         }
 
-        let write_db_response1 = client.write_db_generic("test_generics", "location1", test_data1.clone()).unwrap();
+        let write_db_response1 = client
+            .write_db_generic("test_generics", "location1", test_data1.clone())
+            .unwrap();
 
         match write_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -775,5 +764,4 @@ mod tests {
             _ => {}
         }
     }
-
 }

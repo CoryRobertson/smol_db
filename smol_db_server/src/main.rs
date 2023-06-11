@@ -1,5 +1,6 @@
 use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::exit;
@@ -7,7 +8,6 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -102,7 +102,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
                     Ok(pack) => {
                         println!("packet data: {:?}", pack); // this is also a debug print
-                        // TODO: restrict the types of packets allowed depending on the access key. CreateDB and DeleteDB should be restricted to admins, potentially even ListDB and ListDBContents
+                                                             // TODO: restrict the types of packets allowed depending on the access key. CreateDB and DeleteDB should be restricted to admins, potentially even ListDB and ListDBContents
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
@@ -113,7 +113,12 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.write_db(&db_name, &db_location, db_write_value,&client_key);
+                                let resp = lock.write_db(
+                                    &db_name,
+                                    &db_location,
+                                    db_write_value,
+                                    &client_key,
+                                );
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_specific_db(&db_name);
                                 resp
@@ -121,11 +126,11 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             DBPacket::CreateDB(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
 
-                                let resp = lock.create_db(db_name.get_db_name(), db_settings, &client_key);
+                                let resp =
+                                    lock.create_db(db_name.get_db_name(), db_settings, &client_key);
                                 println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
                                 resp
-
                             }
                             DBPacket::DeleteDB(db_name) => {
                                 let lock = db_list.read().unwrap();
@@ -154,14 +159,15 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::AddUser(db_name, user_hash) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.add_user(&db_name,user_hash,&client_key);
+                                let resp = lock.add_user(&db_name, user_hash, &client_key);
                                 resp
                             }
                             DBPacket::SetKey(key) => {
                                 let lock = db_list.read().unwrap();
                                 if lock.super_admin_hash_list.read().unwrap().is_empty() {
                                     // if there are no super admins, the first person to log in is the super admin.
-                                    let mut super_admin_list_lock = lock.super_admin_hash_list.write().unwrap();
+                                    let mut super_admin_list_lock =
+                                        lock.super_admin_hash_list.write().unwrap();
                                     super_admin_list_lock.push(key.clone());
                                 }
                                 client_key = key;
