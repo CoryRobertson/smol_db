@@ -36,6 +36,11 @@ impl DBPacket {
         DBPacket::Read(DBPacketInfo::new(dbname), DBLocation::new(location))
     }
 
+    /// Creates a new SetKey DBPacket from a key. This represents the users key which determines their permissions on the server.
+    pub fn new_set_key(key: String) -> DBPacket {
+        DBPacket::SetKey(key)
+    }
+
     /// Creates a new Write DBPacket from a name of a database and location string to write to.
     pub fn new_write(dbname: &str, location: &str, data: &str) -> DBPacket {
         DBPacket::Write(

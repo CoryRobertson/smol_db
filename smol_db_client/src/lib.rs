@@ -36,6 +36,40 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    pub fn set_access_key(&mut self, key: String) -> Result<DBPacketResponse<String>,ClientError> {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let packet1 = DBPacket::new_set_key(key);
+        return match packet1.serialize_packet() {
+            Ok(packet_ser) => {
+                match self.socket.write(packet_ser.as_bytes()) {
+                    Ok(_) => {
+                        match self.socket.read(&mut buf) {
+                            Ok(read_len) => {
+                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len]) {
+                                    Ok(packet_response) => {
+                                        Ok(packet_response)
+                                    }
+                                    Err(err) => {
+                                        Err(PacketDeserializationError(Error::from(err)))
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                Err(SocketReadError(err))
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        Err(SocketWriteError(err))
+                    }
+                }
+            }
+            Err(err) => {
+                Err(PacketSerializationError(Error::from(err)))
+            }
+        };
+    }
+
     /// Creates a db through the client with the given name.
     pub fn create_db(
         &mut self,
@@ -320,6 +354,14 @@ mod tests {
     fn test_client() {
         let mut client = Client::new("localhost:8222").unwrap();
 
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let create_response = client.create_db("test2", DBSettings::default()).unwrap();
 
         match create_response {
@@ -394,6 +436,15 @@ mod tests {
     #[test]
     fn test_generics_client() {
         let mut client = Client::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let test_data1 = TestStruct {
             a: 10,
             b: false,
@@ -419,9 +470,7 @@ mod tests {
             _ => {}
         }
 
-        let write_db_response1 = client
-            .write_db_generic("test_generics", "location1", test_data1.clone())
-            .unwrap();
+        let write_db_response1 = client.write_db_generic("test_generics", "location1", test_data1.clone()).unwrap();
 
         match write_db_response1 {
             DBPacketResponse::Error(err) => {
@@ -483,6 +532,14 @@ mod tests {
     fn test_list_db() {
         let mut client = Client::new("localhost:8222").unwrap();
 
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let create_db_response1 = client
             .create_db("test_db_1", DBSettings::default())
             .unwrap();
@@ -534,6 +591,15 @@ mod tests {
     #[test]
     fn test_empty_db_list() {
         let mut client = Client::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         loop {
             // continue looping indefinitely until we manage to read an empty list db, verifying that serialization works even when the list would be empty.
             let list = client.list_db().unwrap();
@@ -549,6 +615,15 @@ mod tests {
     #[test]
     fn test_list_db_contents() {
         let mut client = Client::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let db_name = "test_db_contents1";
 
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
@@ -594,6 +669,15 @@ mod tests {
     #[test]
     fn test_list_db_contents_empty() {
         let mut client = Client::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let db_name = "test_db_contents_empty1";
 
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
@@ -622,6 +706,15 @@ mod tests {
     #[test]
     fn test_list_db_contents_generic() {
         let mut client = Client::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        match set_key_response {
+            DBPacketResponse::SuccessNoData => {}
+            _ => {
+                panic!("Create db failed.");
+            }
+        }
+
         let db_name = "test_list_db_contents_generic1";
         let test_data1 = TestStruct {
             a: 10,
@@ -682,4 +775,5 @@ mod tests {
             _ => {}
         }
     }
+
 }

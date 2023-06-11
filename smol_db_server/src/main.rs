@@ -8,8 +8,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse::Error;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::InvalidPermissions;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -109,7 +107,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
 
-                                let resp = lock.read_db(&db_name, &db_location);
+                                let resp = lock.read_db(&db_name, &db_location, &client_key);
                                 println!("{:?}", resp);
                                 resp
                             }
