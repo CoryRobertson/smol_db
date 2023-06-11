@@ -25,13 +25,24 @@ pub enum DBPacket {
     AddUser(DBPacketInfo, String),
     /// Sets the clients key to the given hash
     SetKey(String),
-    //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
+
+    GetDBSettings(DBPacketInfo),
+
+    ChangeDBSettings(DBPacketInfo, DBSettings),
 }
 
 impl DBPacket {
     /// Creates a new Read DBPacket from a name of a database and location string to read from.
     pub fn new_read(dbname: &str, location: &str) -> DBPacket {
         DBPacket::Read(DBPacketInfo::new(dbname), DBLocation::new(location))
+    }
+
+    pub fn new_get_db_settings(dbname: &str) -> DBPacket {
+        DBPacket::GetDBSettings(DBPacketInfo::new(dbname))
+    }
+
+    pub fn new_set_db_settings(dbname: &str, db_settings: DBSettings) -> DBPacket {
+        DBPacket::ChangeDBSettings(DBPacketInfo::new(dbname),db_settings)
     }
 
     /// Creates a new SetKey DBPacket from a key. This represents the users key which determines their permissions on the server.

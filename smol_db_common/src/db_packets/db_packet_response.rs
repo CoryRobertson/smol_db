@@ -27,6 +27,8 @@ pub enum DBPacketResponseError {
     /// An error occurred during serialization, specifically not during deserialization, but during serialization. This should never happen.
     SerializationError,
 
+    DeserializationError,
+
     InvalidPermissions,
 
     UserNotFound,

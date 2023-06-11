@@ -8,11 +8,12 @@ use crate::ClientError::{
 use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use smol_db_common::db_packets::db_settings::DBSettings;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
+use crate::client_error::ClientError::DBResponseError;
 
 pub mod client_error;
 
@@ -36,6 +37,87 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    pub fn get_db_settings(&mut self, db_name: &str,) -> Result<DBPacketResponse<DBSettings>,ClientError> {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let packet1 = DBPacket::new_get_db_settings(db_name);
+        return match packet1.serialize_packet() {
+            Ok(packet_ser) => {
+                match self.socket.write(packet_ser.as_bytes()) {
+                    Ok(_) => {
+                        match self.socket.read(&mut buf) {
+                            Ok(read_size) => {
+                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_size]) {
+                                    Ok(resp) => {
+                                        match resp {
+                                            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
+                                            DBPacketResponse::SuccessReply(data) => {
+                                                match serde_json::from_str::<DBSettings>(&data) {
+                                                    Ok(db_settings) => {
+                                                        Ok(DBPacketResponse::SuccessReply(db_settings))
+                                                    }
+                                                    Err(err) => {
+                                                        Err(PacketDeserializationError(Error::from(err)))
+                                                    }
+                                                }
+                                            }
+                                            DBPacketResponse::Error(err) => {
+                                                Err(DBResponseError(err))
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        Err(PacketDeserializationError(Error::from(err)))
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                Err(SocketReadError(err))
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        Err(SocketWriteError(err))
+                    }
+                }
+            }
+            Err(err) => {Err(PacketSerializationError(Error::from(err)))}
+        };
+    }
+
+    pub fn set_db_settings(&mut self, db_name: &str, db_settings: DBSettings) -> Result<DBPacketResponse<String>,ClientError> {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let packet1 = DBPacket::new_set_db_settings(db_name,db_settings);
+        return match packet1.serialize_packet() {
+            Ok(packet_ser) => {
+                match self.socket.write(packet_ser.as_bytes()) {
+                    Ok(_) => {
+                        match self.socket.read(&mut buf) {
+                            Ok(read_size) => {
+                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_size]) {
+                                    Ok(resp) => {
+                                        Ok(resp)
+                                    }
+                                    Err(err) => {
+                                        Err(PacketDeserializationError(Error::from(err)))
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                Err(SocketReadError(err))
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        Err(SocketWriteError(err))
+                    }
+                }
+            }
+            Err(err) => {Err(PacketSerializationError(Error::from(err)))}
+        };
+    }
+
+
+    /// Sets this clients access key within the DB Server. The server will persist the key until the session is disconnected, or connection is lost.
     pub fn set_access_key(&mut self, key: String) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_set_key(key);
@@ -589,15 +671,21 @@ mod tests {
             }
         }
 
+        let mut count = 0;
         loop {
             // continue looping indefinitely until we manage to read an empty list db, verifying that serialization works even when the list would be empty.
             let list = client.list_db().unwrap();
             let len = list.len();
-            thread::sleep(Duration::from_millis(1)); // wait a small amount of time between lists so we dont dominate the thread pool on the server.
+            // lazy way to check
+            thread::sleep(Duration::from_millis(250)); // wait a small amount of time between lists so we dont dominate the thread pool on the server.
             if len == 0 {
                 // if we find a 0 length return, then we have clearly not panicked and can stop looping, allowing the test to be successful
                 break;
             }
+            if count >= 16 { // allow 16* 250ms = 4 seconds to pass before declaring the test a failure
+                panic!("count not read empty db list within reasonable amount of time.")
+            }
+            count += 1;
         }
     }
 
@@ -763,5 +851,63 @@ mod tests {
             }
             _ => {}
         }
+    }
+
+    #[test]
+    fn test_get_db_settings() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_settings_test = DBSettings::new(Duration::from_secs(29),(false,true,false),(true,false,true),vec![],vec![]);
+        let db_name = "test_getdb_settings";
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response,DBPacketResponse::SuccessNoData);
+
+        let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
+        assert_eq!(create_response,DBPacketResponse::SuccessNoData);
+
+        let get_settings = client.get_db_settings(db_name).unwrap();
+        assert_eq!(get_settings,DBPacketResponse::SuccessReply(db_settings_test.clone()));
+
+        let received_settings = get_settings.into_result().unwrap().unwrap();
+        assert_eq!(received_settings,db_settings_test);
+
+        let delete_db_response = client.delete_db(db_name).unwrap();
+        assert_eq!(delete_db_response,DBPacketResponse::SuccessNoData);
+
+    }
+
+    #[test]
+    fn test_set_db_settings() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_settings_test = DBSettings::new(Duration::from_secs(27),(false,true,true),(false,false,true),vec![],vec![]);
+        let new_db_settings_test = DBSettings::new(Duration::from_secs(23),(false,false,true),(true,false,true),vec![],vec![]);
+        let db_name = "test_setdb_settings";
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response,DBPacketResponse::SuccessNoData);
+
+        let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
+        assert_eq!(create_response,DBPacketResponse::SuccessNoData);
+
+        let get_settings = client.get_db_settings(db_name).unwrap();
+        assert_eq!(get_settings,DBPacketResponse::SuccessReply(db_settings_test.clone()));
+
+        let received_settings = get_settings.into_result().unwrap().unwrap();
+        assert_eq!(received_settings,db_settings_test.clone());
+        assert_ne!(received_settings,new_db_settings_test.clone());
+
+        let set_settings_response = client.set_db_settings(db_name,new_db_settings_test.clone()).unwrap();
+        assert_eq!(set_key_response,DBPacketResponse::SuccessNoData);
+
+        let get_settings2 = client.get_db_settings(db_name).unwrap();
+        assert_eq!(get_settings2,DBPacketResponse::SuccessReply(new_db_settings_test.clone()));
+
+        let received_settings2 = get_settings2.into_result().unwrap().unwrap();
+        assert_eq!(received_settings2,new_db_settings_test.clone());
+        assert_ne!(received_settings2,db_settings_test.clone());
+
+        let delete_db_response = client.delete_db(db_name).unwrap();
+        assert_eq!(delete_db_response,DBPacketResponse::SuccessNoData);
+
     }
 }

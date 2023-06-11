@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 /// Struct describing settings used when creating a db.
 pub struct DBSettings {
     /// The duration to wait before removing the given db from the cache.

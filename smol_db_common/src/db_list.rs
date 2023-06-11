@@ -38,6 +38,115 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
+    /// Replaces DBSettings for a given DB, requires super admin privileges.
+    /// Returns SuccessNoData when successful
+    pub fn change_db_settings(&self, p_info: &DBPacketInfo, new_db_settings: DBSettings, client_key: &String) -> DBPacketResponse<String> {
+        if !self.is_super_admin(client_key) {
+            return Error(InvalidPermissions);
+        }
+
+        let list_lock = self.list.read().unwrap();
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            db_lock.last_access_time = SystemTime::now();
+
+            db_lock.db_settings = new_db_settings;
+            return SuccessNoData;
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+            db.db_settings = new_db_settings;
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            SuccessNoData
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
+    }
+
+    /// Returns the DBSettings serialized as a string
+    pub fn get_db_settings(&self, p_info: &DBPacketInfo, client_key: &String) -> DBPacketResponse<String> {
+        if !self.is_super_admin(client_key) {
+            return Error(InvalidPermissions);
+        }
+
+        let list_lock = self.list.read().unwrap();
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            db_lock.last_access_time = SystemTime::now();
+
+            return match serde_json::to_string(&db_lock.db_settings) {
+                Ok(thing) => {
+                    SuccessReply(thing)
+                }
+                Err(_) => { Error(SerializationError) }
+            };
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+            let response = match serde_json::to_string(&db.db_settings) {
+                Ok(thing) => {
+                    SuccessReply(thing)
+                }
+                Err(_) => { Error(SerializationError) }
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
+    }
+
     /// Adds a user to a given DB, requires admin privileges
     pub fn add_user(
         &self,
@@ -1302,5 +1411,65 @@ mod tests {
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_get_and_set_db_settings() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_add_remove_admin";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+        let new_admin_key = "new admin key that gets added".to_string();
+        let new_db_settings = DBSettings::new(Duration::from_secs(28),(false,true,false),(false,false,true),vec![],vec![]);
+        assert_ne!(new_db_settings,get_db_test_settings());
+
+        {
+            let create_response = db_list.create_db(
+                db_name,
+                get_db_test_settings(),
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            );
+
+            let _ = create_response.as_result().expect("Create response failed");
+        }
+
+        {
+            let missing_perms_get_db_settings1 = db_list.get_db_settings(&db_pack_info, &TEST_USER_KEY.to_string());
+            assert_eq!(missing_perms_get_db_settings1, DBPacketResponse::Error(InvalidPermissions));
+            let missing_perms_get_db_settings2 = db_list.get_db_settings(&db_pack_info, &"not a working key".to_string());
+            assert_eq!(missing_perms_get_db_settings2, DBPacketResponse::Error(InvalidPermissions));
+            let original_db_settings = db_list.get_db_settings(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
+            let received_original_db_settings: DBSettings = serde_json::from_str(original_db_settings.as_result().unwrap().unwrap()).unwrap();
+            assert_eq!(received_original_db_settings, get_db_test_settings());
+        }
+
+        {
+            let missing_perms_set_db_settings1 = db_list.change_db_settings(&db_pack_info, new_db_settings.clone(), &TEST_USER_KEY.to_string());
+            assert_eq!(missing_perms_set_db_settings1, DBPacketResponse::Error(InvalidPermissions));
+            let missing_perms_set_db_settings2 = db_list.change_db_settings(&db_pack_info,new_db_settings.clone(),&"also not a working key".to_string());
+            assert_eq!(missing_perms_set_db_settings2,DBPacketResponse::Error(InvalidPermissions));
+            let change_db_settings_response = db_list.change_db_settings(&db_pack_info,new_db_settings.clone(),&TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(change_db_settings_response,DBPacketResponse::SuccessNoData);
+
+        }
+        {
+            let missing_perms_get_db_settings1 = db_list.get_db_settings(&db_pack_info, &TEST_USER_KEY.to_string());
+            assert_eq!(missing_perms_get_db_settings1, DBPacketResponse::Error(InvalidPermissions));
+            let missing_perms_get_db_settings2 = db_list.get_db_settings(&db_pack_info, &"not a working key".to_string());
+            assert_eq!(missing_perms_get_db_settings2, DBPacketResponse::Error(InvalidPermissions));
+            let original_db_settings = db_list.get_db_settings(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
+            let received_original_db_settings: DBSettings = serde_json::from_str(original_db_settings.as_result().unwrap().unwrap()).unwrap();
+            assert_eq!(received_original_db_settings, new_db_settings.clone());
+        }
+
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+
     }
 }
