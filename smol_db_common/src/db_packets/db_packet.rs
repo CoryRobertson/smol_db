@@ -19,11 +19,11 @@ pub enum DBPacket {
     ListDB,
     /// ListDBContents(db to read from)
     ListDBContents(DBPacketInfo),
-
+    /// Adds an admin to the database with the given hash
     AddAdmin(DBPacketInfo, String),
-
+    /// Adds a user to the database with the given hash
     AddUser(DBPacketInfo, String),
-
+    /// Sets the clients key to the given hash
     SetKey(String),
     //TODO: ChangeDBSetting takes a DBPacketInfo and a new DBSettings and replaces the old one.
 }
