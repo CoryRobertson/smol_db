@@ -42,7 +42,7 @@ impl DBPacket {
     }
 
     pub fn new_set_db_settings(dbname: &str, db_settings: DBSettings) -> DBPacket {
-        DBPacket::ChangeDBSettings(DBPacketInfo::new(dbname),db_settings)
+        DBPacket::ChangeDBSettings(DBPacketInfo::new(dbname), db_settings)
     }
 
     /// Creates a new SetKey DBPacket from a key. This represents the users key which determines their permissions on the server.

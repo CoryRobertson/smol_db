@@ -173,12 +173,13 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::GetDBSettings(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.get_db_settings(&db_name,&client_key);
+                                let resp = lock.get_db_settings(&db_name, &client_key);
                                 resp
                             }
                             DBPacket::ChangeDBSettings(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.change_db_settings(&db_name,db_settings,&client_key);
+                                let resp =
+                                    lock.change_db_settings(&db_name, db_settings, &client_key);
                                 resp
                             }
                         }
