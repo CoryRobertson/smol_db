@@ -25,10 +25,11 @@ pub enum DBPacket {
     AddUser(DBPacketInfo, String),
     /// Sets the clients key to the given hash
     SetKey(String),
-
+    /// Returns the DBSettings struct within the given db
     GetDBSettings(DBPacketInfo),
-
+    /// Sets the DBSettings struct within the given db to the new settings struct.
     ChangeDBSettings(DBPacketInfo, DBSettings),
+    // TODO: GetRole(DBPacketInfo) packet returns the users role within a given db, super admin, admin, user, other
 }
 
 impl DBPacket {
