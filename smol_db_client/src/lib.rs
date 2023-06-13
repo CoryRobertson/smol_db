@@ -178,7 +178,7 @@ impl Client {
                                         DBPacketResponse::SuccessNoData => Ok(response),
                                         DBPacketResponse::SuccessReply(_) => Ok(response),
                                         DBPacketResponse::Error(db_response_error) => Err(
-                                            ClientError::DBResponseError(db_response_error.clone()),
+                                            DBResponseError(db_response_error.clone()),
                                         ),
                                     },
                                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -300,7 +300,7 @@ impl Client {
                                     }
                                 }
                                 DBPacketResponse::Error(err) => {
-                                    Err(ClientError::DBResponseError(err))
+                                    Err(DBResponseError(err))
                                 }
                             },
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -340,7 +340,7 @@ impl Client {
                                     }
                                 }
                                 DBPacketResponse::Error(err) => {
-                                    Err(ClientError::DBResponseError(err))
+                                    Err(DBResponseError(err))
                                 }
                             },
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -396,7 +396,7 @@ impl Client {
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
-                    DBPacketResponse::Error(err) => Err(ClientError::DBResponseError(err)),
+                    DBPacketResponse::Error(err) => Err(DBResponseError(err)),
                 },
                 Err(err) => Err(err),
             },
@@ -422,7 +422,7 @@ impl Client {
                         Err(err) => Err(PacketDeserializationError(Error::from(err))),
                     }
                 }
-                DBPacketResponse::Error(err) => Err(ClientError::DBResponseError(err)),
+                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
             },
             Err(err) => Err(err),
         }
