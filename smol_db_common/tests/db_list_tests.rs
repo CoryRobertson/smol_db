@@ -2,11 +2,14 @@
 #[allow(unused_imports)]
 mod tests {
 
+    use smol_db_common::db::Role;
+    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_data::DBData;
     use smol_db_common::db_list::DBList;
     use smol_db_common::db_packets::db_location::DBLocation;
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::SuccessNoData;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
         DBAlreadyExists, DBNotFound, InvalidPermissions, UserNotFound,
     };
@@ -17,9 +20,6 @@ mod tests {
     use std::sync::RwLock;
     use std::time::Duration;
     use std::{fs, thread};
-    use smol_db_common::db::Role;
-    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::SuccessNoData;
 
     static TEST_SUPER_ADMIN_KEY: &str = "test_admin_key";
     static TEST_USER_KEY: &str = "test_user_key";
@@ -691,8 +691,9 @@ mod tests {
             vec![user_key.clone()],
         );
 
-        let create_resp = db_list.create_db(db_name,new_db_settings,&TEST_SUPER_ADMIN_KEY.to_string());
-        assert_eq!(create_resp,SuccessNoData);
+        let create_resp =
+            db_list.create_db(db_name, new_db_settings, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(create_resp, SuccessNoData);
 
         {
             let role = db_list.get_role(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
@@ -782,8 +783,7 @@ mod tests {
             }
         }
 
-        let delete_response = db_list.delete_db(db_name,&TEST_SUPER_ADMIN_KEY.to_string());
-        assert_eq!(delete_response,SuccessNoData);
-
+        let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response, SuccessNoData);
     }
 }

@@ -7,6 +7,7 @@ use crate::ClientError::{
     SocketWriteError, UnableToConnect,
 };
 use serde::{Deserialize, Serialize};
+use smol_db_common::db::Role;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
@@ -14,7 +15,6 @@ use smol_db_common::db_packets::db_settings::DBSettings;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
-use smol_db_common::db::Role;
 
 pub mod client_error;
 
@@ -38,61 +38,42 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
-    pub fn get_role(&mut self,db_name: &str) -> Result<Role, ClientError> {
+    pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_get_role(db_name);
         match packet1.serialize_packet() {
-            Ok(packet_ser) => {
-                match self.socket.write(packet_ser.as_bytes()) {
-                    Ok(_) => {
-                        match self.socket.read(&mut buf) {
-                            Ok(read_length) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_length]) {
-                                    Ok(response) => {
-                                        match response {
-                                            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
-                                            DBPacketResponse::SuccessReply(data) => {
-                                                match serde_json::from_str::<Role>(&data) {
-                                                    Ok(role) => {
-                                                        Ok(role)
-                                                    }
-                                                    Err(err) => {
-                                                        Err(PacketDeserializationError(Error::from(err)))
-                                                    }
-                                                }
-                                            }
-                                            DBPacketResponse::Error(err) => {
-                                                Err(DBResponseError(err))
-                                            }
+            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
+                Ok(_) => match self.socket.read(&mut buf) {
+                    Ok(read_length) => {
+                        match serde_json::from_slice::<DBPacketResponse<String>>(
+                            &buf[0..read_length],
+                        ) {
+                            Ok(response) => match response {
+                                DBPacketResponse::SuccessNoData => Err(BadPacket),
+                                DBPacketResponse::SuccessReply(data) => {
+                                    match serde_json::from_str::<Role>(&data) {
+                                        Ok(role) => Ok(role),
+                                        Err(err) => {
+                                            Err(PacketDeserializationError(Error::from(err)))
                                         }
                                     }
-                                    Err(err) => {
-                                        Err(PacketDeserializationError(Error::from(err)))
-                                    }
                                 }
-                            }
-                            Err(err) => {
-                                Err(SocketReadError(err))
-                            }
+                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
+                            },
+                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
-                    Err(err) => {
-                        Err(SocketWriteError(err))
-                    }
-                }
-            }
-            Err(err) => {
-                Err(PacketSerializationError(Error::from(err)))
-            }
+                    Err(err) => Err(SocketReadError(err)),
+                },
+                Err(err) => Err(SocketWriteError(err)),
+            },
+            Err(err) => Err(PacketSerializationError(Error::from(err))),
         }
     }
 
     /// Gets the DBSettings of the given DB.
     /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view DBSettings.
-    pub fn get_db_settings(
-        &mut self,
-        db_name: &str,
-    ) -> Result<DBSettings, ClientError> {
+    pub fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_get_db_settings(db_name);
         return match packet1.serialize_packet() {
@@ -105,9 +86,7 @@ impl Client {
                                 DBPacketResponse::SuccessNoData => Err(BadPacket),
                                 DBPacketResponse::SuccessReply(data) => {
                                     match serde_json::from_str::<DBSettings>(&data) {
-                                        Ok(db_settings) => {
-                                            Ok(db_settings)
-                                        }
+                                        Ok(db_settings) => Ok(db_settings),
                                         Err(err) => {
                                             Err(PacketDeserializationError(Error::from(err)))
                                         }

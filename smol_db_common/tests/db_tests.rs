@@ -47,21 +47,51 @@ mod tests {
             ),
         };
 
-        assert_eq!(db1.has_read_permissions(&other_key,&super_admin_list), false);
-        assert_eq!(db2.has_read_permissions(&other_key,&super_admin_list), true);
-        assert_eq!(db3.has_read_permissions(&other_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_read_permissions(&other_key, &super_admin_list),
+            false
+        );
+        assert_eq!(
+            db2.has_read_permissions(&other_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_read_permissions(&other_key, &super_admin_list),
+            true
+        );
 
-        assert_eq!(db1.has_read_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db2.has_read_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db3.has_read_permissions(&user_key,&super_admin_list), false);
+        assert_eq!(db1.has_read_permissions(&user_key, &super_admin_list), true);
+        assert_eq!(db2.has_read_permissions(&user_key, &super_admin_list), true);
+        assert_eq!(
+            db3.has_read_permissions(&user_key, &super_admin_list),
+            false
+        );
 
-        assert_eq!(db1.has_read_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_read_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_read_permissions(&admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_read_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_read_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_read_permissions(&admin_key, &super_admin_list),
+            true
+        );
 
-        assert_eq!(db1.has_read_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_read_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_read_permissions(&super_admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_read_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_read_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_read_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
     }
 
     #[test]
@@ -104,21 +134,57 @@ mod tests {
                 vec![user_key.clone()],
             ),
         };
-        assert_eq!(db1.has_write_permissions(&other_key,&super_admin_list), false);
-        assert_eq!(db2.has_write_permissions(&other_key,&super_admin_list), true);
-        assert_eq!(db3.has_write_permissions(&other_key,&super_admin_list), false);
+        assert_eq!(
+            db1.has_write_permissions(&other_key, &super_admin_list),
+            false
+        );
+        assert_eq!(
+            db2.has_write_permissions(&other_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_write_permissions(&other_key, &super_admin_list),
+            false
+        );
 
-        assert_eq!(db1.has_write_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db2.has_write_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db3.has_write_permissions(&user_key,&super_admin_list), false);
+        assert_eq!(
+            db1.has_write_permissions(&user_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_write_permissions(&user_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_write_permissions(&user_key, &super_admin_list),
+            false
+        );
 
-        assert_eq!(db1.has_write_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_write_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_write_permissions(&admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_write_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_write_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_write_permissions(&admin_key, &super_admin_list),
+            true
+        );
 
-        assert_eq!(db1.has_write_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_write_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_write_permissions(&super_admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_write_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_write_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_write_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
     }
 
     #[test]
@@ -161,21 +227,51 @@ mod tests {
                 vec![user_key.clone()],
             ),
         };
-        assert_eq!(db1.has_list_permissions(&other_key,&super_admin_list), true);
-        assert_eq!(db2.has_list_permissions(&other_key,&super_admin_list), false);
-        assert_eq!(db3.has_list_permissions(&other_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_list_permissions(&other_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_list_permissions(&other_key, &super_admin_list),
+            false
+        );
+        assert_eq!(
+            db3.has_list_permissions(&other_key, &super_admin_list),
+            true
+        );
 
-        assert_eq!(db1.has_list_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db2.has_list_permissions(&user_key,&super_admin_list), true);
-        assert_eq!(db3.has_list_permissions(&user_key,&super_admin_list), false);
+        assert_eq!(db1.has_list_permissions(&user_key, &super_admin_list), true);
+        assert_eq!(db2.has_list_permissions(&user_key, &super_admin_list), true);
+        assert_eq!(
+            db3.has_list_permissions(&user_key, &super_admin_list),
+            false
+        );
 
-        assert_eq!(db1.has_list_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_list_permissions(&admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_list_permissions(&admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_list_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_list_permissions(&admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_list_permissions(&admin_key, &super_admin_list),
+            true
+        );
 
-        assert_eq!(db1.has_list_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db2.has_list_permissions(&super_admin_key,&super_admin_list), true);
-        assert_eq!(db3.has_list_permissions(&super_admin_key,&super_admin_list), true);
+        assert_eq!(
+            db1.has_list_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db2.has_list_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
+        assert_eq!(
+            db3.has_list_permissions(&super_admin_key, &super_admin_list),
+            true
+        );
     }
 
     #[test]
@@ -197,9 +293,12 @@ mod tests {
             ),
         };
 
-        assert_eq!(db1.get_role(&admin_key,&super_admin_list), Admin);
-        assert_eq!(db1.get_role(&user_key,&super_admin_list), User);
-        assert_eq!(db1.get_role(&other_key,&super_admin_list), Other);
-        assert_eq!(db1.get_role(&super_admin_key,&super_admin_list), SuperAdmin);
+        assert_eq!(db1.get_role(&admin_key, &super_admin_list), Admin);
+        assert_eq!(db1.get_role(&user_key, &super_admin_list), User);
+        assert_eq!(db1.get_role(&other_key, &super_admin_list), Other);
+        assert_eq!(
+            db1.get_role(&super_admin_key, &super_admin_list),
+            SuperAdmin
+        );
     }
 }

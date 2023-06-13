@@ -184,7 +184,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::GetRole(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.get_role(&db_name,&client_key);
+                                let resp = lock.get_role(&db_name, &client_key);
                                 resp
                             }
                         }

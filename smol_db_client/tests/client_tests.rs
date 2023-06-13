@@ -3,12 +3,12 @@
 mod tests {
     use serde::{Deserialize, Serialize};
     use smol_db_client::Client;
+    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::thread;
     use std::time::Duration;
-    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
 
     #[test]
     fn test_client() {
@@ -464,10 +464,7 @@ mod tests {
         assert_eq!(create_response, DBPacketResponse::SuccessNoData);
 
         let get_settings = client.get_db_settings(db_name).unwrap();
-        assert_eq!(
-            get_settings,
-            db_settings_test.clone()
-        );
+        assert_eq!(get_settings, db_settings_test.clone());
 
         let received_settings = get_settings;
         assert_eq!(received_settings, db_settings_test);
@@ -502,10 +499,7 @@ mod tests {
         assert_eq!(create_response, DBPacketResponse::SuccessNoData);
 
         let get_settings = client.get_db_settings(db_name).unwrap();
-        assert_eq!(
-            get_settings,
-            db_settings_test.clone()
-        );
+        assert_eq!(get_settings, db_settings_test.clone());
 
         let received_settings = get_settings;
         assert_eq!(received_settings, db_settings_test.clone());
@@ -517,10 +511,7 @@ mod tests {
         assert_eq!(set_settings_response, DBPacketResponse::SuccessNoData);
 
         let get_settings2 = client.get_db_settings(db_name).unwrap();
-        assert_eq!(
-            get_settings2,
-            new_db_settings_test.clone()
-        );
+        assert_eq!(get_settings2, new_db_settings_test.clone());
 
         let received_settings2 = get_settings2;
         assert_eq!(received_settings2, new_db_settings_test.clone());
@@ -574,7 +565,6 @@ mod tests {
         assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
 
         let delete_response = client.delete_db(db_name).unwrap();
-        assert_eq!(delete_response,DBPacketResponse::SuccessNoData);
-
+        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
     }
 }

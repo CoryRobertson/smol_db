@@ -25,7 +25,7 @@ pub enum Role {
 
 impl DB {
     /// Returns the given role the client key falls in.
-    pub fn get_role(&self, client_key: &String, super_admin_list: &Vec<String>) -> Role {
+    pub fn get_role(&self, client_key: &String, super_admin_list: &[String]) -> Role {
         if super_admin_list.contains(client_key) {
             SuperAdmin
         } else if self.db_settings.is_admin(client_key) {
@@ -39,34 +39,34 @@ impl DB {
 
     /// Returns true if the given key has list permissions
     /// Checks which role the user might fit into depending on DBSettings
-    pub fn has_list_permissions(&self, client_key: &String, super_admin_list: &Vec<String>) -> bool {
-        match self.get_role(client_key,super_admin_list) {
+    pub fn has_list_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
+        match self.get_role(client_key, super_admin_list) {
             Admin => true,
             User => self.db_settings.get_user_rwx().2,
             Other => self.db_settings.get_other_rwx().2,
-            SuperAdmin => { true }
+            SuperAdmin => true,
         }
     }
 
     /// Returns true if the given key has read permissions
     /// Checks which role the user might fit into depending on DBSettings
-    pub fn has_read_permissions(&self, client_key: &String, super_admin_list: &Vec<String>) -> bool {
-        match self.get_role(client_key,super_admin_list) {
+    pub fn has_read_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
+        match self.get_role(client_key, super_admin_list) {
             Admin => true,
             User => self.db_settings.get_user_rwx().0,
             Other => self.db_settings.get_other_rwx().0,
-            SuperAdmin => { true }
+            SuperAdmin => true,
         }
     }
 
     /// Returns true if the given key has write permissions
     /// Checks which role the user might fit into depending on DBSettings
-    pub fn has_write_permissions(&self, client_key: &String, super_admin_list: &Vec<String>) -> bool {
-        match self.get_role(client_key,super_admin_list) {
+    pub fn has_write_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
+        match self.get_role(client_key, super_admin_list) {
             Admin => true,
             User => self.db_settings.get_user_rwx().1,
             Other => self.db_settings.get_other_rwx().1,
-            SuperAdmin => { true }
+            SuperAdmin => true,
         }
     }
 }
