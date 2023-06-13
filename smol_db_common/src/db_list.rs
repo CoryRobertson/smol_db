@@ -38,6 +38,64 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
+    fn get_super_admin_list(&self) -> Vec<String> {
+        self.super_admin_hash_list.read().unwrap().clone()
+    }
+
+    pub fn get_role(&self, p_info: &DBPacketInfo, client_key: &String) -> DBPacketResponse<String> {
+
+        let super_admin_list = self.get_super_admin_list();
+
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            db_lock.last_access_time = SystemTime::now();
+
+            let serialized_role = serde_json::to_string(&db_lock.get_role(client_key,&super_admin_list)).unwrap();
+
+            return SuccessReply(serialized_role);
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+            let serialized_role = serde_json::to_string(&db.get_role(client_key,&super_admin_list)).unwrap();
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+
+            SuccessReply(serialized_role)
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
+
+
+
+    }
+
     /// Replaces DBSettings for a given DB, requires super admin privileges.
     /// Returns SuccessNoData when successful
     pub fn change_db_settings(
@@ -79,7 +137,6 @@ impl DBList {
             let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
 
             db.last_access_time = SystemTime::now();
-            db.db_settings = new_db_settings;
 
             self.cache
                 .write()
@@ -619,6 +676,9 @@ impl DBList {
         p_location: &DBLocation,
         client_key: &String,
     ) -> DBPacketResponse<String> {
+
+        let super_admin_list = self.get_super_admin_list();
+
         let list_lock = self.list.read().unwrap();
 
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
@@ -627,7 +687,7 @@ impl DBList {
 
             let db_lock = db.read().unwrap();
 
-            return if db_lock.has_read_permissions(client_key) || self.is_super_admin(client_key) {
+            return if db_lock.has_read_permissions(client_key,&super_admin_list) {
                 let db_read = db_lock.db_content.read_from_db(p_location.as_key());
                 match db_read {
                     None => Error(DBPacketResponseError::ValueNotFound),
@@ -657,8 +717,7 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-            let response = if db.has_read_permissions(client_key) || self.is_super_admin(client_key)
-            {
+            let response = if db.has_read_permissions(client_key,&super_admin_list) || self.is_super_admin(client_key) {
                 let return_value = db
                     .db_content
                     .read_from_db(p_location.as_key())
@@ -689,6 +748,9 @@ impl DBList {
         db_data: DBData,
         client_key: &String,
     ) -> DBPacketResponse<String> {
+
+        let super_admin_list = self.get_super_admin_list();
+
         let list_lock = self.list.read().unwrap();
 
         {
@@ -700,9 +762,7 @@ impl DBList {
 
                 let mut db_lock = db.write().unwrap();
 
-                return if db_lock.has_write_permissions(client_key)
-                    || self.is_super_admin(client_key)
-                {
+                return if db_lock.has_write_permissions(client_key,&super_admin_list) {
                     db_lock.last_access_time = SystemTime::now();
                     match db_lock.db_content.content.insert(
                         db_location.as_key().to_string(),
@@ -738,7 +798,7 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-            if db.has_write_permissions(client_key) || self.is_super_admin(client_key) {
+            if db.has_write_permissions(client_key,&super_admin_list) {
                 let returned_value = db.db_content.content.insert(
                     db_location.as_key().to_string(),
                     db_data.get_data().to_string(),
@@ -778,6 +838,8 @@ impl DBList {
             return Error(DBNotFound);
         }
 
+        let super_admin_list = self.get_super_admin_list();
+
         let list_lock = self.list.read().unwrap();
 
         {
@@ -789,7 +851,7 @@ impl DBList {
 
                 let mut db_lock = db.write().unwrap();
 
-                return if db_lock.has_list_permissions(client_key)
+                return if db_lock.has_list_permissions(client_key,&super_admin_list)
                     || self.is_super_admin(client_key)
                 {
                     db_lock.last_access_time = SystemTime::now();
@@ -817,7 +879,7 @@ impl DBList {
 
             let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
 
-            if db.has_list_permissions(client_key) || self.is_super_admin(client_key) {
+            if db.has_list_permissions(client_key,&super_admin_list) {
                 db.last_access_time = SystemTime::now();
 
                 let returned_value = &db.db_content.content;

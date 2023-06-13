@@ -8,6 +8,7 @@ mod tests {
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::thread;
     use std::time::Duration;
+    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
 
     #[test]
     fn test_client() {
@@ -465,10 +466,10 @@ mod tests {
         let get_settings = client.get_db_settings(db_name).unwrap();
         assert_eq!(
             get_settings,
-            DBPacketResponse::SuccessReply(db_settings_test.clone())
+            db_settings_test.clone()
         );
 
-        let received_settings = get_settings.into_result().unwrap().unwrap();
+        let received_settings = get_settings;
         assert_eq!(received_settings, db_settings_test);
 
         let delete_db_response = client.delete_db(db_name).unwrap();
@@ -503,10 +504,10 @@ mod tests {
         let get_settings = client.get_db_settings(db_name).unwrap();
         assert_eq!(
             get_settings,
-            DBPacketResponse::SuccessReply(db_settings_test.clone())
+            db_settings_test.clone()
         );
 
-        let received_settings = get_settings.into_result().unwrap().unwrap();
+        let received_settings = get_settings;
         assert_eq!(received_settings, db_settings_test.clone());
         assert_ne!(received_settings, new_db_settings_test.clone());
 
@@ -518,14 +519,62 @@ mod tests {
         let get_settings2 = client.get_db_settings(db_name).unwrap();
         assert_eq!(
             get_settings2,
-            DBPacketResponse::SuccessReply(new_db_settings_test.clone())
+            new_db_settings_test.clone()
         );
 
-        let received_settings2 = get_settings2.into_result().unwrap().unwrap();
+        let received_settings2 = get_settings2;
         assert_eq!(received_settings2, new_db_settings_test.clone());
         assert_ne!(received_settings2, db_settings_test.clone());
 
         let delete_db_response = client.delete_db(db_name).unwrap();
         assert_eq!(delete_db_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_get_role() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let user_key = "this is a user key that works".to_string();
+        let admin_key = "this is an admin key that works".to_string();
+        let other_key = "this is not an admin, super admin, or user key".to_string();
+        let db_settings_test = DBSettings::new(
+            Duration::from_secs(21),
+            (false, true, false),
+            (true, false, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        );
+        let db_name = "test_getrole";
+
+        // set key to super admin key
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+
+        let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
+        assert_eq!(create_response, DBPacketResponse::SuccessNoData);
+
+        assert_eq!(client.get_role(db_name).unwrap(), SuperAdmin);
+        // set admin key
+        let set_key_response = client.set_access_key(admin_key.clone()).unwrap();
+        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+
+        assert_eq!(client.get_role(db_name).unwrap(), Admin);
+        // set user key
+        let set_key_response = client.set_access_key(user_key.clone()).unwrap();
+        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+
+        assert_eq!(client.get_role(db_name).unwrap(), User);
+
+        // set other key
+        let set_key_response = client.set_access_key(other_key.clone()).unwrap();
+        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+
+        assert_eq!(client.get_role(db_name).unwrap(), Other);
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+
+        let delete_response = client.delete_db(db_name).unwrap();
+        assert_eq!(delete_response,DBPacketResponse::SuccessNoData);
+
     }
 }

@@ -17,6 +17,9 @@ mod tests {
     use std::sync::RwLock;
     use std::time::Duration;
     use std::{fs, thread};
+    use smol_db_common::db::Role;
+    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::SuccessNoData;
 
     static TEST_SUPER_ADMIN_KEY: &str = "test_admin_key";
     static TEST_USER_KEY: &str = "test_user_key";
@@ -588,7 +591,6 @@ mod tests {
             vec![],
         );
         assert_ne!(new_db_settings, get_db_test_settings());
-
         {
             let create_response = db_list.create_db(
                 db_name,
@@ -667,5 +669,121 @@ mod tests {
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_get_role() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_get_role";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let new_admin_key = "new admin key that gets added".to_string();
+        let user_key = "this is a working user key".to_string();
+        let new_db_settings = DBSettings::new(
+            Duration::from_secs(28),
+            (false, true, false),
+            (false, false, true),
+            vec![new_admin_key.clone()],
+            vec![user_key.clone()],
+        );
+
+        let create_resp = db_list.create_db(db_name,new_db_settings,&TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(create_resp,SuccessNoData);
+
+        {
+            let role = db_list.get_role(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
+            match role {
+                SuccessNoData => {
+                    panic!("bad response from get role")
+                }
+                DBPacketResponse::SuccessReply(role_ser) => {
+                    match serde_json::from_str::<Role>(&role_ser) {
+                        Ok(role_deser) => {
+                            assert_eq!(role_deser, SuperAdmin)
+                        }
+                        Err(err) => {
+                            panic!("{:?}", err)
+                        }
+                    }
+                }
+                DBPacketResponse::Error(err) => {
+                    panic!("bad response from get role: {:?}", err)
+                }
+            }
+        }
+
+        {
+            let role = db_list.get_role(&db_pack_info, &new_admin_key);
+            match role {
+                SuccessNoData => {
+                    panic!("bad response from get role")
+                }
+                DBPacketResponse::SuccessReply(role_ser) => {
+                    match serde_json::from_str::<Role>(&role_ser) {
+                        Ok(role_deser) => {
+                            assert_eq!(role_deser, Admin)
+                        }
+                        Err(err) => {
+                            panic!("{:?}", err)
+                        }
+                    }
+                }
+                DBPacketResponse::Error(err) => {
+                    panic!("bad response from get role: {:?}", err)
+                }
+            }
+        }
+
+        {
+            let role = db_list.get_role(&db_pack_info, &user_key);
+            match role {
+                SuccessNoData => {
+                    panic!("bad response from get role")
+                }
+                DBPacketResponse::SuccessReply(role_ser) => {
+                    match serde_json::from_str::<Role>(&role_ser) {
+                        Ok(role_deser) => {
+                            assert_eq!(role_deser, User)
+                        }
+                        Err(err) => {
+                            panic!("{:?}", err)
+                        }
+                    }
+                }
+                DBPacketResponse::Error(err) => {
+                    panic!("bad response from get role: {:?}", err)
+                }
+            }
+        }
+
+        {
+            let role = db_list.get_role(&db_pack_info, &"not a key at all!!?!".to_string());
+            match role {
+                SuccessNoData => {
+                    panic!("bad response from get role")
+                }
+                DBPacketResponse::SuccessReply(role_ser) => {
+                    match serde_json::from_str::<Role>(&role_ser) {
+                        Ok(role_deser) => {
+                            assert_eq!(role_deser, Other)
+                        }
+                        Err(err) => {
+                            panic!("{:?}", err)
+                        }
+                    }
+                }
+                DBPacketResponse::Error(err) => {
+                    panic!("bad response from get role: {:?}", err)
+                }
+            }
+        }
+
+        let delete_response = db_list.delete_db(db_name,&TEST_SUPER_ADMIN_KEY.to_string());
+        assert_eq!(delete_response,SuccessNoData);
+
     }
 }

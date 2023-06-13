@@ -14,6 +14,7 @@ use smol_db_common::db_packets::db_settings::DBSettings;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
+use smol_db_common::db::Role;
 
 pub mod client_error;
 
@@ -37,10 +38,61 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    pub fn get_role(&mut self,db_name: &str) -> Result<Role, ClientError> {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let packet1 = DBPacket::new_get_role(db_name);
+        match packet1.serialize_packet() {
+            Ok(packet_ser) => {
+                match self.socket.write(packet_ser.as_bytes()) {
+                    Ok(_) => {
+                        match self.socket.read(&mut buf) {
+                            Ok(read_length) => {
+                                match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_length]) {
+                                    Ok(response) => {
+                                        match response {
+                                            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
+                                            DBPacketResponse::SuccessReply(data) => {
+                                                match serde_json::from_str::<Role>(&data) {
+                                                    Ok(role) => {
+                                                        Ok(role)
+                                                    }
+                                                    Err(err) => {
+                                                        Err(PacketDeserializationError(Error::from(err)))
+                                                    }
+                                                }
+                                            }
+                                            DBPacketResponse::Error(err) => {
+                                                Err(DBResponseError(err))
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        Err(PacketDeserializationError(Error::from(err)))
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                Err(SocketReadError(err))
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        Err(SocketWriteError(err))
+                    }
+                }
+            }
+            Err(err) => {
+                Err(PacketSerializationError(Error::from(err)))
+            }
+        }
+    }
+
+    /// Gets the DBSettings of the given DB.
+    /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view DBSettings.
     pub fn get_db_settings(
         &mut self,
         db_name: &str,
-    ) -> Result<DBPacketResponse<DBSettings>, ClientError> {
+    ) -> Result<DBSettings, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_get_db_settings(db_name);
         return match packet1.serialize_packet() {
@@ -54,7 +106,7 @@ impl Client {
                                 DBPacketResponse::SuccessReply(data) => {
                                     match serde_json::from_str::<DBSettings>(&data) {
                                         Ok(db_settings) => {
-                                            Ok(DBPacketResponse::SuccessReply(db_settings))
+                                            Ok(db_settings)
                                         }
                                         Err(err) => {
                                             Err(PacketDeserializationError(Error::from(err)))
@@ -74,6 +126,8 @@ impl Client {
         };
     }
 
+    /// Sets the DBSettings of a given DB
+    /// Error on IO Error, or when database does not exist, or when the user lacks permissions to set DBSettings
     pub fn set_db_settings(
         &mut self,
         db_name: &str,
@@ -122,6 +176,7 @@ impl Client {
     }
 
     /// Creates a db through the client with the given name.
+    /// Error on IO Error, or when the user lacks permissions to create a DB
     pub fn create_db(
         &mut self,
         db_name: &str,
@@ -162,6 +217,7 @@ impl Client {
 
     /// Writes to a db at the location specified, with the data given as a string.
     /// Returns the data in the location that was over written if there was any.
+    /// Requires permissions to write to the given DB
     pub fn write_db(
         &mut self,
         db_name: &str,
@@ -191,6 +247,7 @@ impl Client {
 
     /// Reads from a db at the location specific.
     /// Returns an error if there is no data in the location.
+    /// Requires permissions to read from the given DB
     pub fn read_db(
         &mut self,
         db_name: &str,
@@ -218,6 +275,7 @@ impl Client {
     }
 
     /// Deletes the given db by name.
+    /// Requires super admin privileges on the given DB Server
     pub fn delete_db(&mut self, db_name: &str) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_delete_db(db_name);
@@ -241,6 +299,7 @@ impl Client {
     }
 
     /// Lists all the current databases available by name from the server
+    /// Only error on IO Error
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db();
@@ -277,6 +336,7 @@ impl Client {
     }
 
     /// Get the hashmap of the contents of a database. Contents are always String:String for the hashmap.
+    /// Requires list permissions on the given DB
     pub fn list_db_contents(
         &mut self,
         db_name: &str,
