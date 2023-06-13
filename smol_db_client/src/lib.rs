@@ -34,7 +34,7 @@ impl Client {
     }
 
     /// Disconnects the socket from the database.
-    pub fn disconnect(self) -> std::io::Result<()> {
+    pub fn disconnect(&self) -> std::io::Result<()> {
         self.socket.shutdown(Shutdown::Both)
     }
 
