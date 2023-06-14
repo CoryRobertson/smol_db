@@ -1,4 +1,4 @@
-#![allow(unused_variables, dead_code)] // TODO: remove this lints
+#![allow(unused_variables, dead_code,unused_imports)] // TODO: remove this lints
 
 use smol_db_client::Client;
 use smol_db_common::db_packets::db_packet::DBPacket;

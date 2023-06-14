@@ -1,4 +1,4 @@
-use crate::app::TemplateApp;
+use crate::app::ApplicationState;
 
 mod app;
 
@@ -9,6 +9,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "smol_db_viewer",
         native_options,
-        Box::new(|cc| Box::new(TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(ApplicationState::new(cc))),
     )
 }

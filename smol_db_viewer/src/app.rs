@@ -1,14 +1,14 @@
-use crate::app::ProgramState::{ClientConnectionError, DisplayClient, PromptForClientDetails};
+use crate::app::ProgramState::{ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey};
 use smol_db_client::client_error::ClientError;
 use smol_db_client::{Client, Role};
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
-pub struct TemplateApp {
+pub struct ApplicationState {
     #[serde(skip)]
     client: Arc<Mutex<Option<Client>>>,
     #[serde(skip)]
@@ -19,7 +19,6 @@ pub struct TemplateApp {
     #[serde(skip)]
     database_list: Option<Vec<String>>,
 
-    #[serde(skip)]
     client_key: String,
 
     #[serde(skip)]
@@ -37,10 +36,11 @@ enum ProgramState {
     NoClient,
     PromptForClientDetails,
     ClientConnectionError(ClientError),
+    PromptForKey,
     DisplayClient,
 }
 
-impl Default for TemplateApp {
+impl Default for ApplicationState {
     fn default() -> Self {
         Self {
             client: Arc::new(Mutex::new(None)),
@@ -55,7 +55,7 @@ impl Default for TemplateApp {
     }
 }
 
-impl TemplateApp {
+impl ApplicationState {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
@@ -65,7 +65,7 @@ impl TemplateApp {
     }
 }
 
-impl eframe::App for TemplateApp {
+impl eframe::App for ApplicationState {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self { .. } = self;
 
@@ -76,14 +76,14 @@ impl eframe::App for TemplateApp {
                         _frame.close();
                     }
                 });
-                ui.menu_button("Connect", |ui| {
+                ui.menu_button("Client", |ui| {
                     if ui.button("Connect").clicked() {
                         *self.program_state.lock().unwrap().deref_mut() = PromptForClientDetails;
                     }
                     if ui.button("Disconnect").clicked() {
                         let mut lock = self.program_state.lock().unwrap();
                         match *lock {
-                            ProgramState::NoClient => {}
+                            NoClient => {}
                             PromptForClientDetails => {}
                             ClientConnectionError(_) => {}
                             DisplayClient => {
@@ -94,10 +94,33 @@ impl eframe::App for TemplateApp {
                                         cl.disconnect().expect("Unable to disconnect from client");
                                     }
                                 }
-                                *lock = ProgramState::NoClient;
+                                *lock = NoClient;
                                 self.database_list = None;
                             }
+                            PromptForKey => {}
                         }
+                    }
+                    if ui.button("Set key").clicked() {
+                        let mut lock = self.program_state.lock().unwrap();
+                        match *lock {
+                            ProgramState::NoClient => {}
+                            PromptForClientDetails => {}
+                            ClientConnectionError(_) => {}
+                            PromptForKey => {}
+                            DisplayClient => {
+                                *lock = PromptForKey;
+                            }
+                        }
+                    }
+                    if ui.button("Refresh stored data").clicked() {
+                        *self.client.lock().unwrap() = None;
+                        *self.program_state.lock().unwrap() = NoClient;
+
+                        self.database_list = None;
+
+                        self.selected_database = None;
+                        self.role = None;
+                        self.connection_thread = None;
                     }
                 });
             });
@@ -105,10 +128,11 @@ impl eframe::App for TemplateApp {
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             match self.program_state.lock().unwrap().deref() {
-                ProgramState::NoClient => {}
+                NoClient => {}
                 PromptForClientDetails => {}
                 ClientConnectionError(_) => {}
                 DisplayClient => {
+                    // side menu that is persistent when displaying the client data.
                     if let Some(selected_db) = &self.selected_database {
                         ui.label(format!("Selected DB: {}", selected_db));
                     }
@@ -128,8 +152,8 @@ impl eframe::App for TemplateApp {
                         ui.label(format!("Role: {:?}", role));
                     }
                 }
+                PromptForKey => {}
             }
-            // TODO: finish
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -138,9 +162,9 @@ impl eframe::App for TemplateApp {
                 "DEBUG Program State: {:?}",
                 self.program_state.lock().unwrap()
             ));
-
-            match self.program_state.lock().unwrap().deref() {
-                ProgramState::NoClient => {
+            let mut ps_lock = self.program_state.lock().unwrap();
+            match ps_lock.deref() {
+                NoClient => {
                     // Display nothing when there are is no client connection.
                     ui.label("Nothing to show here...");
                 }
@@ -177,6 +201,7 @@ impl eframe::App for TemplateApp {
                     }
                 }
                 DisplayClient => {
+                    // get the database list if it is not known
                     match &mut self.database_list {
                         None => {
                             let mut lock = self.client.lock().unwrap();
@@ -199,8 +224,9 @@ impl eframe::App for TemplateApp {
                                 },
                             }
                         }
-                        Some(vec) => {}
+                        Some(_) => {}
                     }
+                    // get the role if it is not known
                     match &self.role {
                         None => {
                             let mut lock = self.client.lock().unwrap();
@@ -225,14 +251,32 @@ impl eframe::App for TemplateApp {
                         Some(_) => {}
                     }
 
-                    // TODO: finish
                 }
                 ClientConnectionError(err) => {
                     ui.label("Client connection error");
                     ui.label(format!("{:?}", err));
                 }
+                PromptForKey => {
+                    ui.label("Enter Key:");
+                    ui.text_edit_singleline(&mut self.client_key);
+                    if ui.button("Set Key").clicked() {
+                        let mut lock = self.client.lock().unwrap();
+                        match *lock {
+                            None => {}
+                            Some(ref mut client) => {
+                                match client.set_access_key(self.client_key.clone()) {
+                                    Ok(_) => {
+                                        *ps_lock = DisplayClient;
+                                    }
+                                    Err(err) => {
+                                        *ps_lock = ClientConnectionError(err);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-
             egui::warn_if_debug_build(ui);
         });
 
