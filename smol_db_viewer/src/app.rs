@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::app::ProgramState::{ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey};
 use smol_db_client::client_error::ClientError;
 use smol_db_client::{Client, Role};
@@ -5,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use serde::{Deserialize, Serialize};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -17,18 +19,32 @@ pub struct ApplicationState {
     ip_address: String,
 
     #[serde(skip)]
-    database_list: Option<Vec<String>>,
+    database_list: Option<Vec<DBCached>>,
 
     client_key: String,
 
     #[serde(skip)]
-    selected_database: Option<String>,
+    selected_database: Option<u32>,
 
     #[serde(skip)]
     role: Option<Role>,
 
     #[serde(skip)]
     connection_thread: Option<JoinHandle<()>>,
+}
+
+#[derive(Clone,Debug, Serialize, Deserialize)]
+enum CacheState {
+    NotCached,
+    Cached,
+    LackingPermissions,
+    Error,
+}
+
+#[derive(Clone,Debug, Serialize, Deserialize)]
+struct DBCached {
+    name: String,
+    content: Option<HashMap<String,String>>,
 }
 
 #[derive(Debug)]
@@ -133,16 +149,34 @@ impl eframe::App for ApplicationState {
                 ClientConnectionError(_) => {}
                 DisplayClient => {
                     // side menu that is persistent when displaying the client data.
-                    if let Some(selected_db) = &self.selected_database {
-                        ui.label(format!("Selected DB: {}", selected_db));
+                    if let Some(selected_db) = self.selected_database {
+                        if let Some(db_list) = &self.database_list {
+                            if let Some(db) = db_list.get(selected_db as usize) {
+                                ui.label(format!("Selected DB: {:?}", db.name));
+                            }
+                        }
+
                     }
-                    match &self.database_list {
+                    match &mut self.database_list {
                         None => {}
                         Some(list) => {
-                            for (index, item) in list.iter().enumerate() {
-                                if ui.button(format!("{}: {}", index + 1, item)).clicked() {
-                                    self.selected_database = Some(item.clone());
-                                    self.role = None;
+                            for (index, item) in list.iter_mut().enumerate() {
+                                if ui.button(format!("{}: {}", index + 1, item.name)).clicked() {
+                                    // self.selected_database = Some(item.clone());
+                                    let mut lock = self.client.lock().unwrap();
+                                    match *lock {
+                                        None => {}
+                                        Some(ref mut client) => {
+                                            self.role = None;
+                                            if item.content.is_none() {
+                                                // TODO: display an error when the contents fail to list, probably change content into the enum CacheState
+                                                if let Ok(content) = client.list_db_contents(item.name.as_str()) {
+                                                    item.content = Some(content);
+                                                }
+                                            }
+                                            self.selected_database = Some(index as u32);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -212,7 +246,7 @@ impl eframe::App for ApplicationState {
                                         self.database_list = Some(
                                             list.iter()
                                                 .map(|db_packet| {
-                                                    db_packet.get_db_name().to_string()
+                                                    DBCached { name: db_packet.get_db_name().to_string(), content: None }
                                                 })
                                                 .collect(),
                                         )
@@ -226,6 +260,23 @@ impl eframe::App for ApplicationState {
                         }
                         Some(_) => {}
                     }
+
+                    if let Some(list) = &self.database_list {
+                        if let Some(index_selected) = self.selected_database {
+                            if let Some(db_cached) = list.get(index_selected as usize) {
+                                if let Some(content) = &db_cached.content {
+                                    let mut list = content.iter()
+                                        .map(|(s1,s2)| (s1.to_string(),s2.to_string()))
+                                        .collect::<Vec<(String,String)>>();
+                                    list.sort();
+                                    for (key, value) in list {
+                                        ui.label(format!("{} : {}",key,value));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // get the role if it is not known
                     match &self.role {
                         None => {
@@ -235,15 +286,20 @@ impl eframe::App for ApplicationState {
                                 Some(ref mut client) => match &self.selected_database {
                                     None => {}
                                     Some(db_selected_name) => {
-                                        match client.get_role(db_selected_name) {
-                                            Ok(role) => {
-                                                self.role = Some(role);
-                                            }
-                                            Err(err) => {
-                                                *self.program_state.lock().unwrap() =
-                                                    ClientConnectionError(err);
+                                        if let Some(db_list) = &self.database_list {
+                                            if let Some(db) = db_list.get(*db_selected_name as usize) {
+                                                match client.get_role(db.name.as_str()) {
+                                                    Ok(role) => {
+                                                        self.role = Some(role);
+                                                    }
+                                                    Err(err) => {
+                                                        *self.program_state.lock().unwrap() =
+                                                            ClientConnectionError(err);
+                                                    }
+                                                }
                                             }
                                         }
+
                                     }
                                 },
                             }
@@ -277,6 +333,8 @@ impl eframe::App for ApplicationState {
                     }
                 }
             }
+
+
             egui::warn_if_debug_build(ui);
         });
 
