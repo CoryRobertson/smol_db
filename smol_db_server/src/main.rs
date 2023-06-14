@@ -39,6 +39,9 @@ fn main() {
             .unwrap()
             .invalidate_caches();
 
+        cache_invalidator_thread_db_list.read().unwrap().save_all_db();
+        cache_invalidator_thread_db_list.read().unwrap().save_db_list();
+
         if invalidated_caches > 0 {
             let number_of_caches_remaining = cache_invalidator_thread_db_list
                 .read()

@@ -1,10 +1,10 @@
+use crate::app::ProgramState::{ClientConnectionError, DisplayClient, PromptForClientDetails};
+use smol_db_client::client_error::ClientError;
+use smol_db_client::{Client, Role};
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
-use smol_db_client::Client;
-use smol_db_client::client_error::ClientError;
-use crate::app::ProgramState::{ClientConnectionError, DisplayClient, PromptForClientDetails};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -17,7 +17,16 @@ pub struct TemplateApp {
     ip_address: String,
 
     #[serde(skip)]
+    database_list: Option<Vec<String>>,
+
+    #[serde(skip)]
     client_key: String,
+
+    #[serde(skip)]
+    selected_database: Option<String>,
+
+    #[serde(skip)]
+    role: Option<Role>,
 
     #[serde(skip)]
     connection_thread: Option<JoinHandle<()>>,
@@ -37,7 +46,10 @@ impl Default for TemplateApp {
             client: Arc::new(Mutex::new(None)),
             program_state: Arc::new(Mutex::new(ProgramState::NoClient)),
             ip_address: "".to_string(),
+            database_list: None,
             client_key: "".to_string(),
+            selected_database: None,
+            role: None,
             connection_thread: None,
         }
     }
@@ -45,7 +57,6 @@ impl Default for TemplateApp {
 
 impl TemplateApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
@@ -84,6 +95,7 @@ impl eframe::App for TemplateApp {
                                     }
                                 }
                                 *lock = ProgramState::NoClient;
+                                self.database_list = None;
                             }
                         }
                     }
@@ -92,12 +104,40 @@ impl eframe::App for TemplateApp {
         });
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            match self.program_state.lock().unwrap().deref() {
+                ProgramState::NoClient => {}
+                PromptForClientDetails => {}
+                ClientConnectionError(_) => {}
+                DisplayClient => {
+                    if let Some(selected_db) = &self.selected_database {
+                        ui.label(format!("Selected DB: {}", selected_db));
+                    }
+                    match &self.database_list {
+                        None => {}
+                        Some(list) => {
+                            for (index, item) in list.iter().enumerate() {
+                                if ui.button(format!("{}: {}", index + 1, item)).clicked() {
+                                    self.selected_database = Some(item.clone());
+                                    self.role = None;
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(role) = &self.role {
+                        ui.label(format!("Role: {:?}", role));
+                    }
+                }
+            }
             // TODO: finish
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             #[cfg(debug_assertions)]
-            ui.label(format!("DEBUG Program State: {:?}", self.program_state.lock().unwrap()));
+            ui.label(format!(
+                "DEBUG Program State: {:?}",
+                self.program_state.lock().unwrap()
+            ));
 
             match self.program_state.lock().unwrap().deref() {
                 ProgramState::NoClient => {
@@ -110,7 +150,6 @@ impl eframe::App for TemplateApp {
                     ui.text_edit_singleline(&mut self.ip_address);
 
                     if ui.button("Connect to ip address.").clicked() {
-
                         // clone a bunch of things that need to be moved into the thread.
                         let client_clone = Arc::clone(&self.client);
                         let program_state_clone = Arc::clone(&self.program_state);
@@ -121,7 +160,8 @@ impl eframe::App for TemplateApp {
                             let client_mutex = client_clone;
                             let ip = ip_clone;
 
-                            match Client::new(&ip) { // connect the client to the server.
+                            match Client::new(&ip) {
+                                // connect the client to the server.
                                 Ok(client_connection) => {
                                     // if client connection successful, move the client to the programs state.
                                     *client_mutex.lock().unwrap() = Some(client_connection);
@@ -134,15 +174,62 @@ impl eframe::App for TemplateApp {
                                 }
                             }
                         }));
-
                     }
                 }
                 DisplayClient => {
+                    match &mut self.database_list {
+                        None => {
+                            let mut lock = self.client.lock().unwrap();
+                            match *lock {
+                                None => {}
+                                Some(ref mut client) => match client.list_db() {
+                                    Ok(list) => {
+                                        self.database_list = Some(
+                                            list.iter()
+                                                .map(|db_packet| {
+                                                    db_packet.get_db_name().to_string()
+                                                })
+                                                .collect(),
+                                        )
+                                    }
+                                    Err(err) => {
+                                        *self.program_state.lock().unwrap() =
+                                            ClientConnectionError(err);
+                                    }
+                                },
+                            }
+                        }
+                        Some(vec) => {}
+                    }
+                    match &self.role {
+                        None => {
+                            let mut lock = self.client.lock().unwrap();
+                            match *lock {
+                                None => {}
+                                Some(ref mut client) => match &self.selected_database {
+                                    None => {}
+                                    Some(db_selected_name) => {
+                                        match client.get_role(db_selected_name) {
+                                            Ok(role) => {
+                                                self.role = Some(role);
+                                            }
+                                            Err(err) => {
+                                                *self.program_state.lock().unwrap() =
+                                                    ClientConnectionError(err);
+                                            }
+                                        }
+                                    }
+                                },
+                            }
+                        }
+                        Some(_) => {}
+                    }
+
                     // TODO: finish
                 }
                 ClientConnectionError(err) => {
                     ui.label("Client connection error");
-                    ui.label(format!("{:?}",err));
+                    ui.label(format!("{:?}", err));
                 }
             }
 

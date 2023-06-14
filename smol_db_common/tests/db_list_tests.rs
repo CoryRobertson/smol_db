@@ -9,7 +9,9 @@ mod tests {
     use smol_db_common::db_packets::db_location::DBLocation;
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{
+        Error, SuccessNoData, SuccessReply,
+    };
     use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
         DBAlreadyExists, DBNotFound, InvalidPermissions, UserNotFound,
     };
@@ -82,10 +84,7 @@ mod tests {
             get_db_test_settings(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
-        assert_eq!(
-            create_response_db_already_exists,
-            Error(DBAlreadyExists)
-        );
+        assert_eq!(create_response_db_already_exists, Error(DBAlreadyExists));
 
         let create_response_db_invalid_perms = db_list.create_db(
             "other_db",
@@ -93,10 +92,7 @@ mod tests {
             &"this is not an admin key".to_string(),
         );
 
-        assert_eq!(
-            create_response_db_invalid_perms,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(create_response_db_invalid_perms, Error(InvalidPermissions));
 
         // clean up unit test files
         fs::remove_file("test_dblist_1_create").unwrap();
@@ -122,10 +118,7 @@ mod tests {
 
         let invalid_perms_delete_response =
             db_list.delete_db(db_name, &"not a working admin key".to_string());
-        assert_eq!(
-            invalid_perms_delete_response,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(invalid_perms_delete_response, Error(InvalidPermissions));
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, SuccessNoData);
@@ -139,10 +132,7 @@ mod tests {
 
         let delete_response_not_listed =
             db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
-        assert_eq!(
-            delete_response_not_listed,
-            Error(DBNotFound)
-        );
+        assert_eq!(delete_response_not_listed, Error(DBNotFound));
     }
 
     #[test]
@@ -172,10 +162,7 @@ mod tests {
             db_data.clone(),
             &"not a working client key".to_string(),
         );
-        assert_eq!(
-            write_invalid_perms,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(write_invalid_perms, Error(InvalidPermissions));
 
         let write_response = db_list.write_db(
             &db_pack_info,
@@ -201,10 +188,7 @@ mod tests {
             &db_location,
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
-        assert_eq!(
-            read_response,
-            SuccessReply(db_data.get_data().to_string())
-        );
+        assert_eq!(read_response, SuccessReply(db_data.get_data().to_string()));
 
         let read_user_perms_response =
             db_list.read_db(&db_pack_info, &db_location, &TEST_USER_KEY.to_string());
@@ -218,10 +202,7 @@ mod tests {
             &db_location,
             &"not a user key or an admin key".to_string(),
         );
-        assert_eq!(
-            read_invalid_perms_response,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(read_invalid_perms_response, Error(InvalidPermissions));
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, SuccessNoData);
@@ -255,19 +236,13 @@ mod tests {
             new_user_key.clone(),
             &TEST_USER_KEY.to_string(),
         );
-        assert_eq!(
-            add_user_invalid_perms1,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(add_user_invalid_perms1, Error(InvalidPermissions));
         let add_user_invalid_perms2 = db_list.add_user(
             &db_pack_info,
             new_user_key.clone(),
             &"not a working key".to_string(),
         );
-        assert_eq!(
-            add_user_invalid_perms2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(add_user_invalid_perms2, Error(InvalidPermissions));
         let add_user_response = db_list.add_user(
             &db_pack_info,
             new_user_key.clone(),
@@ -282,10 +257,7 @@ mod tests {
             db_data.clone(),
             &new_user_key.to_string(),
         );
-        assert_eq!(
-            write_with_new_user_response,
-            SuccessNoData
-        );
+        assert_eq!(write_with_new_user_response, SuccessNoData);
         let read_with_new_user_response =
             db_list.read_db(&db_pack_info, &db_location, &new_user_key.to_string());
         assert_eq!(
@@ -299,19 +271,13 @@ mod tests {
             new_user_key.clone(),
             &TEST_USER_KEY.to_string(),
         );
-        assert_eq!(
-            remove_user_invalid_perms1,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(remove_user_invalid_perms1, Error(InvalidPermissions));
         let remove_user_invalid_perms2 = db_list.remove_user(
             &db_pack_info,
             new_user_key.clone(),
             &"not a working key".to_string(),
         );
-        assert_eq!(
-            remove_user_invalid_perms2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(remove_user_invalid_perms2, Error(InvalidPermissions));
         let remove_user_response1 = db_list.remove_user(
             &db_pack_info,
             new_user_key.clone(),
@@ -332,16 +298,10 @@ mod tests {
             db_data.clone(),
             &new_user_key.to_string(),
         );
-        assert_eq!(
-            write_with_new_user_response2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(write_with_new_user_response2, Error(InvalidPermissions));
         let read_with_new_user_response2 =
             db_list.read_db(&db_pack_info, &db_location, &new_user_key.to_string());
-        assert_eq!(
-            read_with_new_user_response2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(read_with_new_user_response2, Error(InvalidPermissions));
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, SuccessNoData);
@@ -373,19 +333,13 @@ mod tests {
             new_admin_key.clone(),
             &"this is not a working key".to_string(),
         );
-        assert_eq!(
-            add_admin_without_perms1,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(add_admin_without_perms1, Error(InvalidPermissions));
         let add_admin_without_perms2 = db_list.add_admin(
             &db_pack_info,
             new_admin_key.clone(),
             &TEST_USER_KEY.to_string(),
         );
-        assert_eq!(
-            add_admin_without_perms2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(add_admin_without_perms2, Error(InvalidPermissions));
         let add_admin_with_perms = db_list.add_admin(
             &db_pack_info,
             new_admin_key.clone(),
@@ -402,25 +356,16 @@ mod tests {
             new_admin_key.clone(),
             &"this is not a working key".to_string(),
         );
-        assert_eq!(
-            remove_admin_without_perms1,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(remove_admin_without_perms1, Error(InvalidPermissions));
         let remove_admin_without_perms2 =
             db_list.remove_admin(&db_pack_info, new_admin_key.clone(), &new_admin_key.clone());
-        assert_eq!(
-            remove_admin_without_perms2,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(remove_admin_without_perms2, Error(InvalidPermissions));
         let remove_admin_success_response = db_list.remove_admin(
             &db_pack_info,
             new_admin_key.clone(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
-        assert_eq!(
-            remove_admin_success_response,
-            SuccessNoData
-        );
+        assert_eq!(remove_admin_success_response, SuccessNoData);
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, SuccessNoData);
@@ -495,26 +440,21 @@ mod tests {
 
         let list_db_contents_invalid_perms1 =
             db_list.list_db_contents(&db_pack_info, &"not a valid key most likely".to_string());
-        assert_eq!(
-            list_db_contents_invalid_perms1,
-            Error(InvalidPermissions)
-        );
+        assert_eq!(list_db_contents_invalid_perms1, Error(InvalidPermissions));
         let list_db_contents_invalid_perms2 =
             db_list.list_db_contents(&db_pack_info, &TEST_USER_KEY.to_string());
         match list_db_contents_invalid_perms2 {
             SuccessNoData => {
                 panic!("No data received from db contents? Bad packet possibly?");
             }
-            SuccessReply(data) => {
-                match serde_json::from_str::<HashMap<String, String>>(&data) {
-                    Ok(thing) => {
-                        assert_eq!(thing.len(), 0);
-                    }
-                    Err(err) => {
-                        panic!("{:?}", err);
-                    }
+            SuccessReply(data) => match serde_json::from_str::<HashMap<String, String>>(&data) {
+                Ok(thing) => {
+                    assert_eq!(thing.len(), 0);
                 }
-            }
+                Err(err) => {
+                    panic!("{:?}", err);
+                }
+            },
             Error(err) => {
                 panic!("{:?}", err);
             }
@@ -525,16 +465,14 @@ mod tests {
             SuccessNoData => {
                 panic!("No data received from db contents? Bad packet possibly?");
             }
-            SuccessReply(data) => {
-                match serde_json::from_str::<HashMap<String, String>>(&data) {
-                    Ok(thing) => {
-                        assert_eq!(thing.len(), 0);
-                    }
-                    Err(err) => {
-                        panic!("{:?}", err);
-                    }
+            SuccessReply(data) => match serde_json::from_str::<HashMap<String, String>>(&data) {
+                Ok(thing) => {
+                    assert_eq!(thing.len(), 0);
                 }
-            }
+                Err(err) => {
+                    panic!("{:?}", err);
+                }
+            },
             Error(err) => {
                 panic!("{:?}", err);
             }
@@ -553,16 +491,14 @@ mod tests {
             SuccessNoData => {
                 panic!("No data received from db contents? Bad packet possibly?");
             }
-            SuccessReply(data) => {
-                match serde_json::from_str::<HashMap<String, String>>(&data) {
-                    Ok(thing) => {
-                        assert_eq!(thing.len(), 1);
-                    }
-                    Err(err) => {
-                        panic!("{:?}", err);
-                    }
+            SuccessReply(data) => match serde_json::from_str::<HashMap<String, String>>(&data) {
+                Ok(thing) => {
+                    assert_eq!(thing.len(), 1);
                 }
-            }
+                Err(err) => {
+                    panic!("{:?}", err);
+                }
+            },
             Error(err) => {
                 panic!("{:?}", err);
             }
@@ -604,16 +540,10 @@ mod tests {
         {
             let missing_perms_get_db_settings1 =
                 db_list.get_db_settings(&db_pack_info, &TEST_USER_KEY.to_string());
-            assert_eq!(
-                missing_perms_get_db_settings1,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_get_db_settings1, Error(InvalidPermissions));
             let missing_perms_get_db_settings2 =
                 db_list.get_db_settings(&db_pack_info, &"not a working key".to_string());
-            assert_eq!(
-                missing_perms_get_db_settings2,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_get_db_settings2, Error(InvalidPermissions));
             let original_db_settings =
                 db_list.get_db_settings(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
             let received_original_db_settings: DBSettings =
@@ -627,19 +557,13 @@ mod tests {
                 new_db_settings.clone(),
                 &TEST_USER_KEY.to_string(),
             );
-            assert_eq!(
-                missing_perms_set_db_settings1,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_set_db_settings1, Error(InvalidPermissions));
             let missing_perms_set_db_settings2 = db_list.change_db_settings(
                 &db_pack_info,
                 new_db_settings.clone(),
                 &"also not a working key".to_string(),
             );
-            assert_eq!(
-                missing_perms_set_db_settings2,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_set_db_settings2, Error(InvalidPermissions));
             let change_db_settings_response = db_list.change_db_settings(
                 &db_pack_info,
                 new_db_settings.clone(),
@@ -650,16 +574,10 @@ mod tests {
         {
             let missing_perms_get_db_settings1 =
                 db_list.get_db_settings(&db_pack_info, &TEST_USER_KEY.to_string());
-            assert_eq!(
-                missing_perms_get_db_settings1,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_get_db_settings1, Error(InvalidPermissions));
             let missing_perms_get_db_settings2 =
                 db_list.get_db_settings(&db_pack_info, &"not a working key".to_string());
-            assert_eq!(
-                missing_perms_get_db_settings2,
-                Error(InvalidPermissions)
-            );
+            assert_eq!(missing_perms_get_db_settings2, Error(InvalidPermissions));
             let original_db_settings =
                 db_list.get_db_settings(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
             let received_original_db_settings: DBSettings =
@@ -701,16 +619,14 @@ mod tests {
                 SuccessNoData => {
                     panic!("bad response from get role")
                 }
-                SuccessReply(role_ser) => {
-                    match serde_json::from_str::<Role>(&role_ser) {
-                        Ok(role_deser) => {
-                            assert_eq!(role_deser, SuperAdmin)
-                        }
-                        Err(err) => {
-                            panic!("{:?}", err)
-                        }
+                SuccessReply(role_ser) => match serde_json::from_str::<Role>(&role_ser) {
+                    Ok(role_deser) => {
+                        assert_eq!(role_deser, SuperAdmin)
                     }
-                }
+                    Err(err) => {
+                        panic!("{:?}", err)
+                    }
+                },
                 Error(err) => {
                     panic!("bad response from get role: {:?}", err)
                 }
@@ -723,16 +639,14 @@ mod tests {
                 SuccessNoData => {
                     panic!("bad response from get role")
                 }
-                SuccessReply(role_ser) => {
-                    match serde_json::from_str::<Role>(&role_ser) {
-                        Ok(role_deser) => {
-                            assert_eq!(role_deser, Admin)
-                        }
-                        Err(err) => {
-                            panic!("{:?}", err)
-                        }
+                SuccessReply(role_ser) => match serde_json::from_str::<Role>(&role_ser) {
+                    Ok(role_deser) => {
+                        assert_eq!(role_deser, Admin)
                     }
-                }
+                    Err(err) => {
+                        panic!("{:?}", err)
+                    }
+                },
                 Error(err) => {
                     panic!("bad response from get role: {:?}", err)
                 }
@@ -745,16 +659,14 @@ mod tests {
                 SuccessNoData => {
                     panic!("bad response from get role")
                 }
-                SuccessReply(role_ser) => {
-                    match serde_json::from_str::<Role>(&role_ser) {
-                        Ok(role_deser) => {
-                            assert_eq!(role_deser, User)
-                        }
-                        Err(err) => {
-                            panic!("{:?}", err)
-                        }
+                SuccessReply(role_ser) => match serde_json::from_str::<Role>(&role_ser) {
+                    Ok(role_deser) => {
+                        assert_eq!(role_deser, User)
                     }
-                }
+                    Err(err) => {
+                        panic!("{:?}", err)
+                    }
+                },
                 Error(err) => {
                     panic!("bad response from get role: {:?}", err)
                 }
@@ -767,16 +679,14 @@ mod tests {
                 SuccessNoData => {
                     panic!("bad response from get role")
                 }
-                SuccessReply(role_ser) => {
-                    match serde_json::from_str::<Role>(&role_ser) {
-                        Ok(role_deser) => {
-                            assert_eq!(role_deser, Other)
-                        }
-                        Err(err) => {
-                            panic!("{:?}", err)
-                        }
+                SuccessReply(role_ser) => match serde_json::from_str::<Role>(&role_ser) {
+                    Ok(role_deser) => {
+                        assert_eq!(role_deser, Other)
                     }
-                }
+                    Err(err) => {
+                        panic!("{:?}", err)
+                    }
+                },
                 Error(err) => {
                     panic!("bad response from get role: {:?}", err)
                 }

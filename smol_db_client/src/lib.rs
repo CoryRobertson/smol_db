@@ -7,7 +7,6 @@ use crate::ClientError::{
     SocketWriteError, UnableToConnect,
 };
 use serde::{Deserialize, Serialize};
-use smol_db_common::db::Role;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
@@ -17,6 +16,7 @@ use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 
 pub mod client_error;
+pub use smol_db_common::db::Role;
 
 /// Client struct used for communicating to the database.
 pub struct Client {
@@ -177,9 +177,9 @@ impl Client {
                                     Ok(response) => match &response {
                                         DBPacketResponse::SuccessNoData => Ok(response),
                                         DBPacketResponse::SuccessReply(_) => Ok(response),
-                                        DBPacketResponse::Error(db_response_error) => Err(
-                                            DBResponseError(db_response_error.clone()),
-                                        ),
+                                        DBPacketResponse::Error(db_response_error) => {
+                                            Err(DBResponseError(db_response_error.clone()))
+                                        }
                                     },
                                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
                                 }
@@ -299,9 +299,7 @@ impl Client {
                                         }
                                     }
                                 }
-                                DBPacketResponse::Error(err) => {
-                                    Err(DBResponseError(err))
-                                }
+                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
                             },
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
@@ -339,9 +337,7 @@ impl Client {
                                         }
                                     }
                                 }
-                                DBPacketResponse::Error(err) => {
-                                    Err(DBResponseError(err))
-                                }
+                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
                             },
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
