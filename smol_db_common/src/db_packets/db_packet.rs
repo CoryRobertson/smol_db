@@ -11,6 +11,9 @@ pub enum DBPacket {
     Read(DBPacketInfo, DBLocation),
     /// Write(db to operate on, key to write to the db using, data to write to the key location)
     Write(DBPacketInfo, DBLocation, DBData),
+
+    //TODO: implement Delete(DBPacketInfo, DBLocation), delete requires write permissions, deletes the entry from the hash map by key.
+
     /// CreateDB(db to create)
     CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
