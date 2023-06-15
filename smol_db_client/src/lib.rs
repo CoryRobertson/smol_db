@@ -38,7 +38,11 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
-    pub fn delete_data(&mut self, db_name: &str, db_location: &str) -> Result<DBPacketResponse<String>, ClientError> {
+    pub fn delete_data(
+        &mut self,
+        db_name: &str,
+        db_location: &str,
+    ) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_delete_data(db_name, db_location);
         return match packet.serialize_packet() {

@@ -6,7 +6,9 @@ use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
-use crate::db_packets::db_packet_response::DBPacketResponseError::{DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{
+    DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound,
+};
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
@@ -40,8 +42,12 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().clone()
     }
 
-    pub fn delete_data(&self,p_info: &DBPacketInfo,db_location: &DBLocation, client_key: &String) -> DBPacketResponse<String> {
-
+    pub fn delete_data(
+        &self,
+        p_info: &DBPacketInfo,
+        db_location: &DBLocation,
+        client_key: &String,
+    ) -> DBPacketResponse<String> {
         let super_admin_list = self.get_super_admin_list();
 
         let list_lock = self.list.read().unwrap();
@@ -51,23 +57,16 @@ impl DBList {
 
             db_lock.last_access_time = SystemTime::now();
 
-
-
-            return if db_lock.has_write_permissions(client_key,&super_admin_list) {
-
+            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
                 let removed_item = db_lock.db_content.content.remove(db_location.as_key());
 
                 match removed_item {
-                    None => {
-                        Error(ValueNotFound)
-                    }
-                    Some(removed) => {
-                        SuccessReply(removed)
-                    }
+                    None => Error(ValueNotFound),
+                    Some(removed) => SuccessReply(removed),
                 }
             } else {
                 Error(InvalidPermissions)
-            }
+            };
         }
 
         return if list_lock.contains(p_info) {
@@ -89,19 +88,12 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-
-
-            let resp = if db.has_write_permissions(client_key,&super_admin_list) {
-
+            let resp = if db.has_write_permissions(client_key, &super_admin_list) {
                 let removed = db.db_content.content.remove(db_location.as_key());
 
                 match removed {
-                    None => {
-                        Error(ValueNotFound)
-                    }
-                    Some(removed_item) => {
-                        SuccessReply(removed_item)
-                    }
+                    None => Error(ValueNotFound),
+                    Some(removed_item) => SuccessReply(removed_item),
                 }
             } else {
                 Error(InvalidPermissions)

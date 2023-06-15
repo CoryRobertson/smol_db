@@ -1,4 +1,4 @@
-use crate::app::ContentCacheState::NotCached;
+use crate::app::ContentCacheState::{Cached, NotCached};
 use crate::app::ProgramState::{
     ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey,
 };
@@ -36,27 +36,38 @@ pub struct ApplicationState {
 
     #[serde(skip)]
     value_input: String,
+
+    #[serde(skip)]
+    desired_action: DesiredAction,
 }
 
 #[derive(Debug)]
-enum ContentCacheState {
+enum ContentCacheState<T> {
     NotCached,
-    Cached(HashMap<String, String>),
+    Cached(T),
     Error(ClientError),
 }
 
 #[derive(Debug)]
-enum RoleCacheState {
-    NotCached,
-    Cached(Role),
-    ErrorState,
+enum DesiredAction {
+    Write,
+    Delete,
+}
+
+impl DesiredAction {
+    fn as_text(&self) -> &str {
+        match self {
+            DesiredAction::Write => "Write",
+            DesiredAction::Delete => "Delete",
+        }
+    }
 }
 
 #[derive(Debug)]
 struct DBCached {
     name: String,
-    content: ContentCacheState,
-    role: RoleCacheState,
+    content: ContentCacheState<HashMap<String, String>>,
+    role: ContentCacheState<Role>,
 }
 
 #[derive(Debug)]
@@ -80,6 +91,7 @@ impl Default for ApplicationState {
             connection_thread: None,
             key_input: "".to_string(),
             value_input: "".to_string(),
+            desired_action: DesiredAction::Write,
         }
     }
 }
@@ -176,32 +188,63 @@ impl eframe::App for ApplicationState {
                                                 match *client_lock {
                                                     None => {}
                                                     Some(ref mut client) => {
-                                                        match client.write_db(
-                                                            db.name.as_str(),
-                                                            self.key_input.as_str(),
-                                                            self.value_input.as_str(),
-                                                        ) {
-                                                            Ok(_) => {}
-                                                            Err(err) => {
-                                                                *lock = ClientConnectionError(err);
+                                                        match self.desired_action {
+                                                            DesiredAction::Write => {
+                                                                match client.write_db(
+                                                                    db.name.as_str(),
+                                                                    self.key_input.as_str(),
+                                                                    self.value_input.as_str(),
+                                                                ) {
+                                                                    Ok(_) => {}
+                                                                    Err(err) => {
+                                                                        *lock = ClientConnectionError(err);
+                                                                    }
+                                                                }
+                                                            }
+                                                            DesiredAction::Delete => {
+                                                                match client.delete_data(
+                                                                    db.name.as_str(),
+                                                                    self.key_input.as_str(),
+                                                                ) {
+                                                                    Ok(resp) => {
+                                                                        #[cfg(debug_assertions)]
+                                                                        println!("{:?}", resp);
+                                                                    }
+                                                                    Err(err) => {
+                                                                        #[cfg(debug_assertions)]
+                                                                        println!("{:?}",err);
+                                                                        *lock = ClientConnectionError(err);
+                                                                    }
+                                                                }
                                                             }
                                                         }
-                                                        match client
-                                                            .list_db_contents(db.name.as_str())
-                                                        {
+
+                                                        match client.list_db_contents(db.name.as_str()) {
                                                             Ok(data) => {
                                                                 db.content =
-                                                                    ContentCacheState::Cached(data);
+                                                                    Cached(data);
                                                             }
                                                             Err(err) => {
                                                                 *lock = ClientConnectionError(err);
                                                             }
                                                         }
+
                                                     }
                                                 }
                                             }
                                         },
                                     },
+                                }
+                            }
+
+                            if ui.button(format!("{}", self.desired_action.as_text())).clicked() {
+                                match self.desired_action {
+                                    DesiredAction::Write => {
+                                        self.desired_action = DesiredAction::Delete;
+                                    }
+                                    DesiredAction::Delete => {
+                                        self.desired_action = DesiredAction::Write;
+                                    }
                                 }
                             }
                         });
@@ -221,13 +264,13 @@ impl eframe::App for ApplicationState {
                         if let Some(db_list) = &self.database_list {
                             if let Some(db) = db_list.get(selected_db as usize) {
                                 ui.label(format!("Selected DB: {:?}", db.name));
-                                match db.role {
-                                    RoleCacheState::NotCached => {}
-                                    RoleCacheState::Cached(role) => {
+                                match &db.role {
+                                    NotCached => {}
+                                    Cached(role) => {
                                         ui.label(format!("Role: {:?}", role));
                                     }
-                                    RoleCacheState::ErrorState => {
-                                        ui.label("Role: Error");
+                                    ContentCacheState::Error(err) => {
+                                        ui.label(format!("Role: {:?}", err));
                                     }
                                 }
                             }
@@ -249,8 +292,7 @@ impl eframe::App for ApplicationState {
                                                         .list_db_contents(item.name.as_str())
                                                     {
                                                         Ok(data) => {
-                                                            item.content =
-                                                                ContentCacheState::Cached(data);
+                                                            item.content = Cached(data);
                                                         }
                                                         Err(err) => {
                                                             item.content =
@@ -258,27 +300,23 @@ impl eframe::App for ApplicationState {
                                                         }
                                                     }
                                                 }
-                                                ContentCacheState::Cached(_) => {}
+                                                Cached(_) => {}
                                                 ContentCacheState::Error(_) => {}
                                             }
 
                                             // cache the role if it is not cached.
                                             match item.role {
-                                                RoleCacheState::NotCached => {
+                                                NotCached => {
                                                     match client.get_role(item.name.as_str()) {
-                                                        Ok(role) => {
-                                                            // self.role = Some(role);
-                                                            item.role = RoleCacheState::Cached(role)
-                                                        }
+                                                        Ok(role) => item.role = Cached(role),
                                                         Err(err) => {
-                                                            *self.program_state.lock().unwrap() =
-                                                                ClientConnectionError(err);
-                                                            item.role = RoleCacheState::ErrorState;
+                                                            item.role =
+                                                                ContentCacheState::Error(err);
                                                         }
                                                     }
                                                 }
-                                                RoleCacheState::Cached(_) => {}
-                                                RoleCacheState::ErrorState => {}
+                                                Cached(_) => {}
+                                                ContentCacheState::Error(_) => {}
                                             }
 
                                             // set the selected database number in the program state.
@@ -352,7 +390,7 @@ impl eframe::App for ApplicationState {
                                                 .map(|db_packet| DBCached {
                                                     name: db_packet.get_db_name().to_string(),
                                                     content: NotCached,
-                                                    role: RoleCacheState::NotCached,
+                                                    role: NotCached,
                                                 })
                                                 .collect(),
                                         )
@@ -370,7 +408,7 @@ impl eframe::App for ApplicationState {
                                 if let Some(db_cached) = list.get(index_selected as usize) {
                                     match &db_cached.content {
                                         NotCached => {}
-                                        ContentCacheState::Cached(data) => {
+                                        Cached(data) => {
                                             let mut list = data
                                                 .iter()
                                                 .map(|(s1, s2)| (s1.to_string(), s2.to_string()))

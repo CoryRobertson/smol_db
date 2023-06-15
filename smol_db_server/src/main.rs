@@ -198,7 +198,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::DeleteData(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.delete_data(&db_name,&db_location,&client_key);
+                                let resp = lock.delete_data(&db_name, &db_location, &client_key);
                                 resp
                             }
                         }

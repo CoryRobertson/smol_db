@@ -12,7 +12,7 @@ pub enum DBPacket {
     /// Write(db to operate on, key to write to the db using, data to write to the key location)
     Write(DBPacketInfo, DBLocation, DBData),
     /// DeleteData(db to operate on, key to delete data from)
-    DeleteData(DBPacketInfo,DBLocation),
+    DeleteData(DBPacketInfo, DBLocation),
     /// CreateDB(db to create)
     CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
@@ -42,7 +42,7 @@ impl DBPacket {
     }
 
     pub fn new_delete_data(dbname: &str, location: &str) -> DBPacket {
-        DBPacket::DeleteData(DBPacketInfo::new(dbname),DBLocation::new(location))
+        DBPacket::DeleteData(DBPacketInfo::new(dbname), DBLocation::new(location))
     }
 
     pub fn new_get_role(dbname: &str) -> DBPacket {
