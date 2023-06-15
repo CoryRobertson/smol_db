@@ -196,6 +196,11 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp = lock.get_role(&db_name, &client_key);
                                 resp
                             }
+                            DBPacket::DeleteData(db_name, db_location) => {
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.delete_data(&db_name,&db_location,&client_key);
+                                resp
+                            }
                         }
                     }
                     Err(err) => {

@@ -38,6 +38,29 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    pub fn delete_data(&mut self, db_name: &str, db_location: &str) -> Result<DBPacketResponse<String>, ClientError> {
+        let mut buf: [u8; 1024] = [0; 1024];
+        let packet = DBPacket::new_delete_data(db_name, db_location);
+        return match packet.serialize_packet() {
+            Ok(ser) => match self.socket.write(ser.as_bytes()) {
+                Ok(_) => match self.socket.read(&mut buf) {
+                    Ok(read_length) => {
+                        match serde_json::from_slice::<DBPacketResponse<String>>(
+                            &buf[0..read_length],
+                        ) {
+                            Ok(response) => Ok(response),
+                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
+                        }
+                    }
+                    Err(err) => Err(SocketReadError(err)),
+                },
+                Err(err) => Err(SocketWriteError(err)),
+            },
+            Err(err) => Err(PacketSerializationError(Error::from(err))),
+        };
+    }
+
+    /// Returns the role of the given client in the given db.
     pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let packet1 = DBPacket::new_get_role(db_name);

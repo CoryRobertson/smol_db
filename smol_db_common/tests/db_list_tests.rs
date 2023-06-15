@@ -8,13 +8,11 @@ mod tests {
     use smol_db_common::db_list::DBList;
     use smol_db_common::db_packets::db_location::DBLocation;
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+    use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{
         Error, SuccessNoData, SuccessReply,
     };
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
-        DBAlreadyExists, DBNotFound, InvalidPermissions, UserNotFound,
-    };
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{DBAlreadyExists, DBNotFound, InvalidPermissions, UserNotFound, ValueNotFound};
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::collections::HashMap;
     use std::fs::File;
@@ -695,5 +693,65 @@ mod tests {
 
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response, SuccessNoData);
+    }
+
+    #[test]
+    fn test_delete_data() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+        let db_name = "test_delete_data";
+        let db_pack_info = DBPacketInfo::new(db_name);
+        let db_location = DBLocation::new("location1");
+        let db_data = DBData::new("this is data".to_string());
+
+        {
+            let create_resp =
+                db_list.create_db(db_name, get_db_test_settings(), &TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(create_resp, SuccessNoData);
+        }
+
+        {
+            let write_resp = db_list.write_db(&db_pack_info,&db_location,db_data.clone(),&"not a working key probably".to_string());
+            assert_eq!(write_resp,Error(InvalidPermissions));
+        }
+
+        {
+            let write_resp = db_list.write_db(&db_pack_info, &db_location, db_data.clone(), &TEST_USER_KEY.to_string());
+            assert_eq!(write_resp,SuccessNoData);
+        }
+
+        {
+            let write_resp = db_list.write_db(&db_pack_info, &db_location, db_data.clone(), &TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(write_resp,SuccessReply(db_data.get_data().to_string()));
+        }
+
+        {
+            let get_data_resp = db_list.read_db(&db_pack_info,&db_location,&TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(get_data_resp,SuccessReply(db_data.get_data().to_string()));
+        }
+
+        {
+            let delete_response = db_list.delete_data(&db_pack_info,&db_location,&"not a working key probably".to_string());
+            assert_eq!(delete_response,Error(InvalidPermissions));
+        }
+
+        {
+            let delete_response = db_list.delete_data(&db_pack_info,&db_location,&TEST_USER_KEY.to_string());
+            assert_eq!(delete_response,SuccessReply(db_data.get_data().to_string()));
+        }
+
+        {
+            let delete_response = db_list.delete_data(&db_pack_info,&db_location,&TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(delete_response,Error(ValueNotFound));
+        }
+
+        {
+            let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
+            assert_eq!(delete_response, SuccessNoData);
+        }
     }
 }

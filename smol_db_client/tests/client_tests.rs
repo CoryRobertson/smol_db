@@ -1,14 +1,17 @@
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
+    use std::fs::read;
     use serde::{Deserialize, Serialize};
     use smol_db_client::Client;
     use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+    use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::thread;
     use std::time::Duration;
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::ValueNotFound;
 
     #[test]
     fn test_client() {
@@ -566,5 +569,61 @@ mod tests {
 
         let delete_response = client.delete_db(db_name).unwrap();
         assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+    }
+
+    #[test]
+    fn test_delete_data() {
+        let mut client = Client::new("localhost:8222").unwrap();
+        let db_settings_test = DBSettings::new(
+            Duration::from_secs(21),
+            (false, true, false),
+            (true, false, true),
+            vec![],
+            vec![],
+        );
+        let db_name = "test_delete_data";
+        let db_location = "location1";
+        let data= "super cool data";
+
+        {
+            // set key to super admin key
+            let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+            assert_eq!(set_key_response, SuccessNoData);
+        }
+
+        {
+            let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
+            assert_eq!(create_response, SuccessNoData);
+        }
+
+        {
+            let write_response = client.write_db(db_name,db_location,data).unwrap();
+            assert_eq!(write_response,SuccessNoData);
+        }
+
+        {
+            let read_response = client.read_db(db_name,db_location).unwrap();
+            assert_eq!(read_response,SuccessReply(data.to_string()));
+        }
+
+        {
+            let delete_response_data = client.delete_data(db_name,db_location).unwrap();
+            assert_eq!(delete_response_data,SuccessReply(data.to_string()));
+        }
+
+        {
+            let read_response = client.read_db(db_name,db_location).unwrap();
+            assert_eq!(read_response,Error(ValueNotFound));
+        }
+
+        {
+            let delete_data_response = client.delete_data(db_name,db_location).unwrap();
+            assert_eq!(delete_data_response,Error(ValueNotFound));
+        }
+
+        {
+            let delete_response = client.delete_db(db_name).unwrap();
+            assert_eq!(delete_response, SuccessNoData);
+        }
     }
 }

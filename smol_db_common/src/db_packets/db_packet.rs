@@ -11,9 +11,8 @@ pub enum DBPacket {
     Read(DBPacketInfo, DBLocation),
     /// Write(db to operate on, key to write to the db using, data to write to the key location)
     Write(DBPacketInfo, DBLocation, DBData),
-
-    //TODO: implement Delete(DBPacketInfo, DBLocation), delete requires write permissions, deletes the entry from the hash map by key.
-
+    /// DeleteData(db to operate on, key to delete data from)
+    DeleteData(DBPacketInfo,DBLocation),
     /// CreateDB(db to create)
     CreateDB(DBPacketInfo, DBSettings),
     /// DeleteDB(db to delete)
@@ -32,15 +31,18 @@ pub enum DBPacket {
     GetDBSettings(DBPacketInfo),
     /// Sets the DBSettings struct within the given db to the new settings struct.
     ChangeDBSettings(DBPacketInfo, DBSettings),
-
+    /// GetRole(db to read role from)
     GetRole(DBPacketInfo),
-    // TODO: GetRole(DBPacketInfo) packet returns the users role within a given db, super admin, admin, user, other
 }
 
 impl DBPacket {
     /// Creates a new Read DBPacket from a name of a database and location string to read from.
     pub fn new_read(dbname: &str, location: &str) -> DBPacket {
         DBPacket::Read(DBPacketInfo::new(dbname), DBLocation::new(location))
+    }
+
+    pub fn new_delete_data(dbname: &str, location: &str) -> DBPacket {
+        DBPacket::DeleteData(DBPacketInfo::new(dbname),DBLocation::new(location))
     }
 
     pub fn new_get_role(dbname: &str) -> DBPacket {

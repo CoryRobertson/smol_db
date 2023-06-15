@@ -6,9 +6,7 @@ use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponse::{Error, SuccessNoData, SuccessReply};
-use crate::db_packets::db_packet_response::DBPacketResponseError::{
-    DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
-};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound};
 use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
@@ -40,6 +38,85 @@ impl DBList {
 
     fn get_super_admin_list(&self) -> Vec<String> {
         self.super_admin_hash_list.read().unwrap().clone()
+    }
+
+    pub fn delete_data(&self,p_info: &DBPacketInfo,db_location: &DBLocation, client_key: &String) -> DBPacketResponse<String> {
+
+        let super_admin_list = self.get_super_admin_list();
+
+        let list_lock = self.list.read().unwrap();
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            // cache was hit
+            let mut db_lock = db.write().unwrap();
+
+            db_lock.last_access_time = SystemTime::now();
+
+
+
+            return if db_lock.has_write_permissions(client_key,&super_admin_list) {
+
+                let removed_item = db_lock.db_content.content.remove(db_location.as_key());
+
+                match removed_item {
+                    None => {
+                        Error(ValueNotFound)
+                    }
+                    Some(removed) => {
+                        SuccessReply(removed)
+                    }
+                }
+            } else {
+                Error(InvalidPermissions)
+            }
+        }
+
+        return if list_lock.contains(p_info) {
+            // cache was missed but the db exists on the file system
+
+            let mut db_file = match File::open(p_info.get_db_name()) {
+                Ok(f) => f,
+                Err(_) => {
+                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
+
+            let mut db_content_string = String::new();
+            db_file
+                .read_to_string(&mut db_content_string)
+                .expect("TODO: panic message");
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+
+            db.last_access_time = SystemTime::now();
+
+
+
+            let resp = if db.has_write_permissions(client_key,&super_admin_list) {
+
+                let removed = db.db_content.content.remove(db_location.as_key());
+
+                match removed {
+                    None => {
+                        Error(ValueNotFound)
+                    }
+                    Some(removed_item) => {
+                        SuccessReply(removed_item)
+                    }
+                }
+            } else {
+                Error(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            resp
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Error(DBNotFound)
+        };
     }
 
     pub fn get_role(&self, p_info: &DBPacketInfo, client_key: &String) -> DBPacketResponse<String> {
