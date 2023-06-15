@@ -1,13 +1,14 @@
-use std::collections::HashMap;
-use crate::app::ProgramState::{ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey};
+use crate::app::ContentCacheState::NotCached;
+use crate::app::ProgramState::{
+    ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey,
+};
 use smol_db_client::client_error::ClientError;
 use smol_db_client::{Client, Role};
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use serde::{Deserialize, Serialize};
-use crate::app::ContentCacheState::NotCached;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -28,19 +29,17 @@ pub struct ApplicationState {
     selected_database: Option<u32>,
 
     #[serde(skip)]
-    role: Option<Role>,
-
-    #[serde(skip)]
     connection_thread: Option<JoinHandle<()>>,
 }
 
 #[derive(Debug)]
 enum ContentCacheState {
     NotCached,
-    Cached(HashMap<String,String>),
+    Cached(HashMap<String, String>),
     Error(ClientError),
 }
 
+#[derive(Debug)]
 enum RoleCacheState {
     NotCached,
     Cached(Role),
@@ -51,6 +50,7 @@ enum RoleCacheState {
 struct DBCached {
     name: String,
     content: ContentCacheState,
+    role: RoleCacheState,
 }
 
 #[derive(Debug)]
@@ -71,7 +71,6 @@ impl Default for ApplicationState {
             database_list: None,
             client_key: "".to_string(),
             selected_database: None,
-            role: None,
             connection_thread: None,
         }
     }
@@ -112,11 +111,12 @@ impl eframe::App for ApplicationState {
                         }
                         *lock = NoClient;
                         self.database_list = None;
+                        *self.client.lock().unwrap() = None;
                     }
                     if ui.button("Set key").clicked() {
                         let mut lock = self.program_state.lock().unwrap();
                         match *lock {
-                            ProgramState::NoClient => {}
+                            NoClient => {}
                             PromptForClientDetails => {}
                             ClientConnectionError(_) => {}
                             PromptForKey => {}
@@ -132,7 +132,6 @@ impl eframe::App for ApplicationState {
                         self.database_list = None;
 
                         self.selected_database = None;
-                        self.role = None;
                         self.connection_thread = None;
                     }
                 });
@@ -149,36 +148,46 @@ impl eframe::App for ApplicationState {
                 NoClient => {}
                 PromptForClientDetails => {}
                 ClientConnectionError(_) => {}
+                // side menu that is persistent when displaying the client data.
                 DisplayClient => {
-                    // side menu that is persistent when displaying the client data.
                     if let Some(selected_db) = self.selected_database {
                         if let Some(db_list) = &self.database_list {
                             if let Some(db) = db_list.get(selected_db as usize) {
                                 ui.label(format!("Selected DB: {:?}", db.name));
+                                match db.role {
+                                    RoleCacheState::NotCached => {}
+                                    RoleCacheState::Cached(role) => {
+                                        ui.label(format!("Role: {:?}", role));
+                                    }
+                                    RoleCacheState::ErrorState => {
+                                        ui.label("Role: Error");
+                                    }
+                                }
                             }
                         }
-
                     }
                     match &mut self.database_list {
                         None => {}
                         Some(list) => {
                             for (index, item) in list.iter_mut().enumerate() {
                                 if ui.button(format!("{}: {}", index + 1, item.name)).clicked() {
-                                    // self.selected_database = Some(item.clone());
                                     let mut lock = self.client.lock().unwrap();
                                     match *lock {
                                         None => {}
                                         Some(ref mut client) => {
-                                            self.role = None;
+                                            // cache the content if it is not cached.
                                             match item.content {
                                                 NotCached => {
-                                                    // TODO: display an error when the contents fail to list, probably change content into the enum ContentCacheState
-                                                    match client.list_db_contents(item.name.as_str()) {
+                                                    match client
+                                                        .list_db_contents(item.name.as_str())
+                                                    {
                                                         Ok(data) => {
-                                                            item.content = ContentCacheState::Cached(data);
+                                                            item.content =
+                                                                ContentCacheState::Cached(data);
                                                         }
                                                         Err(err) => {
-                                                            item.content = ContentCacheState::Error(err);
+                                                            item.content =
+                                                                ContentCacheState::Error(err);
                                                         }
                                                     }
                                                 }
@@ -186,16 +195,32 @@ impl eframe::App for ApplicationState {
                                                 ContentCacheState::Error(_) => {}
                                             }
 
+                                            // cache the role if it is not cached.
+                                            match item.role {
+                                                RoleCacheState::NotCached => {
+                                                    match client.get_role(item.name.as_str()) {
+                                                        Ok(role) => {
+                                                            // self.role = Some(role);
+                                                            item.role = RoleCacheState::Cached(role)
+                                                        }
+                                                        Err(err) => {
+                                                            *self.program_state.lock().unwrap() =
+                                                                ClientConnectionError(err);
+                                                            item.role = RoleCacheState::ErrorState;
+                                                        }
+                                                    }
+                                                }
+                                                RoleCacheState::Cached(_) => {}
+                                                RoleCacheState::ErrorState => {}
+                                            }
+
+                                            // set the selected database number in the program state.
                                             self.selected_database = Some(index as u32);
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-
-                    if let Some(role) = &self.role {
-                        ui.label(format!("Role: {:?}", role));
                     }
                 }
                 PromptForKey => {}
@@ -247,8 +272,8 @@ impl eframe::App for ApplicationState {
                     }
                 }
                 DisplayClient => {
-                    // get the database list if it is not known
                     match &mut self.database_list {
+                        // get the database list if it is not known
                         None => {
                             let mut lock = self.client.lock().unwrap();
                             match *lock {
@@ -257,8 +282,10 @@ impl eframe::App for ApplicationState {
                                     Ok(list) => {
                                         self.database_list = Some(
                                             list.iter()
-                                                .map(|db_packet| {
-                                                    DBCached { name: db_packet.get_db_name().to_string(), content: NotCached }
+                                                .map(|db_packet| DBCached {
+                                                    name: db_packet.get_db_name().to_string(),
+                                                    content: NotCached,
+                                                    role: RoleCacheState::NotCached,
                                                 })
                                                 .collect(),
                                         )
@@ -270,62 +297,30 @@ impl eframe::App for ApplicationState {
                                 },
                             }
                         }
-                        Some(_) => {}
-                    }
-
-                    if let Some(list) = &self.database_list {
-                        if let Some(index_selected) = self.selected_database {
-                            if let Some(db_cached) = list.get(index_selected as usize) {
-                                match &db_cached.content {
-                                    NotCached => {}
-                                    ContentCacheState::Cached(data) => {
-                                        let mut list = data.iter()
-                                            .map(|(s1,s2)| (s1.to_string(),s2.to_string()))
-                                            .collect::<Vec<(String,String)>>();
-                                        list.sort();
-                                        for (key, value) in list {
-                                            ui.label(format!("{} : {}",key,value));
-                                        }
-                                    }
-                                    ContentCacheState::Error(err) => {
-                                        ui.label(format!("{:?}",err));
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-
-                    // get the role if it is not known
-                    match &self.role {
-                        None => {
-                            let mut lock = self.client.lock().unwrap();
-                            match *lock {
-                                None => {}
-                                Some(ref mut client) => match &self.selected_database {
-                                    None => {}
-                                    Some(db_selected_name) => {
-                                        if let Some(db_list) = &self.database_list {
-                                            if let Some(db) = db_list.get(*db_selected_name as usize) {
-                                                match client.get_role(db.name.as_str()) {
-                                                    Ok(role) => {
-                                                        self.role = Some(role);
-                                                    }
-                                                    Err(err) => {
-                                                        *self.program_state.lock().unwrap() =
-                                                            ClientConnectionError(err);
-                                                    }
-                                                }
+                        // db list exists, populate its information on screen.
+                        Some(list) => {
+                            if let Some(index_selected) = self.selected_database {
+                                if let Some(db_cached) = list.get(index_selected as usize) {
+                                    match &db_cached.content {
+                                        NotCached => {}
+                                        ContentCacheState::Cached(data) => {
+                                            let mut list = data
+                                                .iter()
+                                                .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
+                                                .collect::<Vec<(String, String)>>();
+                                            list.sort();
+                                            for (key, value) in list {
+                                                ui.label(format!("{} : {}", key, value));
                                             }
                                         }
-
+                                        ContentCacheState::Error(err) => {
+                                            ui.label(format!("{:?}", err));
+                                        }
                                     }
-                                },
+                                }
                             }
                         }
-                        Some(_) => {}
                     }
-
                 }
                 ClientConnectionError(err) => {
                     ui.label("Client connection error");
@@ -352,7 +347,6 @@ impl eframe::App for ApplicationState {
                     }
                 }
             }
-
 
             egui::warn_if_debug_build(ui);
         });

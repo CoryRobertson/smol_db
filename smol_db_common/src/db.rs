@@ -14,7 +14,7 @@ pub struct DB {
     pub db_settings: DBSettings,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Debug, Serialize, Deserialize, Clone, Copy)]
 /// Represents the role a user has in a db, given a key.
 pub enum Role {
     SuperAdmin,
