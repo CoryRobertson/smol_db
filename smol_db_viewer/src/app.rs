@@ -30,6 +30,12 @@ pub struct ApplicationState {
 
     #[serde(skip)]
     connection_thread: Option<JoinHandle<()>>,
+
+    #[serde(skip)]
+    key_input: String,
+
+    #[serde(skip)]
+    value_input: String,
 }
 
 #[derive(Debug)]
@@ -66,12 +72,14 @@ impl Default for ApplicationState {
     fn default() -> Self {
         Self {
             client: Arc::new(Mutex::new(None)),
-            program_state: Arc::new(Mutex::new(ProgramState::NoClient)),
+            program_state: Arc::new(Mutex::new(NoClient)),
             ip_address: "".to_string(),
             database_list: None,
             client_key: "".to_string(),
             selected_database: None,
             connection_thread: None,
+            key_input: "".to_string(),
+            value_input: "".to_string(),
         }
     }
 }
@@ -142,6 +150,65 @@ impl eframe::App for ApplicationState {
                 }
             });
         });
+
+        {
+            let mut lock = self.program_state.lock().unwrap();
+            match *lock {
+                NoClient => {}
+                PromptForClientDetails => {}
+                ClientConnectionError(_) => {}
+                PromptForKey => {}
+                DisplayClient => {
+                    egui::TopBottomPanel::bottom("side_panel2").show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Input:");
+                            ui.text_edit_singleline(&mut self.key_input);
+                            ui.text_edit_singleline(&mut self.value_input);
+                            if ui.button("Submit").clicked() {
+                                match self.selected_database {
+                                    None => {}
+                                    Some(index) => match &mut self.database_list {
+                                        None => {}
+                                        Some(list) => match list.get_mut(index as usize) {
+                                            None => {}
+                                            Some(db) => {
+                                                let mut client_lock = self.client.lock().unwrap();
+                                                match *client_lock {
+                                                    None => {}
+                                                    Some(ref mut client) => {
+                                                        match client.write_db(
+                                                            db.name.as_str(),
+                                                            self.key_input.as_str(),
+                                                            self.value_input.as_str(),
+                                                        ) {
+                                                            Ok(_) => {}
+                                                            Err(err) => {
+                                                                *lock = ClientConnectionError(err);
+                                                            }
+                                                        }
+                                                        match client
+                                                            .list_db_contents(db.name.as_str())
+                                                        {
+                                                            Ok(data) => {
+                                                                db.content =
+                                                                    ContentCacheState::Cached(data);
+                                                            }
+                                                            Err(err) => {
+                                                                *lock = ClientConnectionError(err);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    },
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+        }
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             match self.program_state.lock().unwrap().deref() {
