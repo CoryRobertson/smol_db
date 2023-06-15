@@ -145,6 +145,9 @@ impl eframe::App for ApplicationState {
                             }
                         }
                     }
+
+                    // TODO: add a DBSettings manager here that lets the client formulate a new DBSettings to send to the server, also should display current DBSettings.
+
                     if ui.button("Refresh stored data").clicked() {
                         *self.client.lock().unwrap() = None;
                         *self.program_state.lock().unwrap() = NoClient;
