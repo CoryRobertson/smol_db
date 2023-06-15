@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use serde::{Deserialize, Serialize};
+use crate::app::ContentCacheState::NotCached;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -33,18 +34,23 @@ pub struct ApplicationState {
     connection_thread: Option<JoinHandle<()>>,
 }
 
-#[derive(Clone,Debug, Serialize, Deserialize)]
-enum CacheState {
+#[derive(Debug)]
+enum ContentCacheState {
     NotCached,
-    Cached,
-    LackingPermissions,
-    Error,
+    Cached(HashMap<String,String>),
+    Error(ClientError),
 }
 
-#[derive(Clone,Debug, Serialize, Deserialize)]
+enum RoleCacheState {
+    NotCached,
+    Cached(Role),
+    ErrorState,
+}
+
+#[derive(Debug)]
 struct DBCached {
     name: String,
-    content: Option<HashMap<String,String>>,
+    content: ContentCacheState,
 }
 
 #[derive(Debug)]
@@ -98,23 +104,14 @@ impl eframe::App for ApplicationState {
                     }
                     if ui.button("Disconnect").clicked() {
                         let mut lock = self.program_state.lock().unwrap();
-                        match *lock {
-                            NoClient => {}
-                            PromptForClientDetails => {}
-                            ClientConnectionError(_) => {}
-                            DisplayClient => {
-                                // if we are displaying the client, we can allow the user to click disconnect.
-                                match self.client.lock().unwrap().as_ref() {
-                                    None => {}
-                                    Some(cl) => {
-                                        cl.disconnect().expect("Unable to disconnect from client");
-                                    }
-                                }
-                                *lock = NoClient;
-                                self.database_list = None;
+                        match self.client.lock().unwrap().as_ref() {
+                            None => {}
+                            Some(cl) => {
+                                let _ = cl.disconnect();
                             }
-                            PromptForKey => {}
                         }
+                        *lock = NoClient;
+                        self.database_list = None;
                     }
                     if ui.button("Set key").clicked() {
                         let mut lock = self.program_state.lock().unwrap();
@@ -139,6 +136,11 @@ impl eframe::App for ApplicationState {
                         self.connection_thread = None;
                     }
                 });
+                if self.client.lock().unwrap().is_some() {
+                    if ui.button("Refresh DB List").clicked() {
+                        self.database_list = None;
+                    }
+                }
             });
         });
 
@@ -168,12 +170,22 @@ impl eframe::App for ApplicationState {
                                         None => {}
                                         Some(ref mut client) => {
                                             self.role = None;
-                                            if item.content.is_none() {
-                                                // TODO: display an error when the contents fail to list, probably change content into the enum CacheState
-                                                if let Ok(content) = client.list_db_contents(item.name.as_str()) {
-                                                    item.content = Some(content);
+                                            match item.content {
+                                                NotCached => {
+                                                    // TODO: display an error when the contents fail to list, probably change content into the enum ContentCacheState
+                                                    match client.list_db_contents(item.name.as_str()) {
+                                                        Ok(data) => {
+                                                            item.content = ContentCacheState::Cached(data);
+                                                        }
+                                                        Err(err) => {
+                                                            item.content = ContentCacheState::Error(err);
+                                                        }
+                                                    }
                                                 }
+                                                ContentCacheState::Cached(_) => {}
+                                                ContentCacheState::Error(_) => {}
                                             }
+
                                             self.selected_database = Some(index as u32);
                                         }
                                     }
@@ -246,7 +258,7 @@ impl eframe::App for ApplicationState {
                                         self.database_list = Some(
                                             list.iter()
                                                 .map(|db_packet| {
-                                                    DBCached { name: db_packet.get_db_name().to_string(), content: None }
+                                                    DBCached { name: db_packet.get_db_name().to_string(), content: NotCached }
                                                 })
                                                 .collect(),
                                         )
@@ -264,15 +276,22 @@ impl eframe::App for ApplicationState {
                     if let Some(list) = &self.database_list {
                         if let Some(index_selected) = self.selected_database {
                             if let Some(db_cached) = list.get(index_selected as usize) {
-                                if let Some(content) = &db_cached.content {
-                                    let mut list = content.iter()
-                                        .map(|(s1,s2)| (s1.to_string(),s2.to_string()))
-                                        .collect::<Vec<(String,String)>>();
-                                    list.sort();
-                                    for (key, value) in list {
-                                        ui.label(format!("{} : {}",key,value));
+                                match &db_cached.content {
+                                    NotCached => {}
+                                    ContentCacheState::Cached(data) => {
+                                        let mut list = data.iter()
+                                            .map(|(s1,s2)| (s1.to_string(),s2.to_string()))
+                                            .collect::<Vec<(String,String)>>();
+                                        list.sort();
+                                        for (key, value) in list {
+                                            ui.label(format!("{} : {}",key,value));
+                                        }
+                                    }
+                                    ContentCacheState::Error(err) => {
+                                        ui.label(format!("{:?}",err));
                                     }
                                 }
+
                             }
                         }
                     }
