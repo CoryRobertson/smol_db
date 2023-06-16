@@ -487,6 +487,9 @@ impl eframe::App for ApplicationState {
 
         // center panel block
         {
+
+            // TODO: add create and delete db systems to viewer
+
             egui::CentralPanel::default().show(ctx, |ui| {
                 #[cfg(debug_assertions)]
                 ui.label(format!(
