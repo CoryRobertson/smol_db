@@ -5,15 +5,15 @@ use std::time::Duration;
 /// Struct describing settings used when creating a db.
 pub struct DBSettings {
     /// The duration to wait before removing the given db from the cache.
-    invalidation_time: Duration,
+    pub invalidation_time: Duration,
     /// Triple of the permissions others have to (read,write,list)
-    can_others_rwx: (bool, bool, bool),
+    pub can_others_rwx: (bool, bool, bool),
     /// Triple of the permissions users have to (read,write,list)
-    can_users_rwx: (bool, bool, bool),
+    pub can_users_rwx: (bool, bool, bool),
     /// Admin list of hashes
-    admins: Vec<String>,
+    pub admins: Vec<String>,
     /// User list of hashes
-    users: Vec<String>,
+    pub users: Vec<String>,
 }
 
 impl DBSettings {
@@ -32,6 +32,14 @@ impl DBSettings {
             admins,
             users,
         }
+    }
+
+    pub fn get_admin_list(&self) -> &Vec<String> {
+        &self.admins
+    }
+
+    pub fn get_user_list(&self) -> &Vec<String> {
+        &self.users
     }
 
     /// Adds an admin to the DB

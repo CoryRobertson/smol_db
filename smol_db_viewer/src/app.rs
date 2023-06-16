@@ -1,14 +1,17 @@
 use crate::app::ContentCacheState::{Cached, NotCached};
 use crate::app::ProgramState::{
-    ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey,
+    ChangeDBSettings, ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails,
+    PromptForKey,
 };
 use smol_db_client::client_error::ClientError;
+use smol_db_client::db_settings::DBSettings;
 use smol_db_client::{Client, Role};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -39,6 +42,18 @@ pub struct ApplicationState {
 
     #[serde(skip)]
     desired_action: DesiredAction,
+
+    #[serde(skip)]
+    submit_db_settings: DBSettings,
+
+    #[serde(skip)]
+    duration_seconds: u64,
+
+    #[serde(skip)]
+    users_list: String,
+
+    #[serde(skip)]
+    admins_list: String,
 }
 
 #[derive(Debug)]
@@ -68,6 +83,7 @@ struct DBCached {
     name: String,
     content: ContentCacheState<HashMap<String, String>>,
     role: ContentCacheState<Role>,
+    db_settings: ContentCacheState<DBSettings>,
 }
 
 #[derive(Debug)]
@@ -76,6 +92,7 @@ enum ProgramState {
     PromptForClientDetails,
     ClientConnectionError(ClientError),
     PromptForKey,
+    ChangeDBSettings,
     DisplayClient,
 }
 
@@ -92,6 +109,10 @@ impl Default for ApplicationState {
             key_input: "".to_string(),
             value_input: "".to_string(),
             desired_action: DesiredAction::Write,
+            submit_db_settings: DBSettings::default(),
+            duration_seconds: 30,
+            users_list: "".to_string(),
+            admins_list: "".to_string(),
         }
     }
 }
@@ -110,62 +131,77 @@ impl eframe::App for ApplicationState {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self { .. } = self;
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-                ui.menu_button("Client", |ui| {
-                    if ui.button("Connect").clicked() {
-                        *self.program_state.lock().unwrap().deref_mut() = PromptForClientDetails;
-                    }
-                    if ui.button("Disconnect").clicked() {
-                        let mut lock = self.program_state.lock().unwrap();
-                        match self.client.lock().unwrap().as_ref() {
-                            None => {}
-                            Some(cl) => {
-                                let _ = cl.disconnect();
+        // top panel block
+        {
+            egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+                egui::menu::bar(ui, |ui| {
+                    let has_client = self.client.lock().unwrap().is_some();
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Quit").clicked() {
+                            _frame.close();
+                        }
+                    });
+                    ui.separator();
+                    ui.menu_button("Client", |ui| {
+                        if ui.button("Connect").clicked() {
+                            *self.program_state.lock().unwrap().deref_mut() =
+                                PromptForClientDetails;
+                        }
+                        if has_client {
+                            ui.separator();
+                            if ui.button("Disconnect").clicked() {
+                                let mut lock = self.program_state.lock().unwrap();
+                                match self.client.lock().unwrap().as_ref() {
+                                    None => {}
+                                    Some(cl) => {
+                                        let _ = cl.disconnect();
+                                    }
+                                }
+                                *lock = NoClient;
+                                self.database_list = None;
+                                *self.client.lock().unwrap() = None;
+                            }
+                            ui.separator();
+                            if ui.button("Set key").clicked() {
+                                let mut lock = self.program_state.lock().unwrap();
+                                match *lock {
+                                    NoClient => {}
+                                    PromptForClientDetails => {}
+                                    ClientConnectionError(_) => {}
+                                    PromptForKey => {}
+                                    DisplayClient => {
+                                        *lock = PromptForKey;
+                                    }
+                                    ChangeDBSettings => {}
+                                }
+                            }
+                            ui.separator();
+                            if ui.button("DB Settings").clicked() {
+                                *self.program_state.lock().unwrap() = ChangeDBSettings;
                             }
                         }
-                        *lock = NoClient;
-                        self.database_list = None;
-                        *self.client.lock().unwrap() = None;
-                    }
-                    if ui.button("Set key").clicked() {
-                        let mut lock = self.program_state.lock().unwrap();
-                        match *lock {
-                            NoClient => {}
-                            PromptForClientDetails => {}
-                            ClientConnectionError(_) => {}
-                            PromptForKey => {}
-                            DisplayClient => {
-                                *lock = PromptForKey;
-                            }
+                        ui.separator();
+                        if ui.button("Refresh stored data").clicked() {
+                            *self.client.lock().unwrap() = None;
+                            *self.program_state.lock().unwrap() = NoClient;
+
+                            self.database_list = None;
+
+                            self.selected_database = None;
+                            self.connection_thread = None;
+                        }
+                    });
+                    if has_client {
+                        ui.separator();
+                        if ui.button("Refresh").clicked() {
+                            self.database_list = None;
                         }
                     }
-
-                    // TODO: add a DBSettings manager here that lets the client formulate a new DBSettings to send to the server, also should display current DBSettings.
-
-                    if ui.button("Refresh stored data").clicked() {
-                        *self.client.lock().unwrap() = None;
-                        *self.program_state.lock().unwrap() = NoClient;
-
-                        self.database_list = None;
-
-                        self.selected_database = None;
-                        self.connection_thread = None;
-                    }
                 });
-                if self.client.lock().unwrap().is_some() {
-                    if ui.button("Refresh DB List").clicked() {
-                        self.database_list = None;
-                    }
-                }
             });
-        });
+        }
 
+        // bottom panel block
         {
             let mut lock = self.program_state.lock().unwrap();
             match *lock {
@@ -176,9 +212,14 @@ impl eframe::App for ApplicationState {
                 DisplayClient => {
                     egui::TopBottomPanel::bottom("side_panel2").show(ctx, |ui| {
                         ui.horizontal(|ui| {
+
+
                             ui.label("Input:");
-                            ui.text_edit_singleline(&mut self.key_input);
-                            ui.text_edit_singleline(&mut self.value_input);
+
+                            ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.key_input));
+                            // ui.text_edit_singleline(&mut self.key_input)
+                            ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.value_input));
+                            //ui.text_edit_singleline(&mut self.value_input)
                             if ui.button("Submit").clicked() {
                                 match self.selected_database {
                                     None => {}
@@ -253,211 +294,440 @@ impl eframe::App for ApplicationState {
                         });
                     });
                 }
+                ChangeDBSettings => {}
             }
         }
 
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            match self.program_state.lock().unwrap().deref() {
-                NoClient => {}
-                PromptForClientDetails => {}
-                ClientConnectionError(_) => {}
-                // side menu that is persistent when displaying the client data.
-                DisplayClient => {
-                    if let Some(selected_db) = self.selected_database {
-                        if let Some(db_list) = &self.database_list {
-                            if let Some(db) = db_list.get(selected_db as usize) {
-                                ui.label(format!("Selected DB: {:?}", db.name));
-                                match &db.role {
-                                    NotCached => {}
-                                    Cached(role) => {
-                                        ui.label(format!("Role: {:?}", role));
-                                    }
-                                    ContentCacheState::Error(err) => {
-                                        ui.label(format!("Role: {:?}", err));
+        // side panel block
+        {
+            egui::SidePanel::left("side_panel").show(ctx, |ui| {
+                match self.program_state.lock().unwrap().deref() {
+                    NoClient => {}
+                    PromptForClientDetails => {}
+                    ClientConnectionError(_) => {}
+                    // side menu that is persistent when displaying the client data.
+                    DisplayClient | ChangeDBSettings => {
+                        if let Some(selected_db) = self.selected_database {
+                            if let Some(db_list) = &self.database_list {
+                                if let Some(db) = db_list.get(selected_db as usize) {
+                                    ui.label(format!("Selected DB: {:?}", db.name));
+                                    ui.separator();
+                                    match &db.role {
+                                        NotCached => {}
+                                        Cached(role) => {
+                                            ui.label(format!("Role: {:?}", role));
+                                            ui.separator();
+                                        }
+                                        ContentCacheState::Error(_) => {}
                                     }
                                 }
                             }
                         }
+                        match &mut self.database_list {
+                            None => {}
+                            Some(list) => {
+                                for (index, item) in list.iter_mut().enumerate() {
+                                    if ui.button(format!("{}: {}", index + 1, item.name)).clicked()
+                                    {
+                                        let mut lock = self.client.lock().unwrap();
+                                        match *lock {
+                                            None => {}
+                                            Some(ref mut client) => {
+                                                // cache the content if it is not cached.
+                                                match item.content {
+                                                    NotCached => {
+                                                        match client
+                                                            .list_db_contents(item.name.as_str())
+                                                        {
+                                                            Ok(data) => {
+                                                                item.content = Cached(data);
+                                                            }
+                                                            Err(err) => {
+                                                                item.content =
+                                                                    ContentCacheState::Error(err);
+                                                            }
+                                                        }
+                                                    }
+                                                    Cached(_) => {}
+                                                    ContentCacheState::Error(_) => {}
+                                                }
+
+                                                // cache the role if it is not cached.
+                                                match item.role {
+                                                    NotCached => {
+                                                        match client.get_role(item.name.as_str()) {
+                                                            Ok(role) => item.role = Cached(role),
+                                                            Err(err) => {
+                                                                item.role =
+                                                                    ContentCacheState::Error(err);
+                                                            }
+                                                        }
+                                                    }
+                                                    Cached(_) => {}
+                                                    ContentCacheState::Error(_) => {}
+                                                }
+
+                                                match &item.db_settings {
+                                                    NotCached => {
+                                                        match client
+                                                            .get_db_settings(item.name.as_str())
+                                                        {
+                                                            Ok(db_settings) => {
+                                                                item.db_settings =
+                                                                    Cached(db_settings.clone());
+
+                                                                let users_string = {
+                                                                    let mut s = String::new();
+                                                                    db_settings
+                                                                        .users
+                                                                        .iter()
+                                                                        .for_each(|user| {
+                                                                            s.push_str(
+                                                                                format!(
+                                                                                    "{},",
+                                                                                    user
+                                                                                )
+                                                                                .as_str(),
+                                                                            );
+                                                                        });
+                                                                    if s.ends_with(',') {
+                                                                        s.remove(s.len() - 1);
+                                                                    }
+                                                                    s
+                                                                };
+                                                                let admins_string = {
+                                                                    let mut s = String::new();
+                                                                    db_settings
+                                                                        .admins
+                                                                        .iter()
+                                                                        .for_each(|admin| {
+                                                                            s.push_str(
+                                                                                format!(
+                                                                                    "{},",
+                                                                                    admin
+                                                                                )
+                                                                                .as_str(),
+                                                                            );
+                                                                        });
+                                                                    if s.ends_with(',') {
+                                                                        s.remove(s.len() - 1);
+                                                                    }
+                                                                    s
+                                                                };
+
+                                                                self.users_list = users_string;
+                                                                self.admins_list = admins_string;
+                                                                self.duration_seconds = db_settings
+                                                                    .invalidation_time
+                                                                    .as_secs();
+                                                                self.submit_db_settings =
+                                                                    db_settings;
+                                                            }
+                                                            Err(err) => {
+                                                                item.db_settings =
+                                                                    ContentCacheState::Error(err);
+                                                            }
+                                                        }
+                                                    }
+                                                    Cached(settings) => {
+                                                        self.submit_db_settings = settings.clone();
+                                                        let users_string = {
+                                                            let mut s = String::new();
+                                                            settings.users.iter().for_each(
+                                                                |user| {
+                                                                    s.push_str(
+                                                                        format!("{},", user)
+                                                                            .as_str(),
+                                                                    );
+                                                                },
+                                                            );
+                                                            if s.ends_with(',') {
+                                                                s.remove(s.len() - 1);
+                                                            }
+                                                            s
+                                                        };
+                                                        let admins_string = {
+                                                            let mut s = String::new();
+                                                            settings.admins.iter().for_each(
+                                                                |admin| {
+                                                                    s.push_str(
+                                                                        format!("{},", admin)
+                                                                            .as_str(),
+                                                                    );
+                                                                },
+                                                            );
+                                                            if s.ends_with(',') {
+                                                                s.remove(s.len() - 1);
+                                                            }
+                                                            s
+                                                        };
+
+                                                        self.users_list = users_string;
+                                                        self.admins_list = admins_string;
+                                                        self.duration_seconds =
+                                                            settings.invalidation_time.as_secs();
+                                                    }
+                                                    ContentCacheState::Error(_) => {}
+                                                }
+
+                                                // set the selected database number in the program state.
+                                                self.selected_database = Some(index as u32);
+                                            }
+                                        }
+                                    }
+                                }
+                                ui.separator();
+                            }
+                        }
                     }
-                    match &mut self.database_list {
-                        None => {}
-                        Some(list) => {
-                            for (index, item) in list.iter_mut().enumerate() {
-                                if ui.button(format!("{}: {}", index + 1, item.name)).clicked() {
-                                    let mut lock = self.client.lock().unwrap();
-                                    match *lock {
-                                        None => {}
-                                        Some(ref mut client) => {
-                                            // cache the content if it is not cached.
-                                            match item.content {
-                                                NotCached => {
-                                                    match client
-                                                        .list_db_contents(item.name.as_str())
-                                                    {
-                                                        Ok(data) => {
-                                                            item.content = Cached(data);
-                                                        }
-                                                        Err(err) => {
-                                                            item.content =
-                                                                ContentCacheState::Error(err);
-                                                        }
-                                                    }
-                                                }
-                                                Cached(_) => {}
-                                                ContentCacheState::Error(_) => {}
-                                            }
+                    PromptForKey => {} // ChangeDBSettings => {}
+                }
+            });
+        }
 
-                                            // cache the role if it is not cached.
-                                            match item.role {
-                                                NotCached => {
-                                                    match client.get_role(item.name.as_str()) {
-                                                        Ok(role) => item.role = Cached(role),
-                                                        Err(err) => {
-                                                            item.role =
-                                                                ContentCacheState::Error(err);
-                                                        }
-                                                    }
-                                                }
-                                                Cached(_) => {}
-                                                ContentCacheState::Error(_) => {}
-                                            }
+        // center panel block
+        {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                #[cfg(debug_assertions)]
+                ui.label(format!(
+                    "DEBUG Program State: {:?}",
+                    self.program_state.lock().unwrap()
+                ));
+                let mut ps_lock = self.program_state.lock().unwrap();
+                match ps_lock.deref() {
+                    NoClient => {
+                        // Display nothing when there are is no client connection.
+                        ui.label("Nothing to show here...");
+                    }
+                    PromptForClientDetails => {
+                        // When the user clicks connect, we prompt them for client connection details.
+                        ui.label("Enter Ip Address:");
+                        ui.text_edit_singleline(&mut self.ip_address);
 
-                                            // set the selected database number in the program state.
-                                            self.selected_database = Some(index as u32);
+                        if ui.button("Connect to ip address").clicked() {
+                            // clone a bunch of things that need to be moved into the thread.
+                            let client_clone = Arc::clone(&self.client);
+                            let program_state_clone = Arc::clone(&self.program_state);
+                            let ip_clone = self.ip_address.clone();
+                            self.connection_thread = Some(thread::spawn(move || {
+                                // instantly move all the variables into the thread
+                                let ps = program_state_clone;
+                                let client_mutex = client_clone;
+                                let ip = ip_clone;
+
+                                match Client::new(&ip) {
+                                    // connect the client to the server.
+                                    Ok(client_connection) => {
+                                        // if client connection successful, move the client to the programs state.
+                                        *client_mutex.lock().unwrap() = Some(client_connection);
+                                        // change the program state into a DisplayClient state.
+                                        *ps.lock().unwrap() = DisplayClient;
+                                    }
+                                    Err(err) => {
+                                        // if the client connection fails, change the program state accordingly.
+                                        *ps.lock().unwrap() = ClientConnectionError(err);
+                                    }
+                                }
+                            }));
+                        }
+
+                        if let Some(thread) = &self.connection_thread {
+                            if !thread.is_finished() {
+                                ui.spinner();
+                            }
+                        }
+                    }
+                    DisplayClient => {
+                        match &mut self.database_list {
+                            // get the database list if it is not known
+                            None => {
+                                let mut lock = self.client.lock().unwrap();
+                                match *lock {
+                                    None => {}
+                                    Some(ref mut client) => match client.list_db() {
+                                        Ok(list) => {
+                                            self.database_list = Some(
+                                                list.iter()
+                                                    .map(|db_packet| DBCached {
+                                                        name: db_packet.get_db_name().to_string(),
+                                                        content: NotCached,
+                                                        role: NotCached,
+                                                        db_settings: NotCached,
+                                                    })
+                                                    .collect(),
+                                            )
+                                        }
+                                        Err(err) => {
+                                            *self.program_state.lock().unwrap() =
+                                                ClientConnectionError(err);
+                                        }
+                                    },
+                                }
+                            }
+                            // db list exists, populate its information on screen.
+                            Some(list) => {
+                                if let Some(index_selected) = self.selected_database {
+                                    if let Some(db_cached) = list.get(index_selected as usize) {
+                                        match &db_cached.content {
+                                            NotCached => {}
+                                            Cached(data) => {
+                                                let mut list = data
+                                                    .iter()
+                                                    .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
+                                                    .collect::<Vec<(String, String)>>();
+                                                list.sort();
+                                                for (key, value) in list {
+                                                    ui.label(format!("{} : {}", key, value));
+                                                }
+                                            }
+                                            ContentCacheState::Error(err) => {
+                                                ui.label(format!("{:?}", err));
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                PromptForKey => {}
-            }
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            #[cfg(debug_assertions)]
-            ui.label(format!(
-                "DEBUG Program State: {:?}",
-                self.program_state.lock().unwrap()
-            ));
-            let mut ps_lock = self.program_state.lock().unwrap();
-            match ps_lock.deref() {
-                NoClient => {
-                    // Display nothing when there are is no client connection.
-                    ui.label("Nothing to show here...");
-                }
-                PromptForClientDetails => {
-                    // When the user clicks connect, we prompt them for client connection details.
-                    ui.label("Enter Ip Address:");
-                    ui.text_edit_singleline(&mut self.ip_address);
-
-                    if ui.button("Connect to ip address.").clicked() {
-                        // clone a bunch of things that need to be moved into the thread.
-                        let client_clone = Arc::clone(&self.client);
-                        let program_state_clone = Arc::clone(&self.program_state);
-                        let ip_clone = self.ip_address.clone();
-                        self.connection_thread = Some(thread::spawn(move || {
-                            // instantly move all the variables into the thread
-                            let ps = program_state_clone;
-                            let client_mutex = client_clone;
-                            let ip = ip_clone;
-
-                            match Client::new(&ip) {
-                                // connect the client to the server.
-                                Ok(client_connection) => {
-                                    // if client connection successful, move the client to the programs state.
-                                    *client_mutex.lock().unwrap() = Some(client_connection);
-                                    // change the program state into a DisplayClient state.
-                                    *ps.lock().unwrap() = DisplayClient;
-                                }
-                                Err(err) => {
-                                    // if the client connection fails, change the program state accordingly.
-                                    *ps.lock().unwrap() = ClientConnectionError(err);
-                                }
-                            }
-                        }));
+                    ClientConnectionError(err) => {
+                        ui.label("Client connection error");
+                        ui.label(format!("{:?}", err));
                     }
-                }
-                DisplayClient => {
-                    match &mut self.database_list {
-                        // get the database list if it is not known
-                        None => {
+                    PromptForKey => {
+                        ui.label("Enter Key:");
+                        ui.text_edit_singleline(&mut self.client_key);
+                        if ui.button("Set Key").clicked() {
                             let mut lock = self.client.lock().unwrap();
                             match *lock {
                                 None => {}
-                                Some(ref mut client) => match client.list_db() {
-                                    Ok(list) => {
-                                        self.database_list = Some(
-                                            list.iter()
-                                                .map(|db_packet| DBCached {
-                                                    name: db_packet.get_db_name().to_string(),
-                                                    content: NotCached,
-                                                    role: NotCached,
-                                                })
-                                                .collect(),
-                                        )
+                                Some(ref mut client) => {
+                                    match client.set_access_key(self.client_key.clone()) {
+                                        Ok(_) => {
+                                            *ps_lock = DisplayClient;
+                                        }
+                                        Err(err) => {
+                                            *ps_lock = ClientConnectionError(err);
+                                        }
                                     }
-                                    Err(err) => {
-                                        *self.program_state.lock().unwrap() =
-                                            ClientConnectionError(err);
-                                    }
-                                },
+                                }
                             }
                         }
-                        // db list exists, populate its information on screen.
-                        Some(list) => {
-                            if let Some(index_selected) = self.selected_database {
-                                if let Some(db_cached) = list.get(index_selected as usize) {
-                                    match &db_cached.content {
-                                        NotCached => {}
-                                        Cached(data) => {
-                                            let mut list = data
-                                                .iter()
-                                                .map(|(s1, s2)| (s1.to_string(), s2.to_string()))
-                                                .collect::<Vec<(String, String)>>();
-                                            list.sort();
-                                            for (key, value) in list {
-                                                ui.label(format!("{} : {}", key, value));
+                    }
+                    ChangeDBSettings => {
+                        match self.selected_database {
+                            None => {}
+                            Some(index) => {
+                                match &mut self.database_list {
+                                    None => {}
+                                    Some(list) => {
+                                        match list.get_mut(index as usize) {
+                                            None => {}
+                                            Some(db) => {
+                                                match &mut db.db_settings {
+                                                    NotCached => {}
+                                                    Cached(db_settings) => {
+                                                        // invalidation time
+                                                        ui.label(format!("Invalidation time: {}s", db_settings.get_invalidation_time().as_secs()));
+
+                                                        // other permissions
+                                                        let others_perms = db_settings.get_other_rwx();
+                                                        ui.label(format!("Others permissions (rwx): {},{},{}", others_perms.0,others_perms.1,others_perms.2));
+
+                                                        // user permissions
+                                                        let users_perms = db_settings.get_user_rwx();
+                                                        ui.label(format!("Users permissions (rwx): {},{},{}", users_perms.0,users_perms.1,users_perms.2));
+
+                                                        // user list
+                                                        ui.label(format!("User list: {:?}", db_settings.get_user_list()));
+
+                                                        // admin list
+                                                        ui.label(format!("Admin list: {:?}", db_settings.get_admin_list()));
+
+                                                        ui.separator();
+
+                                                        ui.add(egui::DragValue::new(&mut self.duration_seconds));
+                                                        self.submit_db_settings.invalidation_time = Duration::from_secs(self.duration_seconds);
+
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Others: ");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.0,"r");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.1,"w");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.2,"x");
+                                                        });
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Users: ");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.0,"r");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.1,"w");
+                                                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.2,"x");
+                                                        });
+
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Users: ").on_hover_text("Comma separated :)");
+                                                            ui.text_edit_singleline(&mut self.users_list);
+                                                        });
+
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Admins: ").on_hover_text("Comma separated :)");
+                                                            ui.text_edit_singleline(&mut self.admins_list);
+                                                        });
+
+                                                        if !self.users_list.is_empty() {
+                                                            self.submit_db_settings.users = self.users_list.split(',').map(|string| string.to_string()).collect::<Vec<String>>();
+                                                        } else {
+                                                            self.submit_db_settings.users = vec![];
+                                                        }
+
+                                                        if !self.admins_list.is_empty() {
+                                                            self.submit_db_settings.admins = self.admins_list.split(',').map(|string| string.to_string()).collect::<Vec<String>>();
+                                                        } else {
+                                                            self.submit_db_settings.admins = vec![];
+                                                        }
+
+                                                        #[cfg(debug_assertions)]
+                                                        ui.label(format!("DEBUG users: {:?}", self.submit_db_settings.users));
+                                                        #[cfg(debug_assertions)]
+                                                        ui.label(format!("DEBUG admins: {:?}", self.submit_db_settings.admins));
+
+                                                        if ui.button("Submit").clicked() {
+                                                            let mut lock = self.client.lock().unwrap();
+                                                            match *lock {
+                                                                None => {}
+                                                                Some(ref mut client) => {
+                                                                    match client.set_db_settings(db.name.as_str(),self.submit_db_settings.clone()) {
+                                                                        Ok(_) => {
+                                                                            *db_settings = self.submit_db_settings.clone();
+                                                                        }
+                                                                        Err(err) => {
+                                                                            db.db_settings = ContentCacheState::Error(err);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    ContentCacheState::Error(err) => {
+                                                        ui.label(format!("Error reading DBSettings: {:?}", err));
+                                                    }
+                                                }
                                             }
                                         }
-                                        ContentCacheState::Error(err) => {
-                                            ui.label(format!("{:?}", err));
-                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-                ClientConnectionError(err) => {
-                    ui.label("Client connection error");
-                    ui.label(format!("{:?}", err));
-                }
-                PromptForKey => {
-                    ui.label("Enter Key:");
-                    ui.text_edit_singleline(&mut self.client_key);
-                    if ui.button("Set Key").clicked() {
-                        let mut lock = self.client.lock().unwrap();
-                        match *lock {
-                            None => {}
-                            Some(ref mut client) => {
-                                match client.set_access_key(self.client_key.clone()) {
-                                    Ok(_) => {
-                                        *ps_lock = DisplayClient;
-                                    }
-                                    Err(err) => {
-                                        *ps_lock = ClientConnectionError(err);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
-            egui::warn_if_debug_build(ui);
-        });
+                        if ui.button("Back").clicked() {
+                            *ps_lock = DisplayClient;
+                        }
+
+                        ui.separator();
+
+                    }
+                }
+
+                egui::warn_if_debug_build(ui);
+            });
+        }
 
         if false {
             egui::Window::new("Window").show(ctx, |ui| {

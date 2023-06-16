@@ -17,6 +17,7 @@ use std::net::{Shutdown, TcpStream};
 
 pub mod client_error;
 pub use smol_db_common::db::Role;
+pub use smol_db_common::db_packets::db_settings;
 
 /// Client struct used for communicating to the database.
 pub struct Client {

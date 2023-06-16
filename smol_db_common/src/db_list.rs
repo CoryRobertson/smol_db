@@ -42,6 +42,7 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().clone()
     }
 
+    /// Deletes the given data from a db if the user has write permissions
     pub fn delete_data(
         &self,
         p_info: &DBPacketInfo,
@@ -755,7 +756,7 @@ impl DBList {
             return if db_lock.has_read_permissions(client_key, &super_admin_list) {
                 let db_read = db_lock.db_content.read_from_db(p_location.as_key());
                 match db_read {
-                    None => Error(DBPacketResponseError::ValueNotFound),
+                    None => Error(ValueNotFound),
                     Some(value) => SuccessReply(value.to_string()),
                 }
             } else {
@@ -782,9 +783,7 @@ impl DBList {
 
             db.last_access_time = SystemTime::now();
 
-            let response = if db.has_read_permissions(client_key, &super_admin_list)
-                || self.is_super_admin(client_key)
-            {
+            let response = if db.has_read_permissions(client_key, &super_admin_list) {
                 let return_value = db
                     .db_content
                     .read_from_db(p_location.as_key())
