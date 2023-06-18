@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  web:
+    image: "smol_db_server:latest"
+    container_name: "smol_db_server"
+    restart: unless-stopped
+    ports:
+      - "8222:8222"
+    volumes:
+      - "./db_data:/data"

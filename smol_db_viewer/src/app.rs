@@ -306,7 +306,7 @@ impl eframe::App for ApplicationState {
                                 }
                             }
 
-                            if ui.button(format!("{}", self.desired_action.as_text())).clicked() {
+                            if ui.button(self.desired_action.as_text()).clicked() {
                                 match self.desired_action {
                                     DesiredAction::Write => {
                                         self.desired_action = DesiredAction::Delete;

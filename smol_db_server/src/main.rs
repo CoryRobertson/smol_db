@@ -5,9 +5,9 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::exit;
 use std::sync::{Arc, RwLock};
-use std::{fs, thread};
 use std::thread::JoinHandle;
 use std::time::Duration;
+use std::{fs, thread};
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -18,7 +18,9 @@ fn main() {
 
     let db_list: DBListThreadSafe = Arc::new(RwLock::new(DBList::load_db_list()));
 
-    fs::create_dir("./data");
+    let _ = fs::create_dir("./data");
+
+    fs::read_dir("./data").expect("Data directory ./data must exist"); // the data directory must exist, so we make sure this happens
 
     // control-c handler for saving things before the server shuts down.
     let db_list_clone_ctrl_c = Arc::clone(&db_list);

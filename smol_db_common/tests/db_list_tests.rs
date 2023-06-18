@@ -64,6 +64,7 @@ mod tests {
 
     #[test]
     fn test_create_db() {
+        let _ = fs::create_dir("./data");
         let db_list = get_db_list_for_testing();
         db_list
             .super_admin_hash_list
@@ -95,7 +96,7 @@ mod tests {
         assert_eq!(create_response_db_invalid_perms, Error(InvalidPermissions));
 
         // clean up unit test files
-        fs::remove_file("test_dblist_1_create").unwrap();
+        fs::remove_file("./data/test_dblist_1_create").unwrap();
     }
 
     #[test]
