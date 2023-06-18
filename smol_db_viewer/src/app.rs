@@ -374,7 +374,7 @@ impl eframe::App for ApplicationState {
                                                         }
                                                     }
                                                     Cached(_) => {}
-                                                    ContentCacheState::Error(err) => {}
+                                                    ContentCacheState::Error(_) => {}
                                                 }
 
                                                 // cache the role if it is not cached.
