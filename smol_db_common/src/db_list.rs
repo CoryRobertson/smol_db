@@ -144,7 +144,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -201,7 +201,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -255,7 +255,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -313,7 +313,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -377,7 +377,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -444,7 +444,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -505,7 +505,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
             db.db_settings.add_admin(hash);
@@ -779,7 +779,7 @@ impl DBList {
             db_file
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -859,7 +859,7 @@ impl DBList {
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
 
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -942,7 +942,7 @@ impl DBList {
                 .read_to_string(&mut db_content_string)
                 .expect("TODO: panic message");
 
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
+            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             if db.has_list_permissions(client_key, &super_admin_list) {
                 db.last_access_time = SystemTime::now();

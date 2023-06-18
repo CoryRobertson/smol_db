@@ -23,6 +23,16 @@ pub enum Role {
     Other,
 }
 
+impl Default for DB {
+    fn default() -> Self {
+        Self {
+            db_content: Default::default(),
+            last_access_time: SystemTime::now(),
+            db_settings: Default::default(),
+        }
+    }
+}
+
 impl DB {
     /// Returns the given role the client key falls in.
     pub fn get_role(&self, client_key: &String, super_admin_list: &[String]) -> Role {

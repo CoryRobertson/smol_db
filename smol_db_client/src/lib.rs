@@ -9,7 +9,7 @@ use crate::ClientError::{
 use serde::{Deserialize, Serialize};
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+
 use smol_db_common::db_packets::db_settings::DBSettings;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
@@ -18,6 +18,8 @@ use std::net::{Shutdown, TcpStream};
 pub mod client_error;
 pub use smol_db_common::db::Role;
 pub use smol_db_common::db_packets::db_settings;
+pub use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
 
 /// Client struct used for communicating to the database.
 pub struct Client {

@@ -136,7 +136,9 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let resp =
                                     lock.create_db(db_name.get_db_name(), db_settings, &client_key);
                                 println!("{:?}", resp);
-                                db_list.read().unwrap().save_db_list();
+                                lock.save_db_list();
+                                lock.save_all_db();
+
                                 resp
                             }
                             DBPacket::DeleteDB(db_name) => {

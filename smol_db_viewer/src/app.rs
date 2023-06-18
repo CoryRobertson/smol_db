@@ -1,17 +1,15 @@
 use crate::app::ContentCacheState::{Cached, NotCached};
-use crate::app::ProgramState::{
-    ChangeDBSettings, ClientConnectionError, DisplayClient, NoClient, PromptForClientDetails,
-    PromptForKey,
-};
+use crate::app::ProgramState::{ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey};
 use smol_db_client::client_error::ClientError;
 use smol_db_client::db_settings::DBSettings;
-use smol_db_client::{Client, Role};
+use smol_db_client::{Client, DBPacketResponse, DBPacketResponseError, Role};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use smol_db_client::client_error::ClientError::BadPacket;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -54,6 +52,9 @@ pub struct ApplicationState {
 
     #[serde(skip)]
     admins_list: String,
+
+    #[serde(skip)]
+    db_name_create: String,
 }
 
 #[derive(Debug)]
@@ -91,8 +92,10 @@ enum ProgramState {
     NoClient,
     PromptForClientDetails,
     ClientConnectionError(ClientError),
+    DBResponseError(DBPacketResponseError),
     PromptForKey,
     ChangeDBSettings,
+    CreateDB,
     DisplayClient,
 }
 
@@ -113,6 +116,7 @@ impl Default for ApplicationState {
             duration_seconds: 30,
             users_list: "".to_string(),
             admins_list: "".to_string(),
+            db_name_create: "".to_string(),
         }
     }
 }
@@ -172,12 +176,22 @@ impl eframe::App for ApplicationState {
                                     DisplayClient => {
                                         *lock = PromptForKey;
                                     }
-                                    ChangeDBSettings => {}
+                                    ChangeDBSettings => {
+                                        *lock = PromptForKey;
+                                    }
+                                    ProgramState::CreateDB => {
+                                        *lock = PromptForKey;
+                                    }
+                                    DBResponseError(_) => {}
                                 }
                             }
                             ui.separator();
                             if ui.button("DB Settings").clicked() {
                                 *self.program_state.lock().unwrap() = ChangeDBSettings;
+                            }
+                            ui.separator();
+                            if ui.button("Create DB").clicked() {
+                                *self.program_state.lock().unwrap() = CreateDB;
                             }
                         }
                         ui.separator();
@@ -239,7 +253,15 @@ impl eframe::App for ApplicationState {
                                                                     self.key_input.as_str(),
                                                                     self.value_input.as_str(),
                                                                 ) {
-                                                                    Ok(_) => {}
+                                                                    Ok(response) => {
+                                                                        match response {
+                                                                            DBPacketResponse::SuccessNoData => {}
+                                                                            DBPacketResponse::SuccessReply(_) => {}
+                                                                            DBPacketResponse::Error(err) => {
+                                                                                *lock = DBResponseError(err);
+                                                                            }
+                                                                        }
+                                                                    }
                                                                     Err(err) => {
                                                                         *lock = ClientConnectionError(err);
                                                                     }
@@ -295,13 +317,16 @@ impl eframe::App for ApplicationState {
                     });
                 }
                 ChangeDBSettings => {}
+                CreateDB => {}
+                DBResponseError(_) => {}
             }
         }
 
         // side panel block
         {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
-                match self.program_state.lock().unwrap().deref() {
+                let mut ps_lock = self.program_state.lock().unwrap();
+                match *ps_lock {
                     NoClient => {}
                     PromptForClientDetails => {}
                     ClientConnectionError(_) => {}
@@ -334,7 +359,7 @@ impl eframe::App for ApplicationState {
                                             None => {}
                                             Some(ref mut client) => {
                                                 // cache the content if it is not cached.
-                                                match item.content {
+                                                match &item.content {
                                                     NotCached => {
                                                         match client
                                                             .list_db_contents(item.name.as_str())
@@ -349,7 +374,7 @@ impl eframe::App for ApplicationState {
                                                         }
                                                     }
                                                     Cached(_) => {}
-                                                    ContentCacheState::Error(_) => {}
+                                                    ContentCacheState::Error(err) => {}
                                                 }
 
                                                 // cache the role if it is not cached.
@@ -476,20 +501,52 @@ impl eframe::App for ApplicationState {
                                         }
                                     }
                                 }
-                                ui.separator();
+
+
+                                if let Some(index) = self.selected_database {
+                                    if let Some(db) = list.get(index as usize) {
+                                        ui.separator();
+                                        if ui.button("Delete DB").on_hover_text("Double click to delete DB").double_clicked() {
+                                            let mut lock = self.client.lock().unwrap();
+                                            match *lock {
+                                                None => {}
+                                                Some(ref mut client) => {
+                                                    match client.delete_db(db.name.as_str()) {
+                                                        Ok(delete_response) => {
+                                                            match delete_response {
+                                                                DBPacketResponse::SuccessNoData => {
+                                                                    list.remove(index as usize);
+                                                                }
+                                                                DBPacketResponse::SuccessReply(_) => {
+                                                                    *ps_lock = ClientConnectionError(BadPacket);
+                                                                }
+                                                                DBPacketResponse::Error(err) => {
+                                                                    *ps_lock = DBResponseError(err);
+                                                                }
+                                                            }
+                                                        }
+                                                        Err(err) => {
+                                                            *ps_lock = ClientConnectionError(err);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        ui.separator();
+                                    }
+                                }
                             }
                         }
                     }
-                    PromptForKey => {} // ChangeDBSettings => {}
+                    PromptForKey => {}
+                    CreateDB => {}
+                    DBResponseError(_) => {}
                 }
             });
         }
 
         // center panel block
         {
-
-            // TODO: add create and delete db systems to viewer
-
             egui::CentralPanel::default().show(ctx, |ui| {
                 #[cfg(debug_assertions)]
                 ui.label(format!(
@@ -648,17 +705,21 @@ impl eframe::App for ApplicationState {
 
                                                         ui.separator();
 
-                                                        ui.add(egui::DragValue::new(&mut self.duration_seconds));
+                                                        ui.horizontal(|ui| {
+                                                            ui.label("Invalidation time:").on_hover_text("Duration in seconds to cache the database before removing it from cache.");
+                                                            ui.add(egui::DragValue::new(&mut self.duration_seconds));
+                                                        });
+
                                                         self.submit_db_settings.invalidation_time = Duration::from_secs(self.duration_seconds);
 
                                                         ui.horizontal(|ui| {
-                                                            ui.label("Others: ");
+                                                            ui.label("Others permissions: ").on_hover_text("Read, Write, List Contents");
                                                             ui.checkbox(&mut self.submit_db_settings.can_others_rwx.0,"r");
                                                             ui.checkbox(&mut self.submit_db_settings.can_others_rwx.1,"w");
                                                             ui.checkbox(&mut self.submit_db_settings.can_others_rwx.2,"x");
                                                         });
                                                         ui.horizontal(|ui| {
-                                                            ui.label("Users: ");
+                                                            ui.label("Users permissions: ").on_hover_text("Read, Write, List Contents");
                                                             ui.checkbox(&mut self.submit_db_settings.can_users_rwx.0,"r");
                                                             ui.checkbox(&mut self.submit_db_settings.can_users_rwx.1,"w");
                                                             ui.checkbox(&mut self.submit_db_settings.can_users_rwx.2,"x");
@@ -725,6 +786,117 @@ impl eframe::App for ApplicationState {
 
                         ui.separator();
 
+                    }
+                    CreateDB => {
+
+                        ui.horizontal(|ui| {
+                            ui.label("DB name:");
+                            ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.db_name_create));
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Invalidation time:").on_hover_text("Duration in seconds to cache the database before removing it from cache.");
+                            ui.add(egui::DragValue::new(&mut self.duration_seconds));
+                        });
+
+                        self.submit_db_settings.invalidation_time = Duration::from_secs(self.duration_seconds);
+
+                        ui.horizontal(|ui| {
+                            ui.label("Others permissions: ").on_hover_text("Read, Write, List Contents");
+                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.0,"r");
+                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.1,"w");
+                            ui.checkbox(&mut self.submit_db_settings.can_others_rwx.2,"x");
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Users permissions: ").on_hover_text("Read, Write, List Contents");
+                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.0,"r");
+                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.1,"w");
+                            ui.checkbox(&mut self.submit_db_settings.can_users_rwx.2,"x");
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Users: ").on_hover_text("Comma separated :)");
+                            ui.text_edit_singleline(&mut self.users_list);
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.label("Admins: ").on_hover_text("Comma separated :)");
+                            ui.text_edit_singleline(&mut self.admins_list);
+                        });
+
+                        if !self.users_list.is_empty() {
+                            self.submit_db_settings.users = self.users_list.split(',').map(|string| string.to_string()).collect::<Vec<String>>();
+                        } else {
+                            self.submit_db_settings.users = vec![];
+                        }
+
+                        if !self.admins_list.is_empty() {
+                            self.submit_db_settings.admins = self.admins_list.split(',').map(|string| string.to_string()).collect::<Vec<String>>();
+                        } else {
+                            self.submit_db_settings.admins = vec![];
+                        }
+
+                        #[cfg(debug_assertions)]
+                        ui.label(format!("DEBUG users: {:?}", self.submit_db_settings.users));
+                        #[cfg(debug_assertions)]
+                        ui.label(format!("DEBUG admins: {:?}", self.submit_db_settings.admins));
+
+                        if ui.button("Submit").clicked() && !self.db_name_create.is_empty() {
+                            let mut lock = self.client.lock().unwrap();
+                            match *lock {
+                                None => {}
+                                Some(ref mut client) => {
+                                    match client.create_db(self.db_name_create.as_str(),self.submit_db_settings.clone()) {
+                                        Ok(resp) => {
+                                            match resp {
+                                                DBPacketResponse::SuccessNoData => {
+                                                    // after creating a db go back to displaying the client
+                                                    *ps_lock = DisplayClient;
+
+                                                    match &mut self.database_list {
+                                                        None => {}
+                                                        Some(list) => {
+                                                            match client.list_db_contents(self.db_name_create.as_str()) {
+                                                                Ok(response) => {
+                                                                    list.push(DBCached{
+                                                                        name: self.db_name_create.to_string(),
+                                                                        content: Cached(response),
+                                                                        role: NotCached,
+                                                                        db_settings: NotCached,
+                                                                    });
+                                                                }
+                                                                Err(err) => {
+                                                                    *ps_lock = ClientConnectionError(err);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+
+
+                                                }
+                                                DBPacketResponse::SuccessReply(_) => {
+                                                    // this should not happen, creating a db does not respond with data.
+                                                    *ps_lock = ClientConnectionError(BadPacket);
+                                                }
+                                                DBPacketResponse::Error(err) => {
+                                                    *ps_lock = DBResponseError(err);
+                                                }
+                                            }
+                                        }
+                                        Err(err) => {
+                                            *ps_lock = ClientConnectionError(err);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if ui.button("Back").clicked() {
+                            *ps_lock = DisplayClient;
+                        }
+                    }
+                    DBResponseError(err) => {
+                        ui.label(format!("{:?}", err));
                     }
                 }
 
