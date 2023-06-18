@@ -1,6 +1,10 @@
 use crate::app::ContentCacheState::{Cached, NotCached};
-use crate::app::ProgramState::{ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient, PromptForClientDetails, PromptForKey};
+use crate::app::ProgramState::{
+    ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient,
+    PromptForClientDetails, PromptForKey,
+};
 use smol_db_client::client_error::ClientError;
+use smol_db_client::client_error::ClientError::BadPacket;
 use smol_db_client::db_settings::DBSettings;
 use smol_db_client::{Client, DBPacketResponse, DBPacketResponseError, Role};
 use std::collections::HashMap;
@@ -9,7 +13,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use smol_db_client::client_error::ClientError::BadPacket;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -502,11 +505,14 @@ impl eframe::App for ApplicationState {
                                     }
                                 }
 
-
                                 if let Some(index) = self.selected_database {
                                     if let Some(db) = list.get(index as usize) {
                                         ui.separator();
-                                        if ui.button("Delete DB").on_hover_text("Double click to delete DB").double_clicked() {
+                                        if ui
+                                            .button("Delete DB")
+                                            .on_hover_text("Double click to delete DB")
+                                            .double_clicked()
+                                        {
                                             let mut lock = self.client.lock().unwrap();
                                             match *lock {
                                                 None => {}
@@ -517,8 +523,13 @@ impl eframe::App for ApplicationState {
                                                                 DBPacketResponse::SuccessNoData => {
                                                                     list.remove(index as usize);
                                                                 }
-                                                                DBPacketResponse::SuccessReply(_) => {
-                                                                    *ps_lock = ClientConnectionError(BadPacket);
+                                                                DBPacketResponse::SuccessReply(
+                                                                    _,
+                                                                ) => {
+                                                                    *ps_lock =
+                                                                        ClientConnectionError(
+                                                                            BadPacket,
+                                                                        );
                                                                 }
                                                                 DBPacketResponse::Error(err) => {
                                                                     *ps_lock = DBResponseError(err);

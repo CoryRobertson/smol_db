@@ -73,19 +73,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap();
 
             db.last_access_time = SystemTime::now();
 
@@ -132,19 +125,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -189,19 +175,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -243,19 +222,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -301,19 +273,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -365,19 +330,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -432,19 +390,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -493,19 +444,12 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
             db.db_settings.add_admin(hash);
@@ -736,6 +680,24 @@ impl DBList {
         }
     }
 
+    /// Reads a db from a db packet info.
+    fn read_db_from_file(p_info: &DBPacketInfo) -> Result<DB, DBPacketResponseError> {
+        let mut db_file = match File::open(p_info.get_db_name()) {
+            Ok(f) => f,
+            Err(_) => {
+                // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
+                return Err(DBPacketResponseError::DBFileSystemError);
+            }
+        };
+
+        let mut db_content_string = String::new();
+        db_file
+            .read_to_string(&mut db_content_string)
+            .expect("TODO: panic message");
+        let db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
+        Ok(db)
+    }
+
     /// Reads a database given a packet, returns the value if it was found.
     pub fn read_db(
         &self,
@@ -767,19 +729,12 @@ impl DBList {
         if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db_file = match File::open(p_info.get_db_name()) {
-                Ok(f) => f,
+            let mut db = match DBList::read_db_from_file(p_info) {
+                Ok(db) => db,
                 Err(_) => {
-                    // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                     return Error(DBPacketResponseError::DBFileSystemError);
                 }
             };
-
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
 
             db.last_access_time = SystemTime::now();
 
@@ -853,13 +808,12 @@ impl DBList {
 
             let mut cache_lock = self.cache.write().unwrap();
 
-            let mut db_file = File::open(db_info.get_db_name()).unwrap();
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
+            let mut db = match DBList::read_db_from_file(db_info) {
+                Ok(db) => db,
+                Err(_) => {
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
 
             db.last_access_time = SystemTime::now();
 
@@ -936,13 +890,12 @@ impl DBList {
 
             let mut cache_lock = self.cache.write().unwrap();
 
-            let mut db_file = File::open(db_info.get_db_name()).unwrap();
-            let mut db_content_string = String::new();
-            db_file
-                .read_to_string(&mut db_content_string)
-                .expect("TODO: panic message");
-
-            let mut db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
+            let mut db = match DBList::read_db_from_file(db_info) {
+                Ok(db) => db,
+                Err(_) => {
+                    return Error(DBPacketResponseError::DBFileSystemError);
+                }
+            };
 
             if db.has_list_permissions(client_key, &super_admin_list) {
                 db.last_access_time = SystemTime::now();
