@@ -13,6 +13,7 @@ use crate::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseEr
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::format;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -506,7 +507,7 @@ impl DBList {
     pub fn save_all_db(&self) {
         let list = self.cache.read().unwrap();
         for (db_name, db) in list.iter() {
-            let mut db_file = File::create(db_name.get_db_name()).expect(&format!(
+            let mut db_file = File::create(format!("./data/{}",db_name.get_db_name())).expect(&format!(
                 "Unable to create db file: {}",
                 db_name.get_db_name()
             ));
@@ -528,7 +529,7 @@ impl DBList {
         let list = self.cache.read().unwrap();
         match list.get(db_name) {
             Some(db_lock) => {
-                let mut db_file = File::create(db_name.get_db_name()).expect(&format!(
+                let mut db_file = File::create(format!("./data/{}",db_name.get_db_name())).expect(&format!(
                     "Unable to create db file: {}",
                     db_name.get_db_name()
                 ));
@@ -550,7 +551,7 @@ impl DBList {
 
     /// Saves all db names to a file.
     pub fn save_db_list(&self) {
-        let mut db_list_file = File::create("db_list.ser").expect("Unable to save db_list.ser");
+        let mut db_list_file = File::create("./data/db_list.ser").expect("Unable to save db_list.ser");
         let ser_data = serde_json::to_string(&self).expect("Unable to serialize self.");
         let _ = db_list_file
             .write(ser_data.as_bytes())
@@ -559,7 +560,7 @@ impl DBList {
 
     /// Loads all db names from the db list file.
     pub fn load_db_list() -> Self {
-        match File::open("db_list.ser") {
+        match File::open("./data/db_list.ser") {
             Ok(mut f) => {
                 // file found, load from file data
                 let mut ser = String::new();
@@ -606,7 +607,7 @@ impl DBList {
 
         let mut list_write_lock = self.list.write().unwrap();
 
-        return match File::open(db_name) {
+        return match File::open(format!("./data/{}",db_name)) {
             Ok(_) => {
                 // db file was found and should not have been, because this db already exists
 
@@ -614,7 +615,7 @@ impl DBList {
             }
             Err(_) => {
                 // db file was not found
-                match File::create(db_name) {
+                match File::create(format!("./data/{}",db_name)) {
                     Ok(mut file) => {
                         let mut cache_write_lock = self.cache.write().unwrap();
                         let db_packet_info = DBPacketInfo::new(db_name);
@@ -623,7 +624,7 @@ impl DBList {
                             last_access_time: SystemTime::now(),
                             db_settings,
                         };
-                        let ser = serde_json::to_string(&db.db_content).unwrap();
+                        let ser = serde_json::to_string(&db).unwrap();
                         let _ = file
                             .write(ser.as_ref())
                             .expect(&format!("Unable to write db to file. {}", db_name));
@@ -682,7 +683,7 @@ impl DBList {
 
     /// Reads a db from a db packet info.
     fn read_db_from_file(p_info: &DBPacketInfo) -> Result<DB, DBPacketResponseError> {
-        let mut db_file = match File::open(p_info.get_db_name()) {
+        let mut db_file = match File::open(format!("./data/{}",p_info.get_db_name())) {
             Ok(f) => f,
             Err(_) => {
                 // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.

@@ -182,7 +182,7 @@ impl eframe::App for ApplicationState {
                                     ChangeDBSettings => {
                                         *lock = PromptForKey;
                                     }
-                                    ProgramState::CreateDB => {
+                                    CreateDB => {
                                         *lock = PromptForKey;
                                     }
                                     DBResponseError(_) => {}

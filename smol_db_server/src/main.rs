@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process::exit;
 use std::sync::{Arc, RwLock};
-use std::thread;
+use std::{fs, thread};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -17,6 +17,8 @@ fn main() {
     let mut thread_vec: Vec<JoinHandle<()>> = vec![];
 
     let db_list: DBListThreadSafe = Arc::new(RwLock::new(DBList::load_db_list()));
+
+    fs::create_dir("./data");
 
     // control-c handler for saving things before the server shuts down.
     let db_list_clone_ctrl_c = Arc::clone(&db_list);
