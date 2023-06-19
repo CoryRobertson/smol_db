@@ -303,7 +303,6 @@ impl eframe::App for ApplicationState {
                 PromptForKey => {}
                 DisplayClient => {
                     if self.selected_database.is_some() && self.database_list.is_some() {
-
                         egui::TopBottomPanel::bottom("side_panel2").show(ctx, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label("Input:");
@@ -390,7 +389,6 @@ impl eframe::App for ApplicationState {
                                     }
                                 });
                             });
-
                     }
                 }
                 ChangeDBSettings => {}
