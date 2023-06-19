@@ -286,6 +286,7 @@ impl eframe::App for ApplicationState {
                         ui.separator();
                         if ui.button("Refresh").clicked() {
                             self.database_list = None;
+                            self.selected_database = None;
                         }
                     }
                 });
@@ -301,95 +302,96 @@ impl eframe::App for ApplicationState {
                 ClientConnectionError(_) => {}
                 PromptForKey => {}
                 DisplayClient => {
-                    egui::TopBottomPanel::bottom("side_panel2").show(ctx, |ui| {
-                        ui.horizontal(|ui| {
+                    if self.selected_database.is_some() && self.database_list.is_some() {
 
+                        egui::TopBottomPanel::bottom("side_panel2").show(ctx, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label("Input:");
 
-                            ui.label("Input:");
-
-                            ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.key_input));
-                            ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.value_input));
-                            if ui.button("Submit").clicked() {
-                                match self.selected_database {
-                                    None => {}
-                                    Some(index) => match &mut self.database_list {
-                                        None => {}
-                                        Some(list) => match list.get_mut(index as usize) {
+                                    ui.add_sized([160.0, 20.0], egui::TextEdit::singleline(&mut self.key_input));
+                                    ui.add_sized([160.0, 20.0], egui::TextEdit::singleline(&mut self.value_input));
+                                    if ui.button("Submit").clicked() {
+                                        match self.selected_database {
                                             None => {}
-                                            Some(db) => {
-                                                let mut client_lock = self.client.lock().unwrap();
-                                                match *client_lock {
+                                            Some(index) => match &mut self.database_list {
+                                                None => {}
+                                                Some(list) => match list.get_mut(index as usize) {
                                                     None => {}
-                                                    Some(ref mut client) => {
-                                                        match self.desired_action {
-                                                            DesiredAction::Write => {
-                                                                match client.write_db(
-                                                                    db.name.as_str(),
-                                                                    self.key_input.as_str(),
-                                                                    self.value_input.as_str(),
-                                                                ) {
-                                                                    Ok(response) => {
-                                                                        match response {
-                                                                            DBPacketResponse::SuccessNoData => {}
-                                                                            DBPacketResponse::SuccessReply(_) => {}
-                                                                            DBPacketResponse::Error(err) => {
-                                                                                *lock = DBResponseError(err);
+                                                    Some(db) => {
+                                                        let mut client_lock = self.client.lock().unwrap();
+                                                        match *client_lock {
+                                                            None => {}
+                                                            Some(ref mut client) => {
+                                                                match self.desired_action {
+                                                                    DesiredAction::Write => {
+                                                                        match client.write_db(
+                                                                            db.name.as_str(),
+                                                                            self.key_input.as_str(),
+                                                                            self.value_input.as_str(),
+                                                                        ) {
+                                                                            Ok(response) => {
+                                                                                match response {
+                                                                                    DBPacketResponse::SuccessNoData => {}
+                                                                                    DBPacketResponse::SuccessReply(_) => {}
+                                                                                    DBPacketResponse::Error(err) => {
+                                                                                        *lock = DBResponseError(err);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            Err(err) => {
+                                                                                *lock = ClientConnectionError(err);
                                                                             }
                                                                         }
                                                                     }
+                                                                    DesiredAction::Delete => {
+                                                                        match client.delete_data(
+                                                                            db.name.as_str(),
+                                                                            self.key_input.as_str(),
+                                                                        ) {
+                                                                            Ok(resp) => {
+                                                                                #[cfg(debug_assertions)]
+                                                                                println!("{:?}", resp);
+                                                                            }
+                                                                            Err(err) => {
+                                                                                #[cfg(debug_assertions)]
+                                                                                println!("{:?}", err);
+                                                                                *lock = ClientConnectionError(err);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                match client.list_db_contents(db.name.as_str()) {
+                                                                    Ok(data) => {
+                                                                        db.content =
+                                                                            Cached(data);
+                                                                    }
                                                                     Err(err) => {
                                                                         *lock = ClientConnectionError(err);
                                                                     }
                                                                 }
                                                             }
-                                                            DesiredAction::Delete => {
-                                                                match client.delete_data(
-                                                                    db.name.as_str(),
-                                                                    self.key_input.as_str(),
-                                                                ) {
-                                                                    Ok(resp) => {
-                                                                        #[cfg(debug_assertions)]
-                                                                        println!("{:?}", resp);
-                                                                    }
-                                                                    Err(err) => {
-                                                                        #[cfg(debug_assertions)]
-                                                                        println!("{:?}",err);
-                                                                        *lock = ClientConnectionError(err);
-                                                                    }
-                                                                }
-                                                            }
                                                         }
-
-                                                        match client.list_db_contents(db.name.as_str()) {
-                                                            Ok(data) => {
-                                                                db.content =
-                                                                    Cached(data);
-                                                            }
-                                                            Err(err) => {
-                                                                *lock = ClientConnectionError(err);
-                                                            }
-                                                        }
-
                                                     }
-                                                }
-                                            }
-                                        },
-                                    },
-                                }
-                            }
+                                                },
+                                            },
+                                        }
+                                    }
 
-                            if ui.button(self.desired_action.as_text()).clicked() {
-                                match self.desired_action {
-                                    DesiredAction::Write => {
-                                        self.desired_action = DesiredAction::Delete;
+                                    if ui.button(self.desired_action.as_text()).clicked() {
+                                        match self.desired_action {
+                                            DesiredAction::Write => {
+                                                self.desired_action = DesiredAction::Delete;
+                                            }
+                                            DesiredAction::Delete => {
+                                                self.desired_action = DesiredAction::Write;
+                                            }
+                                        }
                                     }
-                                    DesiredAction::Delete => {
-                                        self.desired_action = DesiredAction::Write;
-                                    }
-                                }
-                            }
-                        });
-                    });
+                                });
+                            });
+
+                    }
                 }
                 ChangeDBSettings => {}
                 CreateDB => {}
