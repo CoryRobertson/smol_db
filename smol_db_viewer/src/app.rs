@@ -58,6 +58,10 @@ pub struct ApplicationState {
 
     #[serde(skip)]
     db_name_create: String,
+
+    auto_connect: bool,
+
+    auto_set_key: bool,
 }
 
 #[derive(Debug)]
@@ -120,6 +124,8 @@ impl Default for ApplicationState {
             users_list: "".to_string(),
             admins_list: "".to_string(),
             db_name_create: "".to_string(),
+            auto_connect: false,
+            auto_set_key: false,
         }
     }
 }
@@ -127,7 +133,75 @@ impl Default for ApplicationState {
 impl ApplicationState {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            let mut loaded_state: ApplicationState =
+                eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+
+            if loaded_state.auto_connect && !loaded_state.ip_address.is_empty() {
+                let client_clone = Arc::clone(&loaded_state.client);
+                let program_state_clone = Arc::clone(&loaded_state.program_state);
+                let ip_clone = loaded_state.ip_address.clone();
+                let set_key_clone = loaded_state.auto_set_key;
+                let key_set_clone = loaded_state.client_key.clone();
+                loaded_state.connection_thread = Some(thread::spawn(move || {
+                    // instantly move all the variables into the thread
+                    let set_key = set_key_clone;
+                    let ps = program_state_clone;
+                    let client_mutex = client_clone;
+                    let ip = ip_clone;
+                    let key = key_set_clone;
+
+                    match Client::new(&ip) {
+                        // connect the client to the server.
+                        Ok(mut client_connection) => {
+                            if set_key && !key.is_empty() {
+                                // if the auto set key flag is true, and the users key is not empty
+                                // attempt to set the clients key
+                                match client_connection.set_access_key(key) {
+                                    Ok(set_key_resp) => {
+                                        match set_key_resp {
+                                            DBPacketResponse::SuccessNoData => {
+                                                // if the client set key was successful, then display the client to the user and pass the client connection to the program
+                                                *client_mutex.lock().unwrap() =
+                                                    Some(client_connection);
+                                                *ps.lock().unwrap() = DisplayClient;
+                                            }
+                                            DBPacketResponse::SuccessReply(_) => {
+                                                // the set access key function for the client should never reply with data, if it did, then the packet sent was bad in some way.
+                                                *ps.lock().unwrap() =
+                                                    ClientConnectionError(BadPacket);
+                                            }
+                                            DBPacketResponse::Error(err) => {
+                                                // if there was an error setting the client key, we still pass the client connection to the program, as it is still valid,
+                                                // but we also display the error to the user.
+                                                *client_mutex.lock().unwrap() =
+                                                    Some(client_connection);
+                                                *ps.lock().unwrap() = DBResponseError(err);
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        // if we are unable to set the access key due to a client error,
+                                        // we do not pass the client to the program, and we display the connection error.
+                                        *ps.lock().unwrap() = ClientConnectionError(err);
+                                    }
+                                }
+                            } else {
+                                // this else case is for when the user does not have auto connect on.
+                                // if client connection successful, move the client to the programs state.
+                                *client_mutex.lock().unwrap() = Some(client_connection);
+                                // change the program state into a DisplayClient state.
+                                *ps.lock().unwrap() = DisplayClient;
+                            }
+                        }
+                        Err(err) => {
+                            // if the client connection fails, change the program state accordingly.
+                            *ps.lock().unwrap() = ClientConnectionError(err);
+                        }
+                    }
+                }));
+            }
+
+            return loaded_state;
         }
 
         Default::default()
@@ -234,9 +308,7 @@ impl eframe::App for ApplicationState {
                             ui.label("Input:");
 
                             ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.key_input));
-                            // ui.text_edit_singleline(&mut self.key_input)
                             ui.add_sized([160.0,20.0],egui::TextEdit::singleline(&mut self.value_input));
-                            //ui.text_edit_singleline(&mut self.value_input)
                             if ui.button("Submit").clicked() {
                                 match self.selected_database {
                                     None => {}
@@ -569,11 +641,31 @@ impl eframe::App for ApplicationState {
                     NoClient => {
                         // Display nothing when there are is no client connection.
                         ui.label("Nothing to show here...");
+                        // display a spinner if there is an active client connection thread going.
+                        if let Some(thread) = &self.connection_thread {
+                            if !thread.is_finished() {
+                                ui.horizontal(|ui| {
+                                    ui.label("Connecting...");
+                                    ui.spinner();
+                                });
+                            }
+                        }
                     }
                     PromptForClientDetails => {
                         // When the user clicks connect, we prompt them for client connection details.
                         ui.label("Enter Ip Address:");
                         ui.text_edit_singleline(&mut self.ip_address);
+
+                        if !self.ip_address.is_empty() {
+                            ui.checkbox(&mut self.auto_connect,"Auto connect to given ip address on startup: ");
+                            if self.auto_connect {
+                                // if the users client key is not empty display the possibility to auto set their key.
+                                ui.checkbox(&mut self.auto_set_key, "Auto set key on connect on startup: ").on_hover_text("Key must not be empty to run at startup.");
+                            } else {
+                                // if auto connect is false, then auto set key should also be false.
+                                self.auto_set_key = false;
+                            }
+                        }
 
                         if ui.button("Connect to ip address").clicked() {
                             // clone a bunch of things that need to be moved into the thread.

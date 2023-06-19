@@ -1,3 +1,4 @@
+#![allow(clippy::expect_fun_call)]
 //! Contains structs and implementations for managing the active list of databases, that are both in filesystem, and in cache.
 //! Also handles what to do when packets are received that modify any database that does or does not exist.
 use crate::db::DB;

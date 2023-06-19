@@ -21,7 +21,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -30,7 +30,7 @@ mod tests {
         let create_response = client.create_db("test2", DBSettings::default()).unwrap();
 
         match create_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -40,7 +40,7 @@ mod tests {
         let write_response = client.write_db("test2", "location1", data).unwrap();
 
         match write_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Write db failed.")
             }
@@ -49,7 +49,7 @@ mod tests {
         let read_response = client.read_db("test2", "location1").unwrap();
 
         match read_response {
-            DBPacketResponse::SuccessReply(response_data) => {
+            SuccessReply(response_data) => {
                 assert_eq!(&response_data, data);
             }
             _ => {
@@ -61,7 +61,7 @@ mod tests {
         let write_response2 = client.write_db("test2", "location1", data2).unwrap();
 
         match write_response2 {
-            DBPacketResponse::SuccessReply(previous_data) => {
+            SuccessReply(previous_data) => {
                 assert_eq!(data, &previous_data)
             }
             _ => {
@@ -72,7 +72,7 @@ mod tests {
         let read_response2 = client.read_db("test2", "location1").unwrap();
 
         match read_response2 {
-            DBPacketResponse::SuccessReply(response_data) => {
+            SuccessReply(response_data) => {
                 assert_eq!(&response_data, data2);
             }
             _ => {
@@ -83,7 +83,7 @@ mod tests {
         let delete_response = client.delete_db("test2").unwrap();
 
         match delete_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Delete db failed.")
             }
@@ -104,7 +104,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -129,7 +129,7 @@ mod tests {
             .unwrap();
 
         match create_db_response {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -140,7 +140,7 @@ mod tests {
             .unwrap();
 
         match write_db_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err)
             }
             _ => {}
@@ -151,7 +151,7 @@ mod tests {
             .unwrap();
 
         match read_db_response1 {
-            DBPacketResponse::SuccessReply(received_struct) => {
+            SuccessReply(received_struct) => {
                 assert_eq!(received_struct, test_data1);
             }
             _ => {
@@ -164,7 +164,7 @@ mod tests {
             .unwrap();
 
         match write_db_response2 {
-            DBPacketResponse::SuccessReply(previous_struct) => {
+            SuccessReply(previous_struct) => {
                 assert_eq!(previous_struct, test_data1);
             }
             _ => {
@@ -177,7 +177,7 @@ mod tests {
             .unwrap();
 
         match read_db_response2 {
-            DBPacketResponse::SuccessReply(received_struct) => {
+            SuccessReply(received_struct) => {
                 assert_eq!(received_struct, test_data2);
             }
             _ => {
@@ -188,7 +188,7 @@ mod tests {
         let delete_db_response = client.delete_db("test_generics").unwrap();
 
         match delete_db_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Unable to delete db");
             }
@@ -201,7 +201,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -212,7 +212,7 @@ mod tests {
             .unwrap();
 
         match create_db_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -223,7 +223,7 @@ mod tests {
             .unwrap();
 
         match create_db_response2 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -239,7 +239,7 @@ mod tests {
         let delete_db_response1 = client.delete_db("test_db_1").unwrap();
 
         match delete_db_response1 {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Unable to delete db 1");
             }
@@ -248,7 +248,7 @@ mod tests {
         let delete_db_response2 = client.delete_db("test_db_2").unwrap();
 
         match delete_db_response2 {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Unable to delete db 2");
             }
@@ -261,7 +261,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -280,7 +280,7 @@ mod tests {
             }
             if count >= 16 {
                 // allow 16* 250ms = 4 seconds to pass before declaring the test a failure
-                panic!("count not read empty db list within reasonable amount of time.")
+                panic!("count not read empty db list within reasonable amount of time, its possible there were databases stored that were not related to the unit tests.")
             }
             count += 1;
         }
@@ -292,7 +292,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -303,7 +303,7 @@ mod tests {
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
 
         match create_db_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -311,7 +311,7 @@ mod tests {
 
         let write_response1 = client.write_db(db_name, "location1", "123").unwrap();
         match write_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -319,7 +319,7 @@ mod tests {
 
         let write_response2 = client.write_db(db_name, "location2", "456").unwrap();
         match write_response2 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -333,7 +333,7 @@ mod tests {
         let delete_db_response = client.delete_db(db_name).unwrap();
 
         match delete_db_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Unable to delete db");
             }
@@ -346,7 +346,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -357,7 +357,7 @@ mod tests {
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
 
         match create_db_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -370,7 +370,7 @@ mod tests {
         let delete_db_response = client.delete_db(db_name).unwrap();
 
         match delete_db_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Unable to delete db");
             }
@@ -383,7 +383,7 @@ mod tests {
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         match set_key_response {
-            DBPacketResponse::SuccessNoData => {}
+            SuccessNoData => {}
             _ => {
                 panic!("Create db failed.");
             }
@@ -406,7 +406,7 @@ mod tests {
 
         let create_response = client.create_db(db_name, DBSettings::default()).unwrap();
         match create_response {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -416,7 +416,7 @@ mod tests {
             .write_db_generic(db_name, "location1", test_data1.clone())
             .unwrap();
         match write_response1 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -426,7 +426,7 @@ mod tests {
             .write_db_generic(db_name, "location2", test_data2.clone())
             .unwrap();
         match write_response2 {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -443,7 +443,7 @@ mod tests {
 
         let delete_response = client.delete_db(db_name).unwrap();
         match delete_response {
-            DBPacketResponse::Error(err) => {
+            Error(err) => {
                 panic!("{:?}", err);
             }
             _ => {}
@@ -463,10 +463,10 @@ mod tests {
         let db_name = "test_getdb_settings";
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
-        assert_eq!(create_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(create_response, SuccessNoData);
 
         let get_settings = client.get_db_settings(db_name).unwrap();
         assert_eq!(get_settings, db_settings_test.clone());
@@ -475,7 +475,7 @@ mod tests {
         assert_eq!(received_settings, db_settings_test);
 
         let delete_db_response = client.delete_db(db_name).unwrap();
-        assert_eq!(delete_db_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(delete_db_response, SuccessNoData);
     }
 
     #[test]
@@ -498,10 +498,10 @@ mod tests {
         let db_name = "test_setdb_settings";
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
-        assert_eq!(create_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(create_response, SuccessNoData);
 
         let get_settings = client.get_db_settings(db_name).unwrap();
         assert_eq!(get_settings, db_settings_test.clone());
@@ -513,7 +513,7 @@ mod tests {
         let set_settings_response = client
             .set_db_settings(db_name, new_db_settings_test.clone())
             .unwrap();
-        assert_eq!(set_settings_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_settings_response, SuccessNoData);
 
         let get_settings2 = client.get_db_settings(db_name).unwrap();
         assert_eq!(get_settings2, new_db_settings_test.clone());
@@ -523,7 +523,7 @@ mod tests {
         assert_ne!(received_settings2, db_settings_test.clone());
 
         let delete_db_response = client.delete_db(db_name).unwrap();
-        assert_eq!(delete_db_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(delete_db_response, SuccessNoData);
     }
 
     #[test]
@@ -543,34 +543,34 @@ mod tests {
 
         // set key to super admin key
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         let create_response = client.create_db(db_name, db_settings_test.clone()).unwrap();
-        assert_eq!(create_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(create_response, SuccessNoData);
 
         assert_eq!(client.get_role(db_name).unwrap(), SuperAdmin);
         // set admin key
         let set_key_response = client.set_access_key(admin_key.clone()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         assert_eq!(client.get_role(db_name).unwrap(), Admin);
         // set user key
         let set_key_response = client.set_access_key(user_key.clone()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         assert_eq!(client.get_role(db_name).unwrap(), User);
 
         // set other key
         let set_key_response = client.set_access_key(other_key.clone()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         assert_eq!(client.get_role(db_name).unwrap(), Other);
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        assert_eq!(set_key_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(set_key_response, SuccessNoData);
 
         let delete_response = client.delete_db(db_name).unwrap();
-        assert_eq!(delete_response, DBPacketResponse::SuccessNoData);
+        assert_eq!(delete_response, SuccessNoData);
     }
 
     #[test]

@@ -214,10 +214,10 @@ impl Client {
                                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
                                 }
                             }
-                            Err(err) => Err(SocketReadError(Error::from(err))),
+                            Err(err) => Err(SocketReadError(err)),
                         }
                     }
-                    Err(err) => Err(SocketWriteError(Error::from(err))),
+                    Err(err) => Err(SocketWriteError(err)),
                 }
             }
             Err(err) => Err(PacketSerializationError(Error::from(err))),
