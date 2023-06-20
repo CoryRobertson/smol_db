@@ -3,13 +3,13 @@ A database client and server designed for small databases that simply need quick
 The goal of this database is to use it in most of my other projects when applicable, and make it as easy to use as possible. The database's structure is simply a hashmap.
 
 ### This project consists of 4 subprojects:
-- smol_db_server:
+- **smol_db_server**:
 A server program that waits for connections to it, and serves them on port 8222. It also handles the files needed to run the database.
-- smol_db_client: 
+- **smol_db_client**: 
 A library that can be used to interface with the server program.
-- smol_db_common:
+- **smol_db_common**:
 A library used to run a server, should the smol_db_server not be adequate, this library consists of everything necessary to build a server that handles requests and process them.
-- smol_db_viewer:
+- **smol_db_viewer**:
 An example program that allows the user to connect to a smol_db_server, the program can connect, view, create, delete, read, and write databases on a given server.
 
 ### Connecting:
