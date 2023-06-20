@@ -657,10 +657,10 @@ impl eframe::App for ApplicationState {
                         ui.text_edit_singleline(&mut self.ip_address);
 
                         if !self.ip_address.is_empty() {
-                            ui.checkbox(&mut self.auto_connect,"Auto connect to given ip address on startup: ");
+                            ui.checkbox(&mut self.auto_connect,"Auto connect to given ip address on startup");
                             if self.auto_connect {
                                 // if the users client key is not empty display the possibility to auto set their key.
-                                ui.checkbox(&mut self.auto_set_key, "Auto set key on connect on startup: ").on_hover_text("Key must not be empty to run at startup.");
+                                ui.checkbox(&mut self.auto_set_key, "Auto set key on connect on startup").on_hover_text("Key must not be empty to run at startup.");
                             } else {
                                 // if auto connect is false, then auto set key should also be false.
                                 self.auto_set_key = false;
