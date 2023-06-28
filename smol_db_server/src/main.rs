@@ -12,7 +12,7 @@ use std::{fs, thread};
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:8222").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8222").expect("Failed to bind to port 8222.");
 
     let mut thread_vec: Vec<JoinHandle<()>> = vec![];
 
@@ -61,7 +61,7 @@ fn main() {
                 .unwrap()
                 .len() as u32;
             println!(
-                "Invalidated caches: {}, {} caches remain in cache.",
+                "Slept {} caches, {} caches remain in cache.",
                 invalidated_caches, number_of_caches_remaining
             );
         }
@@ -83,13 +83,13 @@ fn main() {
 
         let db_list_clone = Arc::clone(&db_list);
         let handle = thread::spawn(move || {
-            let stream = income.expect("failed to receive tcp stream");
+            let stream = income.expect("Failed to receive tcp stream");
             handle_client(stream, db_list_clone);
         });
 
         thread_vec.push(handle);
         println!(
-            "connection handled. number of connections: {}",
+            "New client connected, current number of connected clients: {}",
             thread_vec.len()
         );
     }
@@ -110,16 +110,16 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
 
         if let Ok(read) = read_result {
             if read != 0 {
+                #[cfg(debug_assertions)]
                 println!("read size: {}", read); // this is a debug print
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
                     Ok(pack) => {
+                        #[cfg(debug_assertions)]
                         println!("packet data: {:?}", pack); // this is also a debug print
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
-
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);
-                                println!("{:?}", resp);
                                 resp
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
@@ -130,34 +130,26 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                     db_write_value,
                                     &client_key,
                                 );
-                                println!("{:?}", resp);
                                 db_list.read().unwrap().save_specific_db(&db_name);
                                 resp
                             }
                             DBPacket::CreateDB(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
-
                                 let resp =
                                     lock.create_db(db_name.get_db_name(), db_settings, &client_key);
-                                println!("{:?}", resp);
                                 lock.save_db_list();
                                 lock.save_all_db();
-
                                 resp
                             }
                             DBPacket::DeleteDB(db_name) => {
                                 let lock = db_list.read().unwrap();
-
-                                // only allow db deletion when key is super admin
                                 let resp = lock.delete_db(db_name.get_db_name(), &client_key);
-                                println!("{:?}", resp);
                                 db_list.read().unwrap().save_db_list();
                                 resp
                             }
                             DBPacket::ListDB => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.list_db();
-                                println!("{:?}", resp);
                                 resp
                             }
                             DBPacket::ListDBContents(db_name) => {
@@ -168,11 +160,13 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             DBPacket::AddAdmin(db_name, admin_hash) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.add_admin(&db_name, admin_hash, &client_key);
+                                lock.save_specific_db(&db_name);
                                 resp
                             }
                             DBPacket::AddUser(db_name, user_hash) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.add_user(&db_name, user_hash, &client_key);
+                                lock.save_specific_db(&db_name);
                                 resp
                             }
                             DBPacket::SetKey(key) => {
@@ -195,6 +189,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 let lock = db_list.read().unwrap();
                                 let resp =
                                     lock.change_db_settings(&db_name, db_settings, &client_key);
+                                lock.save_specific_db(&db_name);
                                 resp
                             }
                             DBPacket::GetRole(db_name) => {
@@ -205,6 +200,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             DBPacket::DeleteData(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.delete_data(&db_name, &db_location, &client_key);
+                                lock.save_specific_db(&db_name);
                                 resp
                             }
                         }
@@ -216,21 +212,18 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                 };
 
                 let ser = serde_json::to_string(&response).unwrap();
-                // let rand_num: u32 = rand::thread_rng().gen_range(0..100);
-                // let reply_test = format!("test{}", rand_num);
-                // let reply_bytes = reply_test.as_bytes();
                 let write_result = stream.write(ser.as_bytes());
 
                 if write_result.is_err() {
-                    println!("Client dropped. Unable to write socket data.");
+                    println!("Client dropped. Unable to write socket data. {:?}", stream);
                     break;
                 }
             } else {
-                println!("Client dropped. Read 0 bytes from socket.");
+                println!("Client dropped. Read 0 bytes from socket. {:?}", stream);
                 break;
             }
         } else {
-            println!("Client dropped. Unable to read socket data.");
+            println!("Client dropped. Unable to read socket data. {:?}", stream);
             break;
         }
     }

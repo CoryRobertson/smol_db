@@ -5,5 +5,3 @@ members = [
     "smol_db_client",
     "smol_db_viewer",
 ]
-
-# TODO: make a dockerfile for the server that exposes the databases to a volume.
