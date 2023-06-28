@@ -34,10 +34,12 @@ impl DBSettings {
         }
     }
 
+    /// Get a list of the keys who are marked as admins of this database, admins have permission to change any piece of data in the database, and view all of it.
     pub fn get_admin_list(&self) -> &Vec<String> {
         &self.admins
     }
 
+    /// Get a list of the keys who are marked as users of this database, users commonly have slightly elevated privileges compared to non-users (others).
     pub fn get_user_list(&self) -> &Vec<String> {
         &self.users
     }
@@ -66,6 +68,8 @@ impl DBSettings {
         removed
     }
 
+    /// Removes an admin from the db settings
+    /// Returns true if the given admin was removed, false if not.
     pub fn remove_admin(&mut self, hash: &String) -> bool {
         let it = self.admins.clone();
         let mut removed = false;
@@ -78,18 +82,22 @@ impl DBSettings {
         removed
     }
 
+    /// Returns true if the given key is an admin key
     pub fn is_admin(&self, client_key: &String) -> bool {
         self.admins.contains(client_key)
     }
 
+    /// Returns true if the given key is a user key
     pub fn is_user(&self, client_key: &String) -> bool {
         self.users.contains(client_key)
     }
 
+    /// Returns the permissions of the database regarding the users
     pub fn get_user_rwx(&self) -> (bool, bool, bool) {
         self.can_users_rwx
     }
 
+    /// Returns the permissions of the database regarding the others
     pub fn get_other_rwx(&self) -> (bool, bool, bool) {
         self.can_others_rwx
     }

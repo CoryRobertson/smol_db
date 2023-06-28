@@ -1,13 +1,9 @@
-#![allow(unused_variables, dead_code, unused_imports)] // TODO: remove this lints
-
+#[cfg(debug_assertions)]
 use smol_db_client::Client;
-use smol_db_common::db_packets::db_packet::DBPacket;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+#[cfg(debug_assertions)]
 use smol_db_common::db_packets::db_settings::DBSettings;
-use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::str::from_utf8;
-use std::time::{Duration, Instant};
+#[cfg(debug_assertions)]
+use std::time::{Instant};
 
 fn main() {
     #[cfg(not(debug_assertions))]

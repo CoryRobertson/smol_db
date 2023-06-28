@@ -754,7 +754,7 @@ impl eframe::App for ApplicationState {
                         }
                     }
                     ClientConnectionError(err) => {
-                        ui.label("Client connection error");
+                        ui.label("Client error:");
                         ui.label(format!("{:?}", err));
                     }
                     PromptForKey => {

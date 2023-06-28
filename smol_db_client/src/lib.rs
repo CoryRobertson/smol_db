@@ -41,6 +41,7 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    /// Deletes the data at the given db location, requires permissions to do so.
     pub fn delete_data(
         &mut self,
         db_name: &str,
@@ -380,6 +381,7 @@ impl Client {
         };
     }
 
+    /// Lists the given db's contents, deserializing the contents into a hash map.
     pub fn list_db_contents_generic<T>(
         &mut self,
         db_name: &str,

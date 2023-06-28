@@ -19,6 +19,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
+use crate::db::Role::SuperAdmin;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBList {
@@ -39,6 +40,7 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
+    /// Returns the super admin list
     fn get_super_admin_list(&self) -> Vec<String> {
         self.super_admin_hash_list.read().unwrap().clone()
     }
@@ -106,8 +108,14 @@ impl DBList {
         };
     }
 
+    /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
     pub fn get_role(&self, p_info: &DBPacketInfo, client_key: &String) -> DBPacketResponse<String> {
         let super_admin_list = self.get_super_admin_list();
+
+        if super_admin_list.contains(client_key) {
+            // early return super admin if their key is a super admin key.
+            return SuccessReply(serde_json::to_string(&SuperAdmin).unwrap());
+        }
 
         let list_lock = self.list.read().unwrap();
 
@@ -159,6 +167,7 @@ impl DBList {
         client_key: &String,
     ) -> DBPacketResponse<String> {
         if !self.is_super_admin(client_key) {
+            // change settings requires super admin, early return if the user is not a super admin
             return Error(InvalidPermissions);
         }
 
@@ -198,12 +207,14 @@ impl DBList {
     }
 
     /// Returns the DBSettings serialized as a string
+    /// Only super admins can get the db settings
     pub fn get_db_settings(
         &self,
         p_info: &DBPacketInfo,
         client_key: &String,
     ) -> DBPacketResponse<String> {
         if !self.is_super_admin(client_key) {
+            // change settings requires super admin, early return if the user is not a super admin
             return Error(InvalidPermissions);
         }
 
@@ -249,7 +260,7 @@ impl DBList {
         };
     }
 
-    /// Adds a user to a given DB, requires admin privileges
+    /// Adds a user to a given DB, requires admin privileges or super admin privileges.
     pub fn add_user(
         &self,
         p_info: &DBPacketInfo,
@@ -371,6 +382,7 @@ impl DBList {
         client_key: &String,
     ) -> DBPacketResponse<String> {
         if !self.is_super_admin(client_key) {
+            // change settings requires super admin, early return if the user is not a super admin
             return Error(InvalidPermissions);
         }
 
@@ -470,7 +482,7 @@ impl DBList {
     /// Removes all caches which last access time exceeds their invalidation time.
     /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
     /// Returns the number of caches removed.
-    pub fn invalidate_caches(&self) -> usize {
+    pub fn sleep_caches(&self) -> usize {
         // prepare a list of invalid caches
         let invalid_cache_names: Vec<DBPacketInfo> = {
             let read_lock = self.cache.read().unwrap();
@@ -589,6 +601,7 @@ impl DBList {
     }
 
     /// Creates a DB given a name, the packet is not needed, only the name.
+    /// Requires super admin privileges
     pub fn create_db(
         &self,
         db_name: &str,

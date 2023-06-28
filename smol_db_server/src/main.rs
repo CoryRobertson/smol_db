@@ -41,7 +41,7 @@ fn main() {
         let invalidated_caches = cache_invalidator_thread_db_list
             .read()
             .unwrap()
-            .invalidate_caches();
+            .sleep_caches();
 
         cache_invalidator_thread_db_list
             .read()
