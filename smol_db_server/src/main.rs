@@ -69,6 +69,8 @@ fn main() {
         thread::sleep(Duration::from_secs(10));
     });
 
+    println!("Waiting for connections on port 8222");
+
     for income in listener.incoming() {
         for i in 0..thread_vec.len() {
             match thread_vec.get(i) {
