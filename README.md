@@ -15,6 +15,10 @@ A library used to run a server, should the smol_db_server not be adequate, this 
 - **smol_db_viewer**:
 An example program that allows the user to connect to a smol_db_server, the program can connect, view, create, delete, read, and write databases on a given server.
 
+### Programs currently using this database:
+- [cr_tiler_rs](https://github.com/CoryRobertson/cr_tiler_rs) uses the database to store leaderboards information for the game service.
+- Feel free to let me know if you use this database, I would love to know! :)
+
 ### Connecting:
 ![Image of connecting to a database using the viewing application](https://raw.githubusercontent.com/CoryRobertson/smol_db/main/images/viewer_connect.png)
 ### Setting the clients access key:
