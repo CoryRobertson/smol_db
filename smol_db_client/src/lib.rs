@@ -59,14 +59,10 @@ impl Client {
 
         match resp {
             DBPacketResponse::SuccessNoData => Err(BadPacket),
-            DBPacketResponse::SuccessReply(data) => {
-                match serde_json::from_str::<Role>(&data) {
-                    Ok(role) => Ok(role),
-                    Err(err) => {
-                        Err(PacketDeserializationError(Error::from(err)))
-                    }
-                }
-            }
+            DBPacketResponse::SuccessReply(data) => match serde_json::from_str::<Role>(&data) {
+                Ok(role) => Ok(role),
+                Err(err) => Err(PacketDeserializationError(Error::from(err))),
+            },
             DBPacketResponse::Error(err) => Err(DBResponseError(err)),
         }
     }
@@ -77,18 +73,16 @@ impl Client {
         let packet = DBPacket::new_get_db_settings(db_name);
 
         let resp = self.send_packet(packet)?;
-        return match resp {
-            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
+        match resp {
+            DBPacketResponse::SuccessNoData => Err(BadPacket),
             DBPacketResponse::SuccessReply(data) => {
                 match serde_json::from_str::<DBSettings>(&data) {
                     Ok(db_settings) => Ok(db_settings),
-                    Err(err) => {
-                        Err(PacketDeserializationError(Error::from(err)))
-                    }
+                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
                 }
             }
-            DBPacketResponse::Error(err) => { Err(DBResponseError(err)) }
-        };
+            DBPacketResponse::Error(err) => Err(DBResponseError(err)),
+        }
     }
 
     /// Sets the DBSettings of a given DB
@@ -108,13 +102,23 @@ impl Client {
         self.send_packet(packet)
     }
 
-    fn send_packet(&mut self, sent_packet: DBPacket) -> Result<DBPacketResponse<String>, ClientError> {
+    fn send_packet(
+        &mut self,
+        sent_packet: DBPacket,
+    ) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
-        let ser_packet = sent_packet.serialize_packet().map_err(|err| PacketSerializationError(Error::from(err)))?;
-        self.socket.write(ser_packet.as_bytes()).map_err(|err| SocketWriteError(err))?;
-        let read_len = self.socket.read(&mut buf).map_err(|err| SocketReadError(err))?;
-        return serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
-            .map_err(|err| PacketDeserializationError(Error::from(err)));
+        let ser_packet = sent_packet
+            .serialize_packet()
+            .map_err(|err| PacketSerializationError(Error::from(err)))?;
+        self.socket
+            .write(ser_packet.as_bytes())
+            .map_err(SocketWriteError)?;
+        let read_len = self
+            .socket
+            .read(&mut buf)
+            .map_err(SocketReadError)?;
+        serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
+            .map_err(|err| PacketDeserializationError(Error::from(err)))
     }
 
     /// Creates a db through the client with the given name.
@@ -183,9 +187,7 @@ impl Client {
             DBPacketResponse::SuccessReply(data) => {
                 match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
                     Ok(thing) => Ok(thing),
-                    Err(err) => {
-                        Err(PacketDeserializationError(Error::from(err)))
-                    }
+                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
                 }
             }
             DBPacketResponse::Error(err) => Err(DBResponseError(err)),
@@ -207,9 +209,7 @@ impl Client {
             DBPacketResponse::SuccessReply(data) => {
                 match serde_json::from_str::<HashMap<String, String>>(&data) {
                     Ok(thing) => Ok(thing),
-                    Err(err) => {
-                        Err(PacketDeserializationError(Error::from(err)))
-                    }
+                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
                 }
             }
             DBPacketResponse::Error(err) => Err(DBResponseError(err)),

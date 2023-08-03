@@ -3,7 +3,7 @@ use smol_db_client::Client;
 #[cfg(debug_assertions)]
 use smol_db_common::db_packets::db_settings::DBSettings;
 #[cfg(debug_assertions)]
-use std::time::{Instant};
+use std::time::Instant;
 
 fn main() {
     #[cfg(not(debug_assertions))]
