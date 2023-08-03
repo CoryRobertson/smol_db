@@ -113,10 +113,7 @@ impl Client {
         self.socket
             .write(ser_packet.as_bytes())
             .map_err(SocketWriteError)?;
-        let read_len = self
-            .socket
-            .read(&mut buf)
-            .map_err(SocketReadError)?;
+        let read_len = self.socket.read(&mut buf).map_err(SocketReadError)?;
         serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
             .map_err(|err| PacketDeserializationError(Error::from(err)))
     }

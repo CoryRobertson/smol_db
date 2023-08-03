@@ -121,8 +121,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.read_db(&db_name, &db_location, &client_key);
-                                resp
+                                lock.read_db(&db_name, &db_location, &client_key)
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
                                 let lock = db_list.read().unwrap();
@@ -151,13 +150,11 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::ListDB => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.list_db();
-                                resp
+                                lock.list_db()
                             }
                             DBPacket::ListDBContents(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.list_db_contents(&db_name, &client_key);
-                                resp
+                                lock.list_db_contents(&db_name, &client_key)
                             }
                             DBPacket::AddAdmin(db_name, admin_hash) => {
                                 let lock = db_list.read().unwrap();
@@ -184,8 +181,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::GetDBSettings(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.get_db_settings(&db_name, &client_key);
-                                resp
+                                lock.get_db_settings(&db_name, &client_key)
                             }
                             DBPacket::ChangeDBSettings(db_name, db_settings) => {
                                 let lock = db_list.read().unwrap();
@@ -196,8 +192,7 @@ fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                             }
                             DBPacket::GetRole(db_name) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.get_role(&db_name, &client_key);
-                                resp
+                                lock.get_role(&db_name, &client_key)
                             }
                             DBPacket::DeleteData(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();

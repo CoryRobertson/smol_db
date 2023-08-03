@@ -1,6 +1,7 @@
 #![allow(clippy::expect_fun_call)]
 //! Contains structs and implementations for managing the active list of databases, that are both in filesystem, and in cache.
 //! Also handles what to do when packets are received that modify any database that does or does not exist.
+use crate::db::Role::SuperAdmin;
 use crate::db::DB;
 use crate::db_content::DBContent;
 use crate::db_data::DBData;
@@ -19,7 +20,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
-use crate::db::Role::SuperAdmin;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBList {
