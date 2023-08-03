@@ -47,92 +47,47 @@ impl Client {
         db_name: &str,
         db_location: &str,
     ) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_delete_data(db_name, db_location);
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_length) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(
-                            &buf[0..read_length],
-                        ) {
-                            Ok(response) => Ok(response),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+        self.send_packet(packet)
     }
 
     /// Returns the role of the given client in the given db.
     pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_get_role(db_name);
-        match packet1.serialize_packet() {
-            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_length) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(
-                            &buf[0..read_length],
-                        ) {
-                            Ok(response) => match response {
-                                DBPacketResponse::SuccessNoData => Err(BadPacket),
-                                DBPacketResponse::SuccessReply(data) => {
-                                    match serde_json::from_str::<Role>(&data) {
-                                        Ok(role) => Ok(role),
-                                        Err(err) => {
-                                            Err(PacketDeserializationError(Error::from(err)))
-                                        }
-                                    }
-                                }
-                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
-                            },
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
+        let packet = DBPacket::new_get_role(db_name);
+
+        let resp = self.send_packet(packet)?;
+
+        match resp {
+            DBPacketResponse::SuccessNoData => Err(BadPacket),
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<Role>(&data) {
+                    Ok(role) => Ok(role),
+                    Err(err) => {
+                        Err(PacketDeserializationError(Error::from(err)))
                     }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
+                }
+            }
+            DBPacketResponse::Error(err) => Err(DBResponseError(err)),
         }
     }
 
     /// Gets the DBSettings of the given DB.
     /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view DBSettings.
     pub fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_get_db_settings(db_name);
-        return match packet1.serialize_packet() {
-            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_size) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_size])
-                        {
-                            Ok(resp) => match resp {
-                                DBPacketResponse::SuccessNoData => Err(BadPacket),
-                                DBPacketResponse::SuccessReply(data) => {
-                                    match serde_json::from_str::<DBSettings>(&data) {
-                                        Ok(db_settings) => Ok(db_settings),
-                                        Err(err) => {
-                                            Err(PacketDeserializationError(Error::from(err)))
-                                        }
-                                    }
-                                }
-                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
-                            },
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
+        let packet = DBPacket::new_get_db_settings(db_name);
+
+        let resp = self.send_packet(packet)?;
+        return match resp {
+            DBPacketResponse::SuccessNoData => { Err(BadPacket) }
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<DBSettings>(&data) {
+                    Ok(db_settings) => Ok(db_settings),
+                    Err(err) => {
+                        Err(PacketDeserializationError(Error::from(err)))
                     }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
+                }
+            }
+            DBPacketResponse::Error(err) => { Err(DBResponseError(err)) }
         };
     }
 
@@ -143,46 +98,23 @@ impl Client {
         db_name: &str,
         db_settings: DBSettings,
     ) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_set_db_settings(db_name, db_settings);
-        return match packet1.serialize_packet() {
-            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_size) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_size])
-                        {
-                            Ok(resp) => Ok(resp),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+        let packet = DBPacket::new_set_db_settings(db_name, db_settings);
+        self.send_packet(packet)
     }
 
     /// Sets this clients access key within the DB Server. The server will persist the key until the session is disconnected, or connection is lost.
     pub fn set_access_key(&mut self, key: String) -> Result<DBPacketResponse<String>, ClientError> {
+        let packet = DBPacket::new_set_key(key);
+        self.send_packet(packet)
+    }
+
+    fn send_packet(&mut self, sent_packet: DBPacket) -> Result<DBPacketResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_set_key(key);
-        return match packet1.serialize_packet() {
-            Ok(packet_ser) => match self.socket.write(packet_ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_len) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
-                        {
-                            Ok(packet_response) => Ok(packet_response),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+        let ser_packet = sent_packet.serialize_packet().map_err(|err| PacketSerializationError(Error::from(err)))?;
+        self.socket.write(ser_packet.as_bytes()).map_err(|err| SocketWriteError(err))?;
+        let read_len = self.socket.read(&mut buf).map_err(|err| SocketReadError(err))?;
+        return serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
+            .map_err(|err| PacketDeserializationError(Error::from(err)));
     }
 
     /// Creates a db through the client with the given name.
@@ -192,37 +124,16 @@ impl Client {
         db_name: &str,
         db_settings: DBSettings,
     ) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
-        let packet1 = DBPacket::new_create_db(db_name, db_settings);
-        return match packet1.serialize_packet() {
-            Ok(pack_bytes) => {
-                let write_result = self.socket.write(pack_bytes.as_bytes());
-                match write_result {
-                    Ok(_) => {
-                        let read_result = self.socket.read(&mut buf);
-                        match read_result {
-                            Ok(read_size) => {
-                                match serde_json::from_slice::<DBPacketResponse<String>>(
-                                    &buf[0..read_size],
-                                ) {
-                                    Ok(response) => match &response {
-                                        DBPacketResponse::SuccessNoData => Ok(response),
-                                        DBPacketResponse::SuccessReply(_) => Ok(response),
-                                        DBPacketResponse::Error(db_response_error) => {
-                                            Err(DBResponseError(db_response_error.clone()))
-                                        }
-                                    },
-                                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                                }
-                            }
-                            Err(err) => Err(SocketReadError(err)),
-                        }
-                    }
-                    Err(err) => Err(SocketWriteError(err)),
-                }
+        let packet = DBPacket::new_create_db(db_name, db_settings);
+        let resp = self.send_packet(packet)?;
+
+        match &resp {
+            DBPacketResponse::SuccessNoData => Ok(resp),
+            DBPacketResponse::SuccessReply(_) => Ok(resp),
+            DBPacketResponse::Error(db_response_error) => {
+                Err(DBResponseError(db_response_error.clone()))
             }
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+        }
     }
 
     /// Writes to a db at the location specified, with the data given as a string.
@@ -234,25 +145,9 @@ impl Client {
         db_location: &str,
         data: &str,
     ) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_write(db_name, db_location, data);
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_length) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(
-                            &buf[0..read_length],
-                        ) {
-                            Ok(response) => Ok(response),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+
+        self.send_packet(packet)
     }
 
     /// Reads from a db at the location specific.
@@ -263,84 +158,38 @@ impl Client {
         db_name: &str,
         db_location: &str,
     ) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_read(db_name, db_location);
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_length) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(
-                            &buf[0..read_length],
-                        ) {
-                            Ok(response) => Ok(response),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+
+        self.send_packet(packet)
     }
 
     /// Deletes the given db by name.
     /// Requires super admin privileges on the given DB Server
     pub fn delete_db(&mut self, db_name: &str) -> Result<DBPacketResponse<String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_delete_db(db_name);
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_length) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(
-                            &buf[0..read_length],
-                        ) {
-                            Ok(response) => Ok(response),
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
-                    }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+
+        self.send_packet(packet)
     }
 
     /// Lists all the current databases available by name from the server
     /// Only error on IO Error
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db();
 
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_len) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
-                        {
-                            Ok(response) => match response {
-                                DBPacketResponse::SuccessNoData => Err(BadPacket),
-                                DBPacketResponse::SuccessReply(data) => {
-                                    match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
-                                        Ok(thing) => Ok(thing),
-                                        Err(err) => {
-                                            Err(PacketDeserializationError(Error::from(err)))
-                                        }
-                                    }
-                                }
-                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
-                            },
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
+        let response = self.send_packet(packet)?;
+
+        match response {
+            DBPacketResponse::SuccessNoData => Err(BadPacket),
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
+                    Ok(thing) => Ok(thing),
+                    Err(err) => {
+                        Err(PacketDeserializationError(Error::from(err)))
                     }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+                }
+            }
+            DBPacketResponse::Error(err) => Err(DBResponseError(err)),
+        }
     }
 
     /// Get the hashmap of the contents of a database. Contents are always String:String for the hashmap.
@@ -349,36 +198,22 @@ impl Client {
         &mut self,
         db_name: &str,
     ) -> Result<HashMap<String, String>, ClientError> {
-        let mut buf: [u8; 1024] = [0; 1024];
         let packet = DBPacket::new_list_db_contents(db_name);
 
-        return match packet.serialize_packet() {
-            Ok(ser) => match self.socket.write(ser.as_bytes()) {
-                Ok(_) => match self.socket.read(&mut buf) {
-                    Ok(read_len) => {
-                        match serde_json::from_slice::<DBPacketResponse<String>>(&buf[0..read_len])
-                        {
-                            Ok(resp) => match resp {
-                                DBPacketResponse::SuccessNoData => Err(BadPacket),
-                                DBPacketResponse::SuccessReply(data) => {
-                                    match serde_json::from_str::<HashMap<String, String>>(&data) {
-                                        Ok(thing) => Ok(thing),
-                                        Err(err) => {
-                                            Err(PacketDeserializationError(Error::from(err)))
-                                        }
-                                    }
-                                }
-                                DBPacketResponse::Error(err) => Err(DBResponseError(err)),
-                            },
-                            Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                        }
+        let response = self.send_packet(packet)?;
+
+        match response {
+            DBPacketResponse::SuccessNoData => Err(BadPacket),
+            DBPacketResponse::SuccessReply(data) => {
+                match serde_json::from_str::<HashMap<String, String>>(&data) {
+                    Ok(thing) => Ok(thing),
+                    Err(err) => {
+                        Err(PacketDeserializationError(Error::from(err)))
                     }
-                    Err(err) => Err(SocketReadError(err)),
-                },
-                Err(err) => Err(SocketWriteError(err)),
-            },
-            Err(err) => Err(PacketSerializationError(Error::from(err))),
-        };
+                }
+            }
+            DBPacketResponse::Error(err) => Err(DBResponseError(err)),
+        }
     }
 
     /// Lists the given db's contents, deserializing the contents into a hash map.
