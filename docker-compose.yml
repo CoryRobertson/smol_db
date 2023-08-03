@@ -1,8 +1,11 @@
 version: '3'
 
 services:
-  web:
+  db:
     image: "smol_db_server:latest"
+    build:
+      context: "./"
+      dockerfile: "./Dockerfile"
     container_name: "smol_db_server"
     restart: unless-stopped
     ports:

@@ -19,6 +19,19 @@ An example program that allows the user to connect to a smol_db_server, the prog
 - [cr_tiler_rs](https://github.com/CoryRobertson/cr_tiler_rs) uses the database to store leaderboards information for the game service.
 - Feel free to let me know if you use this database, I would love to know! :)
 
+### Example Docker-Compose entry
+```
+db:
+    build: https://github.com/CoryRobertson/smol_db.git#main
+    image: smol_db_server
+    ports:
+      - "8222:8222"
+    container_name: "smol_db_server_instance1"
+    restart: unless-stopped
+    volumes:
+      - "./smol_db:/data"
+```
+
 ### Connecting:
 ![Image of connecting to a database using the viewing application](https://raw.githubusercontent.com/CoryRobertson/smol_db/main/images/viewer_connect.png)
 ### Setting the clients access key:
