@@ -2,19 +2,21 @@
 #[allow(unused_imports)]
 mod tests {
     use serde::{Deserialize, Serialize};
+    use smol_db_client::client_error::ClientError;
     use smol_db_client::Client;
     use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{
         Error, SuccessNoData, SuccessReply,
     };
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{InvalidPermissions, ValueNotFound};
+    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
+        InvalidPermissions, ValueNotFound,
+    };
     use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::fs::read;
     use std::thread;
     use std::time::Duration;
-    use smol_db_client::client_error::ClientError;
 
     #[test]
     fn test_client() {
@@ -103,11 +105,13 @@ mod tests {
     fn test_missing_create_db_permissions() {
         let mut client = Client::new("localhost:8222").unwrap();
 
-        let resp = client.create_db("not enough permissions", DBSettings::default()).unwrap_err();
+        let resp = client
+            .create_db("not enough permissions", DBSettings::default())
+            .unwrap_err();
 
         match resp {
             ClientError::DBResponseError(resp) => {
-                assert_eq!(resp,InvalidPermissions);
+                assert_eq!(resp, InvalidPermissions);
             }
             _ => {
                 assert!(false);

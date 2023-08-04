@@ -274,8 +274,6 @@ mod tests {
         );
     }
 
-
-
     #[test]
     fn test_get_role() {
         let admin_key = "test_admin_123".to_string();

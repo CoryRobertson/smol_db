@@ -15,11 +15,11 @@ use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 
 pub mod client_error;
+use crate::client_error::ClientError::DBResponseError;
 pub use smol_db_common::db::Role;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
 pub use smol_db_common::db_packets::db_settings;
-use crate::client_error::ClientError::DBResponseError;
 
 /// Client struct used for communicating to the database.
 pub struct Client {

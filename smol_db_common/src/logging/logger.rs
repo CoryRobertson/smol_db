@@ -5,8 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::{fs, io};
 
-// TODO: remove logger conditionally when the the feature logging is not enabled
-
 pub struct Logger {
     log_path: Mutex<PathBuf>,
 }
