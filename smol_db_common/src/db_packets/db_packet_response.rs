@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 /// This enum represents the various types of responses that accessing the database can be.
@@ -9,6 +10,31 @@ pub enum DBPacketResponse<T> {
     SuccessReply(T),
     /// Error represents any issue when interacting with a database in general, it contains a further description of the error inside.
     Error(DBPacketResponseError),
+}
+
+impl<T> Display for DBPacketResponse<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DBPacketResponse::SuccessNoData => {
+                write!(f, "SuccessNoData")
+            }
+            DBPacketResponse::SuccessReply(reply) => {
+                write!(f, "SuccessReply: {}", reply)
+            }
+            DBPacketResponse::Error(err) => {
+                write!(f, "Error: {}", err)
+            }
+        }
+    }
+}
+
+impl Display for DBPacketResponseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]

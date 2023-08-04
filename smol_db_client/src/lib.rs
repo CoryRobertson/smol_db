@@ -1,7 +1,6 @@
 //! Library contain the structs that manage the client to connect to smol_db
 
 use crate::client_error::ClientError;
-use crate::client_error::ClientError::DBResponseError;
 use crate::ClientError::{
     BadPacket, PacketDeserializationError, PacketSerializationError, SocketReadError,
     SocketWriteError, UnableToConnect,
@@ -20,6 +19,7 @@ pub use smol_db_common::db::Role;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
 pub use smol_db_common::db_packets::db_settings;
+use crate::client_error::ClientError::DBResponseError;
 
 /// Client struct used for communicating to the database.
 pub struct Client {

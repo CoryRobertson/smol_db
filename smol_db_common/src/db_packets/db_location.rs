@@ -1,9 +1,16 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A struct that describes a key to search with through the database.
 pub struct DBLocation {
     location: String,
+}
+
+impl Display for DBLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.location)
+    }
 }
 
 impl DBLocation {

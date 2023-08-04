@@ -1,9 +1,16 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 /// A struct that describes the name of a database to be searched through.
 pub struct DBPacketInfo {
     dbname: String,
+}
+
+impl Display for DBPacketInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.dbname)
+    }
 }
 
 impl DBPacketInfo {
