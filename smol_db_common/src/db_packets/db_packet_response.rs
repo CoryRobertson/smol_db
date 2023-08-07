@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[deprecated]
 /// This enum represents the various types of responses that accessing the database can be.
 pub enum DBPacketResponse<T> {
     /// DBPacketResponse is a response type for a DBPacket request
@@ -12,10 +13,15 @@ pub enum DBPacketResponse<T> {
     Error(DBPacketResponseError),
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub enum DBSuccessResponse<T> {
+    SuccessNoData,
+    SuccessReply(T),
+}
+
 // TODO: split DBPacketResponse into SuccessResponse and ErrorResponse, make the client parse success first then error second seperately.
 
-
-
+#[allow(deprecated)]
 impl<T> Display for DBPacketResponse<T>
 where
     T: Display,
@@ -64,6 +70,7 @@ pub enum DBPacketResponseError {
     UserNotFound,
 }
 
+#[allow(deprecated)]
 impl<T> DBPacketResponse<T> {
     /// Convert the response from the database to a result
     pub fn as_result(&self) -> Result<Option<&T>, &DBPacketResponseError> {

@@ -3,10 +3,11 @@ use crate::app::ProgramState::{
     ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient,
     PromptForClientDetails, PromptForKey,
 };
+use smol_db_client::DBSuccessResponse;
 use smol_db_client::client_error::ClientError;
 use smol_db_client::client_error::ClientError::BadPacket;
 use smol_db_client::db_settings::DBSettings;
-use smol_db_client::{Client, DBPacketResponse, DBPacketResponseError, Role};
+use smol_db_client::{Client, DBPacketResponseError, Role};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
@@ -159,24 +160,24 @@ impl ApplicationState {
                                 match client_connection.set_access_key(key) {
                                     Ok(set_key_resp) => {
                                         match set_key_resp {
-                                            DBPacketResponse::SuccessNoData => {
+                                            DBSuccessResponse::SuccessNoData => {
                                                 // if the client set key was successful, then display the client to the user and pass the client connection to the program
                                                 *client_mutex.lock().unwrap() =
                                                     Some(client_connection);
                                                 *ps.lock().unwrap() = DisplayClient;
                                             }
-                                            DBPacketResponse::SuccessReply(_) => {
+                                            DBSuccessResponse::SuccessReply(_) => {
                                                 // the set access key function for the client should never reply with data, if it did, then the packet sent was bad in some way.
                                                 *ps.lock().unwrap() =
                                                     ClientConnectionError(BadPacket);
                                             }
-                                            DBPacketResponse::Error(err) => {
-                                                // if there was an error setting the client key, we still pass the client connection to the program, as it is still valid,
-                                                // but we also display the error to the user.
-                                                *client_mutex.lock().unwrap() =
-                                                    Some(client_connection);
-                                                *ps.lock().unwrap() = DBResponseError(err);
-                                            }
+                                            // DBSuccessResponse::Error(err) => {
+                                            //     // if there was an error setting the client key, we still pass the client connection to the program, as it is still valid,
+                                            //     // but we also display the error to the user.
+                                            //     *client_mutex.lock().unwrap() =
+                                            //         Some(client_connection);
+                                            //     *ps.lock().unwrap() = DBResponseError(err);
+                                            // }
                                         }
                                     }
                                     Err(err) => {
@@ -330,11 +331,8 @@ impl eframe::App for ApplicationState {
                                                                         ) {
                                                                             Ok(response) => {
                                                                                 match response {
-                                                                                    DBPacketResponse::SuccessNoData => {}
-                                                                                    DBPacketResponse::SuccessReply(_) => {}
-                                                                                    DBPacketResponse::Error(err) => {
-                                                                                        *lock = DBResponseError(err);
-                                                                                    }
+                                                                                    DBSuccessResponse::SuccessNoData => {}
+                                                                                    DBSuccessResponse::SuccessReply(_) => {}
                                                                                 }
                                                                             }
                                                                             Err(err) => {
@@ -593,19 +591,16 @@ impl eframe::App for ApplicationState {
                                                     match client.delete_db(db.name.as_str()) {
                                                         Ok(delete_response) => {
                                                             match delete_response {
-                                                                DBPacketResponse::SuccessNoData => {
+                                                                DBSuccessResponse::SuccessNoData => {
                                                                     list.remove(index as usize);
                                                                 }
-                                                                DBPacketResponse::SuccessReply(
+                                                                DBSuccessResponse::SuccessReply(
                                                                     _,
                                                                 ) => {
                                                                     *ps_lock =
                                                                         ClientConnectionError(
                                                                             BadPacket,
                                                                         );
-                                                                }
-                                                                DBPacketResponse::Error(err) => {
-                                                                    *ps_lock = DBResponseError(err);
                                                                 }
                                                             }
                                                         }
@@ -953,7 +948,7 @@ impl eframe::App for ApplicationState {
                                     match client.create_db(self.db_name_create.as_str(),self.submit_db_settings.clone()) {
                                         Ok(resp) => {
                                             match resp {
-                                                DBPacketResponse::SuccessNoData => {
+                                                DBSuccessResponse::SuccessNoData => {
                                                     // after creating a db go back to displaying the client
                                                     *ps_lock = DisplayClient;
 
@@ -979,12 +974,9 @@ impl eframe::App for ApplicationState {
 
 
                                                 }
-                                                DBPacketResponse::SuccessReply(_) => {
+                                                DBSuccessResponse::SuccessReply(_) => {
                                                     // this should not happen, creating a db does not respond with data.
                                                     *ps_lock = ClientConnectionError(BadPacket);
-                                                }
-                                                DBPacketResponse::Error(err) => {
-                                                    *ps_lock = DBResponseError(err);
                                                 }
                                             }
                                         }

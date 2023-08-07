@@ -6,7 +6,7 @@ use smol_db_common::{
 
 use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
-use smol_db_common::db_packets::db_packet_response::DBPacketResponse;
+use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 #[cfg(feature = "logging")]
@@ -192,7 +192,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} read \"{}\" in \"{}\", response: {}",
+                                            "{} read \"{}\" in \"{}\", response: {:?}",
                                             client_name, db_location, db_name, resp
                                         )
                                         .as_str(),
@@ -214,7 +214,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} wrote \"{}\" to \"{}\" in \"{}\", response: {}",
+                                            "{} wrote \"{}\" to \"{}\" in \"{}\", response: {:?}",
                                             client_name, db_write_value, db_location, db_name, resp
                                         )
                                         .as_str(),
@@ -236,7 +236,7 @@ fn handle_client(
 
                                 #[cfg(feature = "logging")]
                                 let _ = logger.log(LogEntry::new(
-                                    LogMessage::new(format!("{} created database \"{}\" with settings \"{:?}\", response: {}",client_name,db_name,db_settings, resp).as_str()),
+                                    LogMessage::new(format!("{} created database \"{}\" with settings \"{:?}\", response: {:?}",client_name,db_name,db_settings, resp).as_str()),
                                     LogLevel::Info
                                 ));
 
@@ -251,7 +251,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} deleted database \"{}\", response: {}",
+                                            "{} deleted database \"{}\", response: {:?}",
                                             client_name, db_name, resp
                                         )
                                         .as_str(),
@@ -270,7 +270,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} listed databases, response: {}",
+                                            "{} listed databases, response: {:?}",
                                             client_name, resp
                                         )
                                         .as_str(),
@@ -288,7 +288,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} listed database contents of \"{}\", response: {}",
+                                            "{} listed database contents of \"{}\", response: {:?}",
                                             client_name, db_name, resp
                                         )
                                         .as_str(),
@@ -307,7 +307,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} added an admin \"{}\" to \"{}\", response: {}",
+                                            "{} added an admin \"{}\" to \"{}\", response: {:?}",
                                             client_name, admin_hash, db_name, resp
                                         )
                                         .as_str(),
@@ -326,7 +326,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} added an admin \"{}\" to \"{}\" response: {}",
+                                            "{} added an admin \"{}\" to \"{}\" response: {:?}",
                                             client_name, user_hash, db_name, resp
                                         )
                                         .as_str(),
@@ -356,7 +356,7 @@ fn handle_client(
 
                                 client_key = key;
                                 client_name = format!("Client [{}] [{}]:", ip_address, client_key);
-                                DBPacketResponse::SuccessNoData
+                                Ok(DBSuccessResponse::SuccessNoData)
                             }
                             DBPacket::GetDBSettings(db_name) => {
                                 let lock = db_list.read().unwrap();
@@ -366,7 +366,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} got db settings from \"{}\", response: {}",
+                                            "{} got db settings from \"{}\", response: {:?}",
                                             client_name, db_name, resp
                                         )
                                         .as_str(),
@@ -386,7 +386,7 @@ fn handle_client(
 
                                 #[cfg(feature = "logging")]
                                 let _ = logger.log(LogEntry::new(
-                                    LogMessage::new(format!("{} changed db settings of \"{}\" to \"{:?}\", response: {}",client_name,db_name,db_settings,resp).as_str()),
+                                    LogMessage::new(format!("{} changed db settings of \"{}\" to \"{:?}\", response: {:?}",client_name,db_name,db_settings,resp).as_str()),
                                     LogLevel::Info
                                 ));
 
@@ -401,7 +401,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} got role from \"{}\", response: {}",
+                                            "{} got role from \"{}\", response: {:?}",
                                             client_name, db_name, resp
                                         )
                                         .as_str(),
@@ -419,7 +419,7 @@ fn handle_client(
                                 let _ = logger.log(LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} deleted data from \"{}\" in \"{}\", response: {}",
+                                            "{} deleted data from \"{}\" in \"{}\", response: {:?}",
                                             client_name, db_name, db_location, resp
                                         )
                                         .as_str(),
