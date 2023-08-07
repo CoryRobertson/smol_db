@@ -18,8 +18,8 @@ pub mod client_error;
 use crate::client_error::ClientError::DBResponseError;
 pub use smol_db_common::db::Role;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
-pub use smol_db_common::db_packets::db_settings;
 pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
+pub use smol_db_common::db_packets::db_settings;
 
 /// Client struct used for communicating to the database.
 pub struct Client {
@@ -41,14 +41,12 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
-    // TODO: the newly split DBPacketResponse, success-response should be the Ok() type for all of these results, and the Err() side should be a Client Error as well
-
     /// Deletes the data at the given db location, requires permissions to do so.
     pub fn delete_data(
         &mut self,
         db_name: &str,
         db_location: &str,
-    ) -> Result<DBSuccessResponse<String>,ClientError> {
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_data(db_name, db_location);
         self.send_packet(packet)
     }
@@ -97,7 +95,10 @@ impl Client {
     }
 
     /// Sets this clients access key within the DB Server. The server will persist the key until the session is disconnected, or connection is lost.
-    pub fn set_access_key(&mut self, key: String) -> Result<DBSuccessResponse<String>, ClientError> {
+    pub fn set_access_key(
+        &mut self,
+        key: String,
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_set_key(key);
         self.send_packet(packet)
     }
@@ -114,15 +115,12 @@ impl Client {
             .write(ser_packet.as_bytes())
             .map_err(SocketWriteError)?;
         let read_len = self.socket.read(&mut buf).map_err(SocketReadError)?;
-        match serde_json::from_slice::<Result<DBSuccessResponse<String>,DBPacketResponseError>>(&buf[0..read_len]) {
-            Ok(thing) => {
-                thing.map_err(|err| DBResponseError(err))
-            }
-            Err(err) => {
-                Err(PacketDeserializationError(Error::from(err)))
-            }
+        match serde_json::from_slice::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(
+            &buf[0..read_len],
+        ) {
+            Ok(thing) => thing.map_err(DBResponseError),
+            Err(err) => Err(PacketDeserializationError(Error::from(err))),
         }
-
     }
 
     /// Creates a db through the client with the given name.
@@ -135,10 +133,7 @@ impl Client {
         let packet = DBPacket::new_create_db(db_name, db_settings);
         let resp = self.send_packet(packet)?;
 
-        match &resp {
-            DBSuccessResponse::SuccessNoData => Ok(resp),
-            DBSuccessResponse::SuccessReply(_) => Ok(resp),
-        }
+        Ok(resp)
     }
 
     /// Writes to a db at the location specified, with the data given as a string.

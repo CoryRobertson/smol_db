@@ -3,16 +3,19 @@
 mod tests {
     use serde::{Deserialize, Serialize};
     use smol_db_client::client_error::ClientError;
+    use smol_db_client::client_error::ClientError::DBResponseError;
     use smol_db_client::Client;
     use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponse::{
-        Error, SuccessNoData, SuccessReply,
-    };
     use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
         InvalidPermissions, ValueNotFound,
     };
-    use smol_db_common::db_packets::db_packet_response::{DBPacketResponse, DBPacketResponseError};
+    use smol_db_common::db_packets::db_packet_response::DBSuccessResponse::{
+        SuccessNoData, SuccessReply,
+    };
+    use smol_db_common::db_packets::db_packet_response::{
+        DBPacketResponseError, DBSuccessResponse,
+    };
     use smol_db_common::db_packets::db_settings::DBSettings;
     use std::fs::read;
     use std::thread;
@@ -23,31 +26,14 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let create_response = client.create_db("test2", DBSettings::default()).unwrap();
-
-        match create_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(create_response, SuccessNoData);
 
         let data = "this_is_data";
         let write_response = client.write_db("test2", "location1", data).unwrap();
-
-        match write_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Write db failed.")
-            }
-        }
+        assert_eq!(write_response, SuccessNoData);
 
         let read_response = client.read_db("test2", "location1").unwrap();
 
@@ -84,13 +70,7 @@ mod tests {
         }
 
         let delete_response = client.delete_db("test2").unwrap();
-
-        match delete_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Delete db failed.")
-            }
-        }
+        assert_eq!(delete_response, SuccessNoData);
     }
 
     #[derive(PartialEq, Eq, Deserialize, Serialize, Clone, Debug)]
@@ -110,7 +90,7 @@ mod tests {
             .unwrap_err();
 
         match resp {
-            ClientError::DBResponseError(resp) => {
+            DBResponseError(resp) => {
                 assert_eq!(resp, InvalidPermissions);
             }
             _ => {
@@ -124,12 +104,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let test_data1 = TestStruct {
             a: 10,
@@ -148,24 +123,12 @@ mod tests {
         let create_db_response = client
             .create_db("test_generics", DBSettings::default())
             .unwrap();
-
-        match create_db_response {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_db_response, SuccessNoData);
 
         let write_db_response1 = client
             .write_db_generic("test_generics", "location1", test_data1.clone())
             .unwrap();
-
-        match write_db_response1 {
-            Error(err) => {
-                panic!("{:?}", err)
-            }
-            _ => {}
-        }
+        assert_eq!(write_db_response1, SuccessNoData);
 
         let read_db_response1 = client
             .read_db_generic::<TestStruct>("test_generics", "location1")
@@ -207,13 +170,7 @@ mod tests {
         }
 
         let delete_db_response = client.delete_db("test_generics").unwrap();
-
-        match delete_db_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Unable to delete db");
-            }
-        }
+        assert_eq!(delete_db_response, SuccessNoData);
     }
 
     #[test]
@@ -221,34 +178,17 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let create_db_response1 = client
             .create_db("test_db_1", DBSettings::default())
             .unwrap();
-
-        match create_db_response1 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_db_response1, SuccessNoData);
 
         let create_db_response2 = client
             .create_db("test_db_2", DBSettings::default())
             .unwrap();
-
-        match create_db_response2 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_db_response2, SuccessNoData);
 
         let list_db_response = client.list_db().unwrap();
 
@@ -258,22 +198,10 @@ mod tests {
         assert!(list_db_response.contains(&DBPacketInfo::new("test_db_2")));
 
         let delete_db_response1 = client.delete_db("test_db_1").unwrap();
-
-        match delete_db_response1 {
-            SuccessNoData => {}
-            _ => {
-                panic!("Unable to delete db 1");
-            }
-        }
+        assert_eq!(delete_db_response1, SuccessNoData);
 
         let delete_db_response2 = client.delete_db("test_db_2").unwrap();
-
-        match delete_db_response2 {
-            SuccessNoData => {}
-            _ => {
-                panic!("Unable to delete db 2");
-            }
-        }
+        assert_eq!(delete_db_response2, SuccessNoData);
     }
 
     #[test]
@@ -281,12 +209,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let mut count = 0;
         loop {
@@ -312,39 +235,18 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let db_name = "test_db_contents1";
 
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
-
-        match create_db_response1 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_db_response1, SuccessNoData);
 
         let write_response1 = client.write_db(db_name, "location1", "123").unwrap();
-        match write_response1 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(write_response1, SuccessNoData);
 
         let write_response2 = client.write_db(db_name, "location2", "456").unwrap();
-        match write_response2 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(write_response2, SuccessNoData);
 
         let list_db_contents_response = client.list_db_contents(db_name).unwrap();
 
@@ -352,13 +254,7 @@ mod tests {
         assert_eq!(list_db_contents_response.get("location2").unwrap(), "456");
 
         let delete_db_response = client.delete_db(db_name).unwrap();
-
-        match delete_db_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Unable to delete db");
-            }
-        }
+        assert_eq!(delete_db_response, SuccessNoData);
     }
 
     #[test]
@@ -366,36 +262,19 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let db_name = "test_db_contents_empty1";
 
         let create_db_response1 = client.create_db(db_name, DBSettings::default()).unwrap();
-
-        match create_db_response1 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_db_response1, SuccessNoData);
 
         let contents = client.list_db_contents(db_name).unwrap();
 
         assert_eq!(contents.is_empty(), true); // contents should be empty as no write operations occurred.
 
         let delete_db_response = client.delete_db(db_name).unwrap();
-
-        match delete_db_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Unable to delete db");
-            }
-        }
+        assert_eq!(delete_db_response, SuccessNoData);
     }
 
     #[test]
@@ -403,12 +282,7 @@ mod tests {
         let mut client = Client::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        match set_key_response {
-            SuccessNoData => {}
-            _ => {
-                panic!("Create db failed.");
-            }
-        }
+        assert_eq!(set_key_response, SuccessNoData);
 
         let db_name = "test_list_db_contents_generic1";
         let test_data1 = TestStruct {
@@ -426,32 +300,17 @@ mod tests {
         };
 
         let create_response = client.create_db(db_name, DBSettings::default()).unwrap();
-        match create_response {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(create_response, SuccessNoData);
 
         let write_response1 = client
             .write_db_generic(db_name, "location1", test_data1.clone())
             .unwrap();
-        match write_response1 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(write_response1, SuccessNoData);
 
         let write_response2 = client
             .write_db_generic(db_name, "location2", test_data2.clone())
             .unwrap();
-        match write_response2 {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(write_response2, SuccessNoData);
 
         let list = client
             .list_db_contents_generic::<TestStruct>(db_name)
@@ -463,12 +322,7 @@ mod tests {
         assert_eq!(list.get("location2").unwrap().clone(), test_data2);
 
         let delete_response = client.delete_db(db_name).unwrap();
-        match delete_response {
-            Error(err) => {
-                panic!("{:?}", err);
-            }
-            _ => {}
-        }
+        assert_eq!(delete_response, SuccessNoData);
     }
 
     #[test]
@@ -635,13 +489,16 @@ mod tests {
         }
 
         {
-            let read_response = client.read_db(db_name, db_location).unwrap();
-            assert_eq!(read_response, Error(ValueNotFound));
+            let read_response = client.read_db(db_name, db_location);
+            assert_eq!(read_response.unwrap_err(), DBResponseError(ValueNotFound));
         }
 
         {
-            let delete_data_response = client.delete_data(db_name, db_location).unwrap();
-            assert_eq!(delete_data_response, Error(ValueNotFound));
+            let delete_data_response = client.delete_data(db_name, db_location);
+            assert_eq!(
+                delete_data_response.unwrap_err(),
+                DBResponseError(ValueNotFound)
+            );
         }
 
         {

@@ -10,6 +10,7 @@ use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponseError::{
     DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound,
 };
+use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
-use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DBList {
@@ -109,7 +109,11 @@ impl DBList {
     }
 
     /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
-    pub fn get_role(&self, p_info: &DBPacketInfo, client_key: &String) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    pub fn get_role(
+        &self,
+        p_info: &DBPacketInfo,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let super_admin_list = self.get_super_admin_list();
 
         if super_admin_list.contains(client_key) {
@@ -212,7 +216,7 @@ impl DBList {
         &self,
         p_info: &DBPacketInfo,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // change settings requires super admin, early return if the user is not a super admin
             return Err(InvalidPermissions);
@@ -266,7 +270,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         new_key: String,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
@@ -320,7 +324,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         removed_key: String,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
@@ -380,7 +384,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         removed_key: String,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // change settings requires super admin, early return if the user is not a super admin
             return Err(InvalidPermissions);
@@ -438,7 +442,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         hash: String,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // to add an admin, you must be a super admin first, else you have invalid permissions
             return Err(InvalidPermissions);
@@ -607,7 +611,7 @@ impl DBList {
         db_name: &str,
         db_settings: DBSettings,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // to create a db you must be a super admin
             return Err(InvalidPermissions);
@@ -655,7 +659,11 @@ impl DBList {
 
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
-    pub fn delete_db(&self, db_name: &str, client_key: &String) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    pub fn delete_db(
+        &self,
+        db_name: &str,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // to delete a db, you must be a super admin no matter what.
             return Err(InvalidPermissions);
@@ -717,7 +725,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         p_location: &DBLocation,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let super_admin_list = self.get_super_admin_list();
 
         let list_lock = self.list.read().unwrap();
@@ -781,7 +789,7 @@ impl DBList {
         db_location: &DBLocation,
         db_data: DBData,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let super_admin_list = self.get_super_admin_list();
 
         let list_lock = self.list.read().unwrap();
@@ -852,7 +860,7 @@ impl DBList {
     }
 
     /// Returns the db list in a serialized form of Vec : DBPacketInfo
-    pub fn list_db(&self) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    pub fn list_db(&self) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list = self.list.read().unwrap();
         match serde_json::to_string(&list.clone()) {
             Ok(thing) => Ok(SuccessReply(thing)),
@@ -865,7 +873,7 @@ impl DBList {
         &self,
         db_info: &DBPacketInfo,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.db_name_exists(db_info.get_db_name()) {
             return Err(DBNotFound);
         }

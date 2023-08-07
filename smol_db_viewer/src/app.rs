@@ -3,10 +3,10 @@ use crate::app::ProgramState::{
     ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient,
     PromptForClientDetails, PromptForKey,
 };
-use smol_db_client::DBSuccessResponse;
 use smol_db_client::client_error::ClientError;
 use smol_db_client::client_error::ClientError::BadPacket;
 use smol_db_client::db_settings::DBSettings;
+use smol_db_client::DBSuccessResponse;
 use smol_db_client::{Client, DBPacketResponseError, Role};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -100,6 +100,7 @@ enum ProgramState {
     NoClient,
     PromptForClientDetails,
     ClientConnectionError(ClientError),
+    #[allow(dead_code)]
     DBResponseError(DBPacketResponseError),
     PromptForKey,
     ChangeDBSettings,
@@ -171,13 +172,6 @@ impl ApplicationState {
                                                 *ps.lock().unwrap() =
                                                     ClientConnectionError(BadPacket);
                                             }
-                                            // DBSuccessResponse::Error(err) => {
-                                            //     // if there was an error setting the client key, we still pass the client connection to the program, as it is still valid,
-                                            //     // but we also display the error to the user.
-                                            //     *client_mutex.lock().unwrap() =
-                                            //         Some(client_connection);
-                                            //     *ps.lock().unwrap() = DBResponseError(err);
-                                            // }
                                         }
                                     }
                                     Err(err) => {
@@ -589,21 +583,17 @@ impl eframe::App for ApplicationState {
                                                 None => {}
                                                 Some(ref mut client) => {
                                                     match client.delete_db(db.name.as_str()) {
-                                                        Ok(delete_response) => {
-                                                            match delete_response {
-                                                                DBSuccessResponse::SuccessNoData => {
-                                                                    list.remove(index as usize);
-                                                                }
-                                                                DBSuccessResponse::SuccessReply(
-                                                                    _,
-                                                                ) => {
-                                                                    *ps_lock =
-                                                                        ClientConnectionError(
-                                                                            BadPacket,
-                                                                        );
-                                                                }
+                                                        Ok(delete_response) => match delete_response
+                                                        {
+                                                            DBSuccessResponse::SuccessNoData => {
+                                                                list.remove(index as usize);
                                                             }
-                                                        }
+                                                            DBSuccessResponse::SuccessReply(_) => {
+                                                                *ps_lock = ClientConnectionError(
+                                                                    BadPacket,
+                                                                );
+                                                            }
+                                                        },
                                                         Err(err) => {
                                                             *ps_lock = ClientConnectionError(err);
                                                         }

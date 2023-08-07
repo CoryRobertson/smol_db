@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -18,8 +19,6 @@ pub enum DBSuccessResponse<T> {
     SuccessNoData,
     SuccessReply(T),
 }
-
-// TODO: split DBPacketResponse into SuccessResponse and ErrorResponse, make the client parse success first then error second seperately.
 
 #[allow(deprecated)]
 impl<T> Display for DBPacketResponse<T>

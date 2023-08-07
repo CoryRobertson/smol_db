@@ -19,3 +19,31 @@ pub enum ClientError {
     /// Client received the incorrect packet from a response, this should not happen.
     BadPacket,
 }
+
+impl PartialEq for ClientError {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            ClientError::UnableToConnect(_) => {
+                matches!(other, ClientError::UnableToConnect(_))
+            }
+            ClientError::PacketSerializationError(_) => {
+                matches!(other, ClientError::PacketSerializationError(_))
+            }
+            ClientError::SocketWriteError(_) => {
+                matches!(other, ClientError::SocketWriteError(_))
+            }
+            ClientError::SocketReadError(_) => {
+                matches!(other, ClientError::SocketReadError(_))
+            }
+            ClientError::PacketDeserializationError(_) => {
+                matches!(other, ClientError::PacketDeserializationError(_))
+            }
+            ClientError::DBResponseError(_) => {
+                matches!(other, ClientError::DBResponseError(_))
+            }
+            ClientError::BadPacket => {
+                matches!(other, ClientError::BadPacket)
+            }
+        }
+    }
+}
