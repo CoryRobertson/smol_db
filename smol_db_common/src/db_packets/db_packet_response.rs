@@ -12,6 +12,10 @@ pub enum DBPacketResponse<T> {
     Error(DBPacketResponseError),
 }
 
+// TODO: split DBPacketResponse into SuccessResponse and ErrorResponse, make the client parse success first then error second seperately.
+
+
+
 impl<T> Display for DBPacketResponse<T>
 where
     T: Display,

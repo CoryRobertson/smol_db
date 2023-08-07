@@ -41,6 +41,8 @@ impl Client {
         self.socket.shutdown(Shutdown::Both)
     }
 
+    // TODO: the newly split DBPacketResponse, success-response should be the Ok() type for all of these results, and the Err() side should be a Client Error as well
+
     /// Deletes the data at the given db location, requires permissions to do so.
     pub fn delete_data(
         &mut self,
