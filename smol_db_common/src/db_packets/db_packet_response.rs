@@ -15,9 +15,73 @@ pub enum DBPacketResponse<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+/// This enum represents the various types of successful responses that accessing the database can be.
 pub enum DBSuccessResponse<T> {
+    /// SuccessNoData represents when the operation was successful, but no response data was necessary to be replied back.
     SuccessNoData,
+    /// SuccessReply represents when the operation was successful, and there is data to be replied back
     SuccessReply(T),
+}
+
+impl<T> From<DBSuccessResponse<T>> for Option<T> {
+    fn from(value: DBSuccessResponse<T>) -> Self {
+        match value {
+            DBSuccessResponse::SuccessNoData => { None }
+            DBSuccessResponse::SuccessReply(data) => { Some(data) }
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<T> DBSuccessResponse<T> {
+
+    pub fn into_option(self) -> Option<T> {
+        match self{
+            DBSuccessResponse::SuccessNoData => {
+                None
+            }
+            DBSuccessResponse::SuccessReply(data) => {
+                Some(data)
+            }
+        }
+    }
+
+    pub fn as_option(&self) -> Option<&T> {
+        match self {
+            DBSuccessResponse::SuccessNoData => {
+                None
+            }
+            DBSuccessResponse::SuccessReply(data) => {
+                Some(data)
+            }
+        }
+    }
+
+    pub fn as_option_mut(&mut self) -> Option<&mut T> {
+        match self {
+            DBSuccessResponse::SuccessNoData => {
+                None
+            }
+            DBSuccessResponse::SuccessReply(data) => {
+                Some(data)
+            }
+        }
+    }
+}
+
+impl<T> Display for DBSuccessResponse<T>
+where T: Display,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DBSuccessResponse::SuccessNoData => {
+                write!(f, "SuccessNoData")
+            }
+            DBSuccessResponse::SuccessReply(reply) => {
+                write!(f, "SuccessReply: {}", reply)
+            }
+        }
+    }
 }
 
 #[allow(deprecated)]
@@ -61,11 +125,11 @@ pub enum DBPacketResponseError {
     DBAlreadyExists,
     /// An error occurred during serialization, specifically not during deserialization, but during serialization. This should never happen.
     SerializationError,
-
+    /// An error occurred during deserialization, data could have been dropped during transmission, or an unexpected or malformed packet was recieved.
     DeserializationError,
-
+    /// The client issuing the command does not have the required permissions to this data or operation
     InvalidPermissions,
-
+    /// A user was attempted to be read, and was not found
     UserNotFound,
 }
 
