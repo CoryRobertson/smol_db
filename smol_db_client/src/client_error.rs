@@ -23,26 +23,26 @@ pub enum ClientError {
 impl PartialEq for ClientError {
     fn eq(&self, other: &Self) -> bool {
         match self {
-            ClientError::UnableToConnect(_) => {
-                matches!(other, ClientError::UnableToConnect(_))
+            Self::UnableToConnect(_) => {
+                matches!(other, Self::UnableToConnect(_))
             }
-            ClientError::PacketSerializationError(_) => {
-                matches!(other, ClientError::PacketSerializationError(_))
+            Self::PacketSerializationError(_) => {
+                matches!(other, Self::PacketSerializationError(_))
             }
-            ClientError::SocketWriteError(_) => {
-                matches!(other, ClientError::SocketWriteError(_))
+            Self::SocketWriteError(_) => {
+                matches!(other, Self::SocketWriteError(_))
             }
-            ClientError::SocketReadError(_) => {
-                matches!(other, ClientError::SocketReadError(_))
+            Self::SocketReadError(_) => {
+                matches!(other, Self::SocketReadError(_))
             }
-            ClientError::PacketDeserializationError(_) => {
-                matches!(other, ClientError::PacketDeserializationError(_))
+            Self::PacketDeserializationError(_) => {
+                matches!(other, Self::PacketDeserializationError(_))
             }
-            ClientError::DBResponseError(_) => {
-                matches!(other, ClientError::DBResponseError(_))
+            Self::DBResponseError(_) => {
+                matches!(other, Self::DBResponseError(_))
             }
-            ClientError::BadPacket => {
-                matches!(other, ClientError::BadPacket)
+            Self::BadPacket => {
+                matches!(other, Self::BadPacket)
             }
         }
     }

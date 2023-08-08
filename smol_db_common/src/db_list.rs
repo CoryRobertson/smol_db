@@ -76,7 +76,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -138,7 +138,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -162,8 +162,8 @@ impl DBList {
         };
     }
 
-    /// Replaces DBSettings for a given DB, requires super admin privileges.
-    /// Returns SuccessNoData when successful
+    /// Replaces `DBSettings` for a given DB, requires super admin privileges.
+    /// Returns `SuccessNoData` when successful
     pub fn change_db_settings(
         &self,
         p_info: &DBPacketInfo,
@@ -183,13 +183,14 @@ impl DBList {
             db_lock.last_access_time = SystemTime::now();
 
             db_lock.db_settings = new_db_settings;
+            drop(db_lock);
             return Ok(SuccessNoData);
         }
 
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -210,7 +211,7 @@ impl DBList {
         };
     }
 
-    /// Returns the DBSettings serialized as a string
+    /// Returns the `DBSettings` serialized as a string
     /// Only super admins can get the db settings
     pub fn get_db_settings(
         &self,
@@ -238,7 +239,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -289,7 +290,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -322,7 +323,7 @@ impl DBList {
     pub fn remove_user(
         &self,
         p_info: &DBPacketInfo,
-        removed_key: String,
+        removed_key: &str,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
@@ -333,7 +334,7 @@ impl DBList {
             return if db_lock.db_settings.is_admin(client_key) || self.is_super_admin(client_key) {
                 db_lock.last_access_time = SystemTime::now();
 
-                if db_lock.db_settings.remove_user(&removed_key) {
+                if db_lock.db_settings.remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -346,7 +347,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -357,7 +358,7 @@ impl DBList {
 
             let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key)
             {
-                if db.db_settings.remove_user(&removed_key) {
+                if db.db_settings.remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -382,7 +383,7 @@ impl DBList {
     pub fn remove_admin(
         &self,
         p_info: &DBPacketInfo,
-        removed_key: String,
+        removed_key: &str,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
@@ -397,7 +398,7 @@ impl DBList {
 
             db_lock.last_access_time = SystemTime::now();
 
-            return if db_lock.db_settings.remove_admin(&removed_key) {
+            return if db_lock.db_settings.remove_admin(removed_key) {
                 Ok(SuccessNoData)
             } else {
                 Err(UserNotFound)
@@ -407,7 +408,7 @@ impl DBList {
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -417,7 +418,7 @@ impl DBList {
             db.last_access_time = SystemTime::now();
 
             let response = {
-                if db.db_settings.remove_admin(&removed_key) {
+                if db.db_settings.remove_admin(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -455,13 +456,14 @@ impl DBList {
             db_lock.last_access_time = SystemTime::now();
 
             db_lock.db_settings.add_admin(hash);
+            drop(db_lock);
             return Ok(SuccessNoData);
         }
 
         return if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -497,6 +499,7 @@ impl DBList {
                     let db_lock = db.read().unwrap();
                     let last_access_time = db_lock.last_access_time;
                     let invalidation_time = db_lock.db_settings.get_invalidation_time();
+                    drop(db_lock);
 
                     match SystemTime::now().duration_since(last_access_time) {
                         // invalidate them based on their duration since access and invalidation time
@@ -646,6 +649,7 @@ impl DBList {
                             .expect(&format!("Unable to write db to file. {}", db_name));
                         cache_write_lock.insert(db_packet_info.clone(), RwLock::from(db));
                         list_write_lock.push(db_packet_info);
+                        drop(cache_write_lock);
                         Ok(SuccessNoData)
                     }
                     Err(_) => {
@@ -750,7 +754,7 @@ impl DBList {
         if list_lock.contains(p_info) {
             // cache was missed but the db exists on the file system
 
-            let mut db = match DBList::read_db_from_file(p_info) {
+            let mut db = match Self::read_db_from_file(p_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -782,12 +786,12 @@ impl DBList {
         }
     }
 
-    /// Writes to a db given a DBPacket
+    /// Writes to a db given a `DBPacket`
     pub fn write_db(
         &self,
         db_info: &DBPacketInfo,
         db_location: &DBLocation,
-        db_data: DBData,
+        db_data: &DBData,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let super_admin_list = self.get_super_admin_list();
@@ -829,7 +833,7 @@ impl DBList {
 
             let mut cache_lock = self.cache.write().unwrap();
 
-            let mut db = match DBList::read_db_from_file(db_info) {
+            let mut db = match Self::read_db_from_file(db_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);
@@ -859,7 +863,7 @@ impl DBList {
         }
     }
 
-    /// Returns the db list in a serialized form of Vec : DBPacketInfo
+    /// Returns the db list in a serialized form of Vec : `DBPacketInfo`
     pub fn list_db(&self) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list = self.list.read().unwrap();
         match serde_json::to_string(&list.clone()) {
@@ -911,7 +915,7 @@ impl DBList {
 
             let mut cache_lock = self.cache.write().unwrap();
 
-            let mut db = match DBList::read_db_from_file(db_info) {
+            let mut db = match Self::read_db_from_file(db_info) {
                 Ok(db) => db,
                 Err(_) => {
                     return Err(DBPacketResponseError::DBFileSystemError);

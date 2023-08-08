@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 /// Struct describing settings used when creating a db.
 pub struct DBSettings {
     /// The duration to wait before removing the given db from the cache.
@@ -17,7 +17,7 @@ pub struct DBSettings {
 }
 
 impl DBSettings {
-    /// Returns a new DBSettings given a duration
+    /// Returns a new `DBSettings` given a duration
     pub fn new(
         invalidation_time: Duration,
         can_others_rwx: (bool, bool, bool),
@@ -56,7 +56,7 @@ impl DBSettings {
 
     /// Removes a user from the db settings
     /// Returns true if it found the users hash, false if the users hash was not found
-    pub fn remove_user(&mut self, hash: &String) -> bool {
+    pub fn remove_user(&mut self, hash: &str) -> bool {
         let it = self.users.clone();
         let mut removed = false;
         for (index, item) in it.iter().enumerate() {
@@ -70,7 +70,7 @@ impl DBSettings {
 
     /// Removes an admin from the db settings
     /// Returns true if the given admin was removed, false if not.
-    pub fn remove_admin(&mut self, hash: &String) -> bool {
+    pub fn remove_admin(&mut self, hash: &str) -> bool {
         let it = self.admins.clone();
         let mut removed = false;
         for (index, item) in it.iter().enumerate() {

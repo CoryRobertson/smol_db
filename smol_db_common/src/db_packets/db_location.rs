@@ -14,7 +14,7 @@ impl Display for DBLocation {
 }
 
 impl DBLocation {
-    /// Function to create a new DBLocation struct from a given location.
+    /// Function to create a new `DBLocation` struct from a given location.
     pub fn new(location: &str) -> Self {
         Self {
             location: location.to_string(),

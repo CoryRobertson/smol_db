@@ -172,7 +172,7 @@ mod tests {
         let write_invalid_perms = db_list.write_db(
             &db_pack_info,
             &db_location,
-            db_data.clone(),
+            &db_data.clone(),
             &"not a working client key".to_string(),
         );
         assert_eq!(write_invalid_perms.unwrap_err(), InvalidPermissions);
@@ -180,7 +180,7 @@ mod tests {
         let write_response = db_list.write_db(
             &db_pack_info,
             &db_location,
-            db_data.clone(),
+            &db_data.clone(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
         assert_eq!(write_response.unwrap(), SuccessNoData);
@@ -189,7 +189,7 @@ mod tests {
             .write_db(
                 &db_pack_info,
                 &db_location,
-                db_data.clone(),
+                &db_data.clone(),
                 &TEST_SUPER_ADMIN_KEY.to_string(),
             )
             .unwrap();
@@ -291,7 +291,7 @@ mod tests {
         let write_with_new_user_response = db_list.write_db(
             &db_pack_info,
             &db_location,
-            db_data.clone(),
+            &db_data.clone(),
             &new_user_key.to_string(),
         );
         assert_eq!(write_with_new_user_response.unwrap(), SuccessNoData);
@@ -309,25 +309,25 @@ mod tests {
         // remove user with invalid perms, then eventually remove the user with an admin perm, and try removing the user again and note that the user is not found
         let remove_user_invalid_perms1 = db_list.remove_user(
             &db_pack_info,
-            new_user_key.clone(),
+            new_user_key.clone().as_str(),
             &TEST_USER_KEY.to_string(),
         );
         assert_eq!(remove_user_invalid_perms1.unwrap_err(), InvalidPermissions);
         let remove_user_invalid_perms2 = db_list.remove_user(
             &db_pack_info,
-            new_user_key.clone(),
+            new_user_key.clone().as_str(),
             &"not a working key".to_string(),
         );
         assert_eq!(remove_user_invalid_perms2.unwrap_err(), InvalidPermissions);
         let remove_user_response1 = db_list.remove_user(
             &db_pack_info,
-            new_user_key.clone(),
+            new_user_key.clone().as_str(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
         assert_eq!(remove_user_response1.unwrap(), SuccessNoData);
         let remove_user_response2 = db_list.remove_user(
             &db_pack_info,
-            new_user_key.clone(),
+            new_user_key.clone().as_str(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
         assert_eq!(remove_user_response2.unwrap_err(), UserNotFound);
@@ -336,7 +336,7 @@ mod tests {
         let write_with_new_user_response2 = db_list.write_db(
             &db_pack_info,
             &db_location,
-            db_data.clone(),
+            &db_data.clone(),
             &new_user_key.to_string(),
         );
         assert_eq!(
@@ -399,16 +399,16 @@ mod tests {
 
         let remove_admin_without_perms1 = db_list.remove_admin(
             &db_pack_info,
-            new_admin_key.clone(),
+            new_admin_key.clone().as_str(),
             &"this is not a working key".to_string(),
         );
         assert_eq!(remove_admin_without_perms1.unwrap_err(), InvalidPermissions);
         let remove_admin_without_perms2 =
-            db_list.remove_admin(&db_pack_info, new_admin_key.clone(), &new_admin_key.clone());
+            db_list.remove_admin(&db_pack_info, new_admin_key.clone().as_str(), &new_admin_key.clone());
         assert_eq!(remove_admin_without_perms2.unwrap_err(), InvalidPermissions);
         let remove_admin_success_response = db_list.remove_admin(
             &db_pack_info,
-            new_admin_key.clone(),
+            new_admin_key.clone().as_str(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
         assert_eq!(remove_admin_success_response.unwrap(), SuccessNoData);
@@ -522,7 +522,7 @@ mod tests {
         let write_response = db_list.write_db(
             &db_pack_info,
             &db_location,
-            db_data.clone(),
+            &db_data.clone(),
             &TEST_SUPER_ADMIN_KEY.to_string(),
         );
         assert_eq!(write_response.unwrap(), SuccessNoData);
@@ -782,7 +782,7 @@ mod tests {
             let write_resp = db_list.write_db(
                 &db_pack_info,
                 &db_location,
-                db_data.clone(),
+                &db_data.clone(),
                 &"not a working key probably".to_string(),
             );
             assert_eq!(write_resp.unwrap_err(), InvalidPermissions);
@@ -792,7 +792,7 @@ mod tests {
             let write_resp = db_list.write_db(
                 &db_pack_info,
                 &db_location,
-                db_data.clone(),
+                &db_data.clone(),
                 &TEST_USER_KEY.to_string(),
             );
             assert_eq!(write_resp.unwrap(), SuccessNoData);
@@ -802,7 +802,7 @@ mod tests {
             let write_resp = db_list.write_db(
                 &db_pack_info,
                 &db_location,
-                db_data.clone(),
+                &db_data.clone(),
                 &TEST_SUPER_ADMIN_KEY.to_string(),
             );
             assert_eq!(

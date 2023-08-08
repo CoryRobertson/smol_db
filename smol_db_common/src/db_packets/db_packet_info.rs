@@ -14,14 +14,14 @@ impl Display for DBPacketInfo {
 }
 
 impl DBPacketInfo {
-    /// Function to create a new DBPacketInfo struct with the given name
+    /// Function to create a new `DBPacketInfo` struct with the given name
     pub fn new(dbname: &str) -> Self {
         Self {
             dbname: dbname.to_string(),
         }
     }
 
-    /// Function to retrieve the name from the DBPacketInfo struct.
+    /// Function to retrieve the name from the `DBPacketInfo` struct.
     pub fn get_db_name(&self) -> &str {
         &self.dbname
     }

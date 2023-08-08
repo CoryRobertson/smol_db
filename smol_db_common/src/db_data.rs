@@ -15,12 +15,12 @@ impl Display for DBData {
 }
 
 impl DBData {
-    /// Function to create a new DBData struct for a DBPacket::Write packet.
-    pub fn new(data: String) -> Self {
+    /// Function to create a new `DBData` struct for a `DBPacket::Write` packet.
+    pub const fn new(data: String) -> Self {
         Self { data }
     }
 
-    /// Getter function for the data inside the DBData struct.
+    /// Getter function for the data inside the `DBData` struct.
     pub fn get_data(&self) -> &str {
         &self.data
     }

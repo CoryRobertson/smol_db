@@ -14,7 +14,7 @@ pub enum DBPacketResponse<T> {
     Error(DBPacketResponseError),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 /// This enum represents the various types of successful responses that accessing the database can be.
 pub enum DBSuccessResponse<T> {
     /// SuccessNoData represents when the operation was successful, but no response data was necessary to be replied back.
@@ -26,58 +26,46 @@ pub enum DBSuccessResponse<T> {
 impl<T> From<DBSuccessResponse<T>> for Option<T> {
     fn from(value: DBSuccessResponse<T>) -> Self {
         match value {
-            DBSuccessResponse::SuccessNoData => { None }
-            DBSuccessResponse::SuccessReply(data) => { Some(data) }
+            DBSuccessResponse::SuccessNoData => None,
+            DBSuccessResponse::SuccessReply(data) => Some(data),
         }
     }
 }
 
 #[allow(dead_code)]
 impl<T> DBSuccessResponse<T> {
-
     pub fn into_option(self) -> Option<T> {
-        match self{
-            DBSuccessResponse::SuccessNoData => {
-                None
-            }
-            DBSuccessResponse::SuccessReply(data) => {
-                Some(data)
-            }
+        match self {
+            Self::SuccessNoData => None,
+            Self::SuccessReply(data) => Some(data),
         }
     }
 
     pub fn as_option(&self) -> Option<&T> {
         match self {
-            DBSuccessResponse::SuccessNoData => {
-                None
-            }
-            DBSuccessResponse::SuccessReply(data) => {
-                Some(data)
-            }
+            Self::SuccessNoData => None,
+            Self::SuccessReply(data) => Some(data),
         }
     }
 
     pub fn as_option_mut(&mut self) -> Option<&mut T> {
         match self {
-            DBSuccessResponse::SuccessNoData => {
-                None
-            }
-            DBSuccessResponse::SuccessReply(data) => {
-                Some(data)
-            }
+            Self::SuccessNoData => None,
+            Self::SuccessReply(data) => Some(data),
         }
     }
 }
 
 impl<T> Display for DBSuccessResponse<T>
-where T: Display,
+where
+    T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DBSuccessResponse::SuccessNoData => {
+            Self::SuccessNoData => {
                 write!(f, "SuccessNoData")
             }
-            DBSuccessResponse::SuccessReply(reply) => {
+            Self::SuccessReply(reply) => {
                 write!(f, "SuccessReply: {}", reply)
             }
         }
@@ -91,13 +79,13 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DBPacketResponse::SuccessNoData => {
+            Self::SuccessNoData => {
                 write!(f, "SuccessNoData")
             }
-            DBPacketResponse::SuccessReply(reply) => {
+            Self::SuccessReply(reply) => {
                 write!(f, "SuccessReply: {}", reply)
             }
-            DBPacketResponse::Error(err) => {
+            Self::Error(err) => {
                 write!(f, "Error: {}", err)
             }
         }
@@ -110,7 +98,7 @@ impl Display for DBPacketResponseError {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq)]
 /// This enum represents the various types of errors that can occur when an error is returned in a db packet response
 pub enum DBPacketResponseError {
     /// BadPacket represents a packet that was improperly handled, these should be reported immediately and should never happen under proper circumstances.
@@ -138,18 +126,18 @@ impl<T> DBPacketResponse<T> {
     /// Convert the response from the database to a result
     pub fn as_result(&self) -> Result<Option<&T>, &DBPacketResponseError> {
         match self {
-            DBPacketResponse::SuccessNoData => Ok(None),
-            DBPacketResponse::SuccessReply(data) => Ok(Some(data)),
-            DBPacketResponse::Error(err) => Err(err),
+            Self::SuccessNoData => Ok(None),
+            Self::SuccessReply(data) => Ok(Some(data)),
+            Self::Error(err) => Err(err),
         }
     }
 
     /// Consume the response and convert into a result
     pub fn into_result(self) -> Result<Option<T>, DBPacketResponseError> {
         match self {
-            DBPacketResponse::SuccessNoData => Ok(None),
-            DBPacketResponse::SuccessReply(data) => Ok(Some(data)),
-            DBPacketResponse::Error(err) => Err(err),
+            Self::SuccessNoData => Ok(None),
+            Self::SuccessReply(data) => Ok(Some(data)),
+            Self::Error(err) => Err(err),
         }
     }
 }

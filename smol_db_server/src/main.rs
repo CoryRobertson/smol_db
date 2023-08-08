@@ -43,7 +43,7 @@ fn main() {
     ctrlc::set_handler(move || {
         println!("Received CTRL+C, gracefully shutting down program.");
         #[cfg(feature = "logging")]
-        let _ = ctrl_c_logger_clone.log(LogEntry::new(
+        let _ = ctrl_c_logger_clone.log(&LogEntry::new(
             LogMessage::new("Received CTRL+C, gracefully shutting down program."),
             LogLevel::Info,
         ));
@@ -54,7 +54,7 @@ fn main() {
         println!("Saved all db files and db list.");
         #[cfg(feature = "logging")]
         ctrl_c_logger_clone
-            .log(LogEntry::new(
+            .log(&LogEntry::new(
                 LogMessage::new("Saved all db files and db list."),
                 LogLevel::Info,
             ))
@@ -96,8 +96,10 @@ fn main() {
             );
             println!("{}", msg);
             #[cfg(feature = "logging")]
-            let _ = cache_invalidator_logger
-                .log(LogEntry::new(LogMessage::new(msg.as_str()), LogLevel::Info));
+            let _ = cache_invalidator_logger.log(&LogEntry::new(
+                LogMessage::new(msg.as_str()),
+                LogLevel::Info,
+            ));
         }
 
         thread::sleep(Duration::from_secs(10));
@@ -136,14 +138,14 @@ fn main() {
             };
 
             #[cfg(feature = "logging")]
-            let _ = logger_clone.log(LogEntry::new(
+            let _ = logger_clone.log(&LogEntry::new(
                 LogMessage::new(format!("New client connected: {}", msg).as_str()),
                 LogLevel::Info,
             ));
             #[cfg(feature = "logging")]
-            handle_client(stream, db_list_clone, logger_clone);
+            handle_client(stream, &db_list_clone, logger_clone);
             #[cfg(not(feature = "logging"))]
-            handle_client(stream, db_list_clone);
+            handle_client(stream, &db_list_clone);
         });
 
         thread_vec.push(handle);
@@ -162,7 +164,7 @@ fn main() {
 #[allow(clippy::let_and_return)]
 fn handle_client(
     mut stream: TcpStream,
-    db_list: DBListThreadSafe,
+    db_list: &DBListThreadSafe,
     #[cfg(feature = "logging")] logger: Arc<Logger>,
 ) {
     let ip_address = stream.peer_addr().unwrap();
@@ -189,7 +191,7 @@ fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} read \"{}\" in \"{}\", response: {:?}",
@@ -206,12 +208,12 @@ fn handle_client(
                                 let resp = lock.write_db(
                                     &db_name,
                                     &db_location,
-                                    db_write_value.clone(),
+                                    &db_write_value.clone(),
                                     &client_key,
                                 );
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} wrote \"{}\" to \"{}\" in \"{}\", response: {:?}",
@@ -235,7 +237,7 @@ fn handle_client(
                                 lock.save_db_list();
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(format!("{} created database \"{}\" with settings \"{:?}\", response: {:?}",client_name,db_name,db_settings, resp).as_str()),
                                     LogLevel::Info
                                 ));
@@ -248,7 +250,7 @@ fn handle_client(
                                 let resp = lock.delete_db(db_name.get_db_name(), &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} deleted database \"{}\", response: {:?}",
@@ -267,7 +269,7 @@ fn handle_client(
                                 let resp = lock.list_db();
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} listed databases, response: {:?}",
@@ -285,7 +287,7 @@ fn handle_client(
                                 let resp = lock.list_db_contents(&db_name, &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} listed database contents of \"{}\", response: {:?}",
@@ -304,7 +306,7 @@ fn handle_client(
                                     lock.add_admin(&db_name, admin_hash.clone(), &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} added an admin \"{}\" to \"{}\", response: {:?}",
@@ -323,7 +325,7 @@ fn handle_client(
                                 let resp = lock.add_user(&db_name, user_hash.clone(), &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} added an admin \"{}\" to \"{}\" response: {:?}",
@@ -347,7 +349,7 @@ fn handle_client(
                                 }
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!("{} set key to \"{}\"", client_name, key).as_str(),
                                     ),
@@ -363,7 +365,7 @@ fn handle_client(
                                 let resp = lock.get_db_settings(&db_name, &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} got db settings from \"{}\", response: {:?}",
@@ -385,7 +387,7 @@ fn handle_client(
                                 );
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(format!("{} changed db settings of \"{}\" to \"{:?}\", response: {:?}",client_name,db_name,db_settings,resp).as_str()),
                                     LogLevel::Info
                                 ));
@@ -398,7 +400,7 @@ fn handle_client(
                                 let resp = lock.get_role(&db_name, &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} got role from \"{}\", response: {:?}",
@@ -416,7 +418,7 @@ fn handle_client(
                                 let resp = lock.delete_data(&db_name, &db_location, &client_key);
 
                                 #[cfg(feature = "logging")]
-                                let _ = logger.log(LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} deleted data from \"{}\" in \"{}\", response: {:?}",

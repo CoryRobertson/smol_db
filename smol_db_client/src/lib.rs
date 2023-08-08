@@ -1,4 +1,4 @@
-//! Library contain the structs that manage the client to connect to smol_db
+//! Library contain the structs that manage the client to connect to `smol_db`
 
 use crate::client_error::ClientError;
 use crate::ClientError::{
@@ -27,7 +27,7 @@ pub struct Client {
 }
 
 impl Client {
-    /// Creates a new SmolDBClient struct connected to the ip address given.
+    /// Creates a new `SmolDBClient` struct connected to the ip address given.
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);
         match socket {
@@ -48,14 +48,14 @@ impl Client {
         db_location: &str,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_data(db_name, db_location);
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     /// Returns the role of the given client in the given db.
     pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
         let packet = DBPacket::new_get_role(db_name);
 
-        let resp = self.send_packet(packet)?;
+        let resp = self.send_packet(&packet)?;
 
         match resp {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),
@@ -66,12 +66,12 @@ impl Client {
         }
     }
 
-    /// Gets the DBSettings of the given DB.
-    /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view DBSettings.
+    /// Gets the `DBSettings` of the given DB.
+    /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view `DBSettings`.
     pub fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
         let packet = DBPacket::new_get_db_settings(db_name);
 
-        let resp = self.send_packet(packet)?;
+        let resp = self.send_packet(&packet)?;
         match resp {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),
             DBSuccessResponse::SuccessReply(data) => {
@@ -83,15 +83,15 @@ impl Client {
         }
     }
 
-    /// Sets the DBSettings of a given DB
-    /// Error on IO Error, or when database does not exist, or when the user lacks permissions to set DBSettings
+    /// Sets the `DBSettings` of a given DB
+    /// Error on IO Error, or when database does not exist, or when the user lacks permissions to set `DBSettings`
     pub fn set_db_settings(
         &mut self,
         db_name: &str,
         db_settings: DBSettings,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_set_db_settings(db_name, db_settings);
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     /// Sets this clients access key within the DB Server. The server will persist the key until the session is disconnected, or connection is lost.
@@ -100,12 +100,12 @@ impl Client {
         key: String,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_set_key(key);
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     fn send_packet(
         &mut self,
-        sent_packet: DBPacket,
+        sent_packet: &DBPacket,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
         let ser_packet = sent_packet
@@ -131,7 +131,7 @@ impl Client {
         db_settings: DBSettings,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_create_db(db_name, db_settings);
-        let resp = self.send_packet(packet)?;
+        let resp = self.send_packet(&packet)?;
 
         Ok(resp)
     }
@@ -147,7 +147,7 @@ impl Client {
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_write(db_name, db_location, data);
 
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     /// Reads from a db at the location specific.
@@ -160,7 +160,7 @@ impl Client {
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_read(db_name, db_location);
 
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     /// Deletes the given db by name.
@@ -168,7 +168,7 @@ impl Client {
     pub fn delete_db(&mut self, db_name: &str) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_db(db_name);
 
-        self.send_packet(packet)
+        self.send_packet(&packet)
     }
 
     /// Lists all the current databases available by name from the server
@@ -176,7 +176,7 @@ impl Client {
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let packet = DBPacket::new_list_db();
 
-        let response = self.send_packet(packet)?;
+        let response = self.send_packet(&packet)?;
 
         match response {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),
@@ -197,7 +197,7 @@ impl Client {
     ) -> Result<HashMap<String, String>, ClientError> {
         let packet = DBPacket::new_list_db_contents(db_name);
 
-        let response = self.send_packet(packet)?;
+        let response = self.send_packet(&packet)?;
 
         match response {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),

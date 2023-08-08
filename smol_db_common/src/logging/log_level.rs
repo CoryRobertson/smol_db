@@ -13,13 +13,13 @@ pub enum LogLevel {
 impl Display for LogLevel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogLevel::Error => {
+            Self::Error => {
                 write!(f, "Error")
             }
-            LogLevel::Warn => {
+            Self::Warn => {
                 write!(f, "Warn")
             }
-            LogLevel::Info => {
+            Self::Info => {
                 write!(f, "Info")
             }
         }

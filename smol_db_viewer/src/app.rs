@@ -79,10 +79,10 @@ enum DesiredAction {
 }
 
 impl DesiredAction {
-    fn as_text(&self) -> &str {
+    const fn as_text(&self) -> &str {
         match self {
-            DesiredAction::Write => "Write",
-            DesiredAction::Delete => "Delete",
+            Self::Write => "Write",
+            Self::Delete => "Delete",
         }
     }
 }
@@ -135,7 +135,7 @@ impl Default for ApplicationState {
 impl ApplicationState {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
-            let mut loaded_state: ApplicationState =
+            let mut loaded_state: Self =
                 eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
 
             if loaded_state.auto_connect && !loaded_state.ip_address.is_empty() {
@@ -199,12 +199,12 @@ impl ApplicationState {
             return loaded_state;
         }
 
-        Default::default()
+        Self::default()
     }
 }
 
 impl eframe::App for ApplicationState {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let Self { .. } = self;
 
         // top panel block
@@ -214,7 +214,7 @@ impl eframe::App for ApplicationState {
                     let has_client = self.client.lock().unwrap().is_some();
                     ui.menu_button("File", |ui| {
                         if ui.button("Quit").clicked() {
-                            _frame.close();
+                            frame.close();
                         }
                     });
                     ui.separator();
@@ -704,7 +704,7 @@ impl eframe::App for ApplicationState {
                                                         db_settings: NotCached,
                                                     })
                                                     .collect(),
-                                            )
+                                            );
                                         }
                                         Err(err) => {
                                             *self.program_state.lock().unwrap() =

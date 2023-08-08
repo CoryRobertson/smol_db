@@ -1,4 +1,4 @@
-//! Common library between the client and server for smol_db
+//! Common library between the client and server for `smol_db`
 
 pub mod db;
 pub mod db_content;
