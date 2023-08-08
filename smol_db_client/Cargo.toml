@@ -5,6 +5,9 @@ edition = "2021"
 description = "A client library for smol_db"
 license = "GPL-3"
 repository = "https://github.com/CoryRobertson/smol_db"
+homepage = "https://github.com/CoryRobertson/smol_db"
+readme = "../README.md"
+keywords = ["client","library","database","db"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

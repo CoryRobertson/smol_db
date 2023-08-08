@@ -125,7 +125,7 @@ pub enum DBPacketResponseError {
     DBAlreadyExists,
     /// An error occurred during serialization, specifically not during deserialization, but during serialization. This should never happen.
     SerializationError,
-    /// An error occurred during deserialization, data could have been dropped during transmission, or an unexpected or malformed packet was recieved.
+    /// An error occurred during deserialization, data could have been dropped during transmission, or an unexpected or malformed packet was received.
     DeserializationError,
     /// The client issuing the command does not have the required permissions to this data or operation
     InvalidPermissions,
