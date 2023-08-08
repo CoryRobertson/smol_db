@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-use smol_db_client::Client;
+use smol_db_client::SmolDbClient;
 #[cfg(debug_assertions)]
 use smol_db_common::db_packets::db_settings::DBSettings;
 #[cfg(debug_assertions)]
@@ -16,7 +16,7 @@ fn main() {
     #[cfg(debug_assertions)]
     {
         let key = "test_key_123";
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
         client.set_access_key(key.to_string()).unwrap();
 
         {

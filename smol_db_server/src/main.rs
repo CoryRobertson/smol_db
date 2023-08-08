@@ -1,3 +1,4 @@
+//! Binary application that runs a `smol_db` server instance
 #[cfg(feature = "logging")]
 use smol_db_common::{
     logging::log_entry::LogEntry, logging::log_level::LogLevel, logging::log_message::LogMessage,

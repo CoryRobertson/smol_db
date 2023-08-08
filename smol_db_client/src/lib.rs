@@ -1,4 +1,4 @@
-//! Library contain the structs that manage the client to connect to `smol_db`
+//! Library containing the structs that manage the client to connect to `smol_db`
 
 use crate::client_error::ClientError;
 use crate::ClientError::{
@@ -21,12 +21,13 @@ pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
 pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 pub use smol_db_common::db_packets::db_settings;
 
-/// Client struct used for communicating to the database.
-pub struct Client {
+/// SmolDbClient struct used for communicating to the database.
+/// This struct has implementations that allow for end to end communication with the database server.
+pub struct SmolDbClient {
     socket: TcpStream,
 }
 
-impl Client {
+impl SmolDbClient {
     /// Creates a new `SmolDBClient` struct connected to the ip address given.
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);

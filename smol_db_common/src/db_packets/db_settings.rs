@@ -1,3 +1,4 @@
+//! Module containing a DBSettings struct, a struct that represents the various settings a database has.
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

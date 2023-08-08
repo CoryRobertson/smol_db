@@ -1,3 +1,4 @@
+//! `smol_db` viewer application, allows for viewing the state of a server and its databases.
 use crate::app::ApplicationState;
 
 mod app;

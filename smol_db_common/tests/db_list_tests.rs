@@ -403,8 +403,11 @@ mod tests {
             &"this is not a working key".to_string(),
         );
         assert_eq!(remove_admin_without_perms1.unwrap_err(), InvalidPermissions);
-        let remove_admin_without_perms2 =
-            db_list.remove_admin(&db_pack_info, new_admin_key.clone().as_str(), &new_admin_key.clone());
+        let remove_admin_without_perms2 = db_list.remove_admin(
+            &db_pack_info,
+            new_admin_key.clone().as_str(),
+            &new_admin_key.clone(),
+        );
         assert_eq!(remove_admin_without_perms2.unwrap_err(), InvalidPermissions);
         let remove_admin_success_response = db_list.remove_admin(
             &db_pack_info,

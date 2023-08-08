@@ -4,7 +4,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use smol_db_client::client_error::ClientError;
     use smol_db_client::client_error::ClientError::DBResponseError;
-    use smol_db_client::Client;
+    use smol_db_client::SmolDbClient;
     use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
     use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
     use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
@@ -23,7 +23,7 @@ mod tests {
 
     #[test]
     fn test_client() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_missing_create_db_permissions() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let resp = client
             .create_db("not enough permissions", DBSettings::default())
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_generics_client() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_list_db() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_empty_db_list() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_list_db_contents() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_list_db_contents_empty() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_list_db_contents_generic() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
         assert_eq!(set_key_response, SuccessNoData);
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_get_db_settings() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
         let db_settings_test = DBSettings::new(
             Duration::from_secs(29),
             (false, true, false),
@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_set_db_settings() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
         let db_settings_test = DBSettings::new(
             Duration::from_secs(27),
             (false, true, true),
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_get_role() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
         let user_key = "this is a user key that works".to_string();
         let admin_key = "this is an admin key that works".to_string();
         let other_key = "this is not an admin, super admin, or user key".to_string();
@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_delete_data() {
-        let mut client = Client::new("localhost:8222").unwrap();
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
         let db_settings_test = DBSettings::new(
             Duration::from_secs(21),
             (false, true, false),

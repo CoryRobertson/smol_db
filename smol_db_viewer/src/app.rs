@@ -7,7 +7,7 @@ use smol_db_client::client_error::ClientError;
 use smol_db_client::client_error::ClientError::BadPacket;
 use smol_db_client::db_settings::DBSettings;
 use smol_db_client::DBSuccessResponse;
-use smol_db_client::{Client, DBPacketResponseError, Role};
+use smol_db_client::{DBPacketResponseError, Role, SmolDbClient};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
@@ -19,7 +19,7 @@ use std::time::Duration;
 #[serde(default)]
 pub struct ApplicationState {
     #[serde(skip)]
-    client: Arc<Mutex<Option<Client>>>,
+    client: Arc<Mutex<Option<SmolDbClient>>>,
     #[serde(skip)]
     program_state: Arc<Mutex<ProgramState>>,
 
@@ -152,7 +152,7 @@ impl ApplicationState {
                     let ip = ip_clone;
                     let key = key_set_clone;
 
-                    match Client::new(&ip) {
+                    match SmolDbClient::new(&ip) {
                         // connect the client to the server.
                         Ok(mut client_connection) => {
                             if set_key && !key.is_empty() {
@@ -664,7 +664,7 @@ impl eframe::App for ApplicationState {
                                 let client_mutex = client_clone;
                                 let ip = ip_clone;
 
-                                match Client::new(&ip) {
+                                match SmolDbClient::new(&ip) {
                                     // connect the client to the server.
                                     Ok(client_connection) => {
                                         // if client connection successful, move the client to the programs state.

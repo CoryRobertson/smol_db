@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[deprecated]
-/// This enum represents the various types of responses that accessing the database can be.
+/// Represents the various types of responses that accessing the database can be.
 pub enum DBPacketResponse<T> {
     /// DBPacketResponse is a response type for a DBPacket request
     SuccessNoData,
@@ -15,7 +15,7 @@ pub enum DBPacketResponse<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-/// This enum represents the various types of successful responses that accessing the database can be.
+/// Represents the various types of successful responses that accessing the database can be.
 pub enum DBSuccessResponse<T> {
     /// SuccessNoData represents when the operation was successful, but no response data was necessary to be replied back.
     SuccessNoData,
@@ -99,7 +99,7 @@ impl Display for DBPacketResponseError {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq)]
-/// This enum represents the various types of errors that can occur when an error is returned in a db packet response
+/// Represents the various types of errors that can occur when an error is returned in a db packet response
 pub enum DBPacketResponseError {
     /// BadPacket represents a packet that was improperly handled, these should be reported immediately and should never happen under proper circumstances.
     BadPacket,
