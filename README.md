@@ -19,6 +19,11 @@ An example program that allows the user to connect to a smol_db_server, the prog
 - [cr_tiler_rs](https://github.com/CoryRobertson/cr_tiler_rs) uses the database to store leaderboards information for the game service.
 - Feel free to let me know if you use this database, I would love to know! :)
 
+### Security:
+smol_db is not designed to be extremely secure, most of its use cases are exist on the local network, where security can less necessary. 
+If there are any improvements that can be made to security that come to my mind, I will slowly implement them as I get around to those ideas.
+access keys are not stored in a hash or encrypted format, and therefore should not be assumed to be safe or secure when stored.
+
 ### Example Docker-Compose entry
 ```
 db:
@@ -31,6 +36,13 @@ db:
     volumes:
       - "./smol_db:/data"
 ```
+
+### Setup:
+To create a smol_db_server instance, the above docker compose example can be used, 
+or the server package can be built from source and run on the server computer.
+After creating an instance of the server on either bare-metal or a docker container, 
+simply connect to it using the smol_db_client library, or through the smol_db_viewer.
+Images below outline what the smol_db_viewer looks like and what screens are available.
 
 ### Connecting:
 ![Image of connecting to a database using the viewing application](https://raw.githubusercontent.com/CoryRobertson/smol_db/main/images/viewer_connect.png)
