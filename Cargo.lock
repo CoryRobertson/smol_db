@@ -20,9 +20,9 @@ checksum = "c71b1793ee61086797f5c80b6efa2b8ffa6d5dd703f118545808a7f2e27f7046"
 
 [[package]]
 name = "accesskit"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d77020650e30e570cff04a3650872b9be650b79de494005da13809574a0d1fdb"
+checksum = "76eb1adf08c5bcaa8490b9851fd53cca27fa9880076f178ea9d29f05196728a8"
 dependencies = [
  "enumn",
  "serde",
@@ -30,18 +30,18 @@ dependencies = [
 
 [[package]]
 name = "accesskit_consumer"
-version = "0.15.1"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14346d6d9b9e88d03f42f21453977946dac425b3e962476931e1da8a959817b3"
+checksum = "04bb4d9e4772fe0d47df57d0d5dbe5d85dd05e2f37ae1ddb6b105e76be58fb00"
 dependencies = [
  "accesskit",
 ]
 
 [[package]]
 name = "accesskit_macos"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfa2fdecd5a520958deb7fd3614c2b6500d808a3acfc6ddd52211bf57ba8d6bc"
+checksum = "134d0acf6acb667c89d3332999b1a5df4edbc8d6113910f392ebb73f2b03bb56"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -51,9 +51,9 @@ dependencies = [
 
 [[package]]
 name = "accesskit_unix"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3ec78c315c97e25a394e957912d34a26224f576902334bfd505f6cd092c39d"
+checksum = "e084cb5168790c0c112626175412dc5ad127083441a8248ae49ddf6725519e83"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -66,23 +66,23 @@ dependencies = [
 
 [[package]]
 name = "accesskit_windows"
-version = "0.14.1"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a4ab2fad3575f5c77f21cddeaa0e156db6ce35f8f3522f7c69e0ac51e7bd0f4"
+checksum = "9eac0a7f2d7cd7a93b938af401d3d8e8b7094217989a7c25c55a953023436e31"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
  "arrayvec",
  "once_cell",
  "paste",
- "windows 0.44.0",
+ "windows",
 ]
 
 [[package]]
 name = "accesskit_winit"
-version = "0.14.2"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "badc92d61313d1e495edb0f1b3ec0fe6e337e1ea1e868bc1d02b9c245d46da5d"
+checksum = "825d23acee1bd6d25cbaa3ca6ed6e73faf24122a774ec33d52c5c86c6ab423c0"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -1222,7 +1222,7 @@ dependencies = [
  "iana-time-zone-haiku",
  "js-sys",
  "wasm-bindgen",
- "windows 0.48.0",
+ "windows",
 ]
 
 [[package]]
@@ -2700,29 +2700,20 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
-version = "0.44.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e745dab35a0c4c77aa3ce42d595e13d2003d6902d6b08c9ef5fc326d08da12b"
-dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-targets 0.42.2",
-]
-
-[[package]]
-name = "windows"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e686886bc078bc1b0b600cac0147aadb815089b6e4da64016cbd754b6342700f"
 dependencies = [
+ "windows-implement",
+ "windows-interface",
  "windows-targets 0.48.1",
 ]
 
 [[package]]
 name = "windows-implement"
-version = "0.44.0"
+version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ce87ca8e3417b02dc2a8a22769306658670ec92d78f1bd420d6310a67c245c6"
+checksum = "5e2ee588991b9e7e6c8338edf3333fbe4da35dc72092643958ebb43f0ab2c49c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2731,9 +2722,9 @@ dependencies = [
 
 [[package]]
 name = "windows-interface"
-version = "0.44.0"
+version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "853f69a591ecd4f810d29f17e902d40e349fb05b0b11fff63b08b826bfe39c7f"
+checksum = "e6fb8df20c9bcaa8ad6ab513f7b40104840c8867d5751126e4df3b08388d0cc7"
 dependencies = [
  "proc-macro2",
  "quote",
