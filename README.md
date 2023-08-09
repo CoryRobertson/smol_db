@@ -44,6 +44,29 @@ After creating an instance of the server on either bare-metal or a docker contai
 simply connect to it using the smol_db_client library, or through the smol_db_viewer.
 Images below outline what the smol_db_viewer looks like and what screens are available.
 
+## Example usage of client library:
+```rust
+use smol_db_client::SmolDbClient;
+fn main() {
+    // server is assumed to be running on localhost on port 8222
+    let mut client = SmolDbClient::new("localhost:8222").unwrap();
+    let data = "super cool user data";
+    
+    let _ = client.set_access_key("readme_db_key".to_string()).unwrap();
+    let _ = client.create_db("cool_db_name", DBSettings::default()).unwrap();
+    let _ = client.write_db("cool_db_name", "cool_data_location", data).unwrap();
+
+    match client.read_db("cool_db_name","cool_data_location") {
+        SuccessReply(response_data) => {
+            assert_eq!(&response_data, data);
+        }
+        SuccessNoData => {
+            assert!(false);
+        }
+    }
+}
+```
+
 ### Connecting:
 ![Image of connecting to a database using the viewing application](https://raw.githubusercontent.com/CoryRobertson/smol_db/main/images/viewer_connect.png)
 ### Setting the clients access key:
