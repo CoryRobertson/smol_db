@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[deprecated]
 /// Represents the various types of responses that accessing the database can be.
 pub enum DBPacketResponse<T> {

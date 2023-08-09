@@ -26,7 +26,7 @@ impl Logger {
 
     pub fn log(&self, log_entry: &LogEntry) -> io::Result<usize> {
         let path = self.log_path.lock().unwrap();
-        match Logger::get_log_file(path.as_path()) {
+        match Self::get_log_file(path.as_path()) {
             Ok(mut log_file) => log_file.write(log_entry.to_string().as_bytes()),
             Err(err) => Err(err),
         }
