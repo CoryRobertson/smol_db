@@ -2,21 +2,7 @@
 #[allow(unused_imports)]
 mod tests {
     use serde::{Deserialize, Serialize};
-    use smol_db_client::client_error::ClientError;
-    use smol_db_client::client_error::ClientError::DBResponseError;
-    use smol_db_client::SmolDbClient;
-    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
-    use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-    use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::{
-        InvalidPermissions, ValueNotFound,
-    };
-    use smol_db_common::db_packets::db_packet_response::DBSuccessResponse::{
-        SuccessNoData, SuccessReply,
-    };
-    use smol_db_common::db_packets::db_packet_response::{
-        DBPacketResponseError, DBSuccessResponse,
-    };
-    use smol_db_common::db_packets::db_settings::DBSettings;
+    use smol_db_client::prelude::*;
     use std::fs::read;
     use std::thread;
     use std::time::Duration;
@@ -41,7 +27,7 @@ mod tests {
             SuccessReply(response_data) => {
                 assert_eq!(&response_data, data);
             }
-            _ => {
+            SuccessNoData => {
                 panic!("data response was not as expected");
             }
         }
