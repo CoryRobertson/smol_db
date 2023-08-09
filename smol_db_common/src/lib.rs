@@ -5,4 +5,4 @@ pub mod db_content;
 pub mod db_data;
 pub mod db_list;
 pub mod db_packets;
-pub mod logging;
+pub use simple_logger_rs::logging;
