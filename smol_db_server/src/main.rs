@@ -1,13 +1,12 @@
 //! Binary application that runs a `smol_db` server instance
+use smol_db_common::db_list::DBList;
+use smol_db_common::db_packets::db_packet::DBPacket;
+use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 #[cfg(feature = "logging")]
 use smol_db_common::{
     logging::log_entry::LogEntry, logging::log_level::LogLevel, logging::log_message::LogMessage,
     logging::logger::Logger,
 };
-
-use smol_db_common::db_list::DBList;
-use smol_db_common::db_packets::db_packet::DBPacket;
-use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 #[cfg(feature = "logging")]
