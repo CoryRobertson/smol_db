@@ -1,6 +1,6 @@
 [package]
 name = "smol_db_client"
-version = "0.1.11"
+version = "1.0.0"
 edition = "2021"
 description = "A client library for smol_db"
 license = "GPL-3.0-only"

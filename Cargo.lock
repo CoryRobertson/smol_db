@@ -2155,7 +2155,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_client"
-version = "0.1.11"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2173,7 +2173,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_server"
-version = "0.1.11"
+version = "1.0.0"
 dependencies = [
  "ctrlc",
  "rand",
@@ -2184,7 +2184,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_viewer"
-version = "0.1.9"
+version = "1.0.0"
 dependencies = [
  "eframe",
  "egui",
