@@ -2163,7 +2163,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_client"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_common"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "serde",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "smol_db_server"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "ctrlc",
  "rand",
