@@ -2103,7 +2103,8 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 [[package]]
 name = "simple_logger_rs"
 version = "1.0.0"
-source = "git+https://github.com/CoryRobertson/simple_logger_rs#e6318c050a629cb8ece54d08cbcf3e7281cd9e86"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa67bba746c46db25f4248f9d58d7c2b9f892381124386848a0df048cd32f91f"
 dependencies = [
  "chrono",
 ]
