@@ -89,7 +89,7 @@ fn main() {
                 .cache
                 .read()
                 .unwrap()
-                .len() as u32;
+                .len();
             let msg = format!(
                 "Slept {} caches, {} caches remain in cache.",
                 invalidated_caches, number_of_caches_remaining

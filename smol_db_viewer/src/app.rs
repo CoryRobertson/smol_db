@@ -31,7 +31,7 @@ pub struct ApplicationState {
     client_key: String,
 
     #[serde(skip)]
-    selected_database: Option<u32>,
+    selected_database: Option<usize>,
 
     #[serde(skip)]
     connection_thread: Option<JoinHandle<()>>,
@@ -309,7 +309,7 @@ impl eframe::App for ApplicationState {
                                             None => {}
                                             Some(index) => match &mut self.database_list {
                                                 None => {}
-                                                Some(list) => match list.get_mut(index as usize) {
+                                                Some(list) => match list.get_mut(index) {
                                                     None => {}
                                                     Some(db) => {
                                                         let mut client_lock = self.client.lock().unwrap();
@@ -402,7 +402,7 @@ impl eframe::App for ApplicationState {
                     DisplayClient | ChangeDBSettings => {
                         if let Some(selected_db) = self.selected_database {
                             if let Some(db_list) = &self.database_list {
-                                if let Some(db) = db_list.get(selected_db as usize) {
+                                if let Some(db) = db_list.get(selected_db) {
                                     ui.label(format!("Selected DB: {:?}", db.name));
                                     ui.separator();
                                     match &db.role {
@@ -564,14 +564,14 @@ impl eframe::App for ApplicationState {
                                                 }
 
                                                 // set the selected database number in the program state.
-                                                self.selected_database = Some(index as u32);
+                                                self.selected_database = Some(index);
                                             }
                                         }
                                     }
                                 }
 
                                 if let Some(index) = self.selected_database {
-                                    if let Some(db) = list.get(index as usize) {
+                                    if let Some(db) = list.get(index) {
                                         ui.separator();
                                         if ui
                                             .button("Delete DB")
@@ -586,7 +586,7 @@ impl eframe::App for ApplicationState {
                                                         Ok(delete_response) => match delete_response
                                                         {
                                                             DBSuccessResponse::SuccessNoData => {
-                                                                list.remove(index as usize);
+                                                                list.remove(index);
                                                             }
                                                             DBSuccessResponse::SuccessReply(_) => {
                                                                 *ps_lock = ClientConnectionError(
@@ -716,7 +716,7 @@ impl eframe::App for ApplicationState {
                             // db list exists, populate its information on screen.
                             Some(list) => {
                                 if let Some(index_selected) = self.selected_database {
-                                    if let Some(db_cached) = list.get(index_selected as usize) {
+                                    if let Some(db_cached) = list.get(index_selected) {
                                         match &db_cached.content {
                                             NotCached => {}
                                             Cached(data) => {
@@ -769,7 +769,7 @@ impl eframe::App for ApplicationState {
                                 match &mut self.database_list {
                                     None => {}
                                     Some(list) => {
-                                        match list.get_mut(index as usize) {
+                                        match list.get_mut(index) {
                                             None => {}
                                             Some(db) => {
                                                 match &mut db.db_settings {
