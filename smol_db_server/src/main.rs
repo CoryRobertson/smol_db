@@ -22,6 +22,8 @@ type DBListThreadSafe = Arc<RwLock<DBList>>;
 #[cfg(feature = "logging")]
 const LOG_FILE_PATH: &str = "./data/log.log";
 
+// TODO: make a "statistics" struct for the server, this struct should keep a list of things like clients connected, number of packets recieved, and such, and store them, this should be saved and loaded from a file.
+
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8222").expect("Failed to bind to port 8222.");
 
