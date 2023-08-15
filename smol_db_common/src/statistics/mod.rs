@@ -1,14 +1,11 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
 use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug,Serialize,Deserialize)]
+#[derive(Debug,Serialize,Deserialize,Clone)]
 #[non_exhaustive]
 pub struct DBStatistics {
-    total_requests: AtomicU64,
-    current_average_time: Mutex<f32>,
-    client_list: Vec<String>,
+    total_requests: u64,
+    current_average_time: f32,
     // avg = ((current average time * num of reqs) + new time) / total number of reqs
 }
 
@@ -18,42 +15,32 @@ impl DBStatistics {
     }
 
     pub fn get_avg_time(&self) -> f32 {
-        self.current_average_time.lock().unwrap().clone()
+        self.current_average_time
     }
 
     pub fn get_total_req(&self) -> u64 {
-        self.total_requests.load(Ordering::Relaxed)
+        self.total_requests
     }
 
-    pub fn add_new_time(&self, last_access_time: SystemTime) {
+    pub fn add_new_time(&mut self, last_access_time: SystemTime) {
         self.add_avg_time(SystemTime::now().duration_since(last_access_time).unwrap().as_secs_f32());
     }
 
-    fn add_avg_time(&self, new_time: f32) {
-        let mut cur_avg = self.current_average_time.lock().unwrap();
-        let cur_total = self.total_requests.fetch_add(1,Ordering::Relaxed);
-        let new_avg = ((*cur_avg * cur_total as f32) + new_time) / (cur_total as f32 + 1.0);
-        *cur_avg = new_avg;
+    fn add_avg_time(&mut self, new_time: f32) {
+        let cur_avg = self.current_average_time;
+        let cur_total = self.total_requests;
+        let new_avg = ((cur_avg * cur_total as f32) + new_time) / (cur_total as f32 + 1.0);
+        self.current_average_time = new_avg;
+        self.total_requests += 1;
     }
 
-}
-
-impl Clone for DBStatistics {
-    fn clone(&self) -> Self {
-        Self {
-            total_requests: self.total_requests.load(Ordering::Relaxed).into(),
-            current_average_time: Mutex::new(*self.current_average_time.lock().unwrap()),
-            client_list: self.client_list.clone(),
-        }
-    }
 }
 
 impl Default for DBStatistics {
     fn default() -> Self {
         Self {
-            total_requests: AtomicU64::new(0),
-            current_average_time: Mutex::new(0.0),
-            client_list: vec![],
+            total_requests: 0,
+            current_average_time: 0.0,
         }
     }
 }
@@ -64,7 +51,7 @@ mod tests {
 
     #[test]
     fn test_avg() {
-        let s = DBStatistics::default();
+        let mut s = DBStatistics::default();
 
         let mut total;
         let mut sum = 0;
@@ -75,7 +62,7 @@ mod tests {
             sum += num;
             avg = sum as f32 / total as f32;
             s.add_avg_time(num as f32);
-            assert!((avg - s.get_avg_time()).abs() <= 0.2, "{}", format!("{} , {}", avg,s.get_avg_time()));
+            assert!((avg - s.get_avg_time()).abs() <= 0.2, "{}", format!("[{index}]: {} , {}", avg,s.get_avg_time()));
         }
     }
 }
