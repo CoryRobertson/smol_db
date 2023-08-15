@@ -3,7 +3,6 @@
 //! Also handles what to do when packets are received that modify any database that does or does not exist.
 use crate::db::Role::SuperAdmin;
 use crate::db::DB;
-use crate::db_content::DBContent;
 use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
@@ -62,11 +61,11 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
             return if db_lock.has_write_permissions(client_key, &super_admin_list) {
                 db_lock
-                    .db_content
+                    .get_content_mut()
                     .content
                     .remove(db_location.as_key())
                     .map(SuccessReply)
@@ -81,10 +80,11 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             let resp = if db.has_write_permissions(client_key, &super_admin_list) {
-                db.db_content
+                db
+                    .get_content_mut()
                     .content
                     .remove(db_location.as_key())
                     .map(SuccessReply)
@@ -124,7 +124,7 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
             let serialized_role =
                 serde_json::to_string(&db_lock.get_role(client_key, &super_admin_list)).unwrap();
@@ -137,7 +137,7 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             let serialized_role =
                 serde_json::to_string(&db.get_role(client_key, &super_admin_list)).unwrap();
@@ -172,9 +172,9 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
-            db_lock.db_settings = new_db_settings;
+            db_lock.set_settings(new_db_settings);
             drop(db_lock);
             return Ok(SuccessNoData);
         }
@@ -184,7 +184,7 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             self.cache
                 .write()
@@ -215,9 +215,9 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
-            return serde_json::to_string(&db_lock.db_settings)
+            return serde_json::to_string(&db_lock.get_settings())
                 .map(SuccessReply)
                 .map_err(|_| SerializationError);
         }
@@ -227,9 +227,9 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
-            let response = serde_json::to_string(&db.db_settings)
+            let response = serde_json::to_string(&db.get_settings())
                 .map(SuccessReply)
                 .map_err(|_| SerializationError);
 
@@ -257,10 +257,10 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            return if db_lock.db_settings.is_admin(client_key) || self.is_super_admin(client_key) {
-                db_lock.last_access_time = SystemTime::now();
+            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                db_lock.update_access_time();
 
-                db_lock.db_settings.add_user(new_key);
+                db_lock.get_settings_mut().add_user(new_key);
                 Ok(SuccessNoData)
             } else {
                 Err(InvalidPermissions)
@@ -272,11 +272,11 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
-            let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key)
+            let response = if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
             {
-                db.db_settings.add_admin(new_key);
+                db.get_settings_mut().add_admin(new_key);
                 Ok(SuccessNoData)
             } else {
                 Err(InvalidPermissions)
@@ -306,10 +306,10 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            return if db_lock.db_settings.is_admin(client_key) || self.is_super_admin(client_key) {
-                db_lock.last_access_time = SystemTime::now();
+            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                db_lock.update_access_time();
 
-                if db_lock.db_settings.remove_user(removed_key) {
+                if db_lock.get_settings_mut().remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -324,11 +324,11 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
-            let response = if db.db_settings.is_admin(client_key) || self.is_super_admin(client_key)
+            let response = if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
             {
-                if db.db_settings.remove_user(removed_key) {
+                if db.get_settings_mut().remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -366,9 +366,9 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
-            return if db_lock.db_settings.remove_admin(removed_key) {
+            return if db_lock.get_settings_mut().remove_admin(removed_key) {
                 Ok(SuccessNoData)
             } else {
                 Err(UserNotFound)
@@ -380,10 +380,10 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             let response = {
-                if db.db_settings.remove_admin(removed_key) {
+                if db.get_settings_mut().remove_admin(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -418,9 +418,9 @@ impl DBList {
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
             let mut db_lock = db.write().unwrap();
-            db_lock.last_access_time = SystemTime::now();
+            db_lock.update_access_time();
 
-            db_lock.db_settings.add_admin(hash);
+            db_lock.get_settings_mut().add_admin(hash);
             drop(db_lock);
             return Ok(SuccessNoData);
         }
@@ -430,8 +430,8 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
-            db.db_settings.add_admin(hash);
+            db.update_access_time();
+            db.get_settings_mut().add_admin(hash);
 
             self.cache
                 .write()
@@ -457,8 +457,8 @@ impl DBList {
                 // filter to keep only caches that have a last access duration greater than their invalidation time.
                 .filter(|(_, db)| {
                     let db_lock = db.read().unwrap();
-                    let last_access_time = db_lock.last_access_time;
-                    let invalidation_time = db_lock.db_settings.get_invalidation_time();
+                    let last_access_time = db_lock.get_access_time();
+                    let invalidation_time = db_lock.get_settings().get_invalidation_time();
                     drop(db_lock);
 
                     match SystemTime::now().duration_since(last_access_time) {
@@ -594,11 +594,7 @@ impl DBList {
                     Ok(mut file) => {
                         let mut cache_write_lock = self.cache.write().unwrap();
                         let db_packet_info = DBPacketInfo::new(db_name);
-                        let db = DB {
-                            db_content: DBContent::default(),
-                            last_access_time: SystemTime::now(),
-                            db_settings,
-                        };
+                        let db = DB::new_from_settings(db_settings);
                         let ser = serde_json::to_string(&db).unwrap();
                         let _ = file
                             .write(ser.as_ref())
@@ -693,13 +689,13 @@ impl DBList {
 
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
             // cache was hit
-            db.write().unwrap().last_access_time = SystemTime::now();
+            db.write().unwrap().update_access_time();
 
             let db_lock = db.read().unwrap();
 
             return if db_lock.has_read_permissions(client_key, &super_admin_list) {
                 db_lock
-                    .db_content
+                    .get_content()
                     .read_from_db(p_location.as_key())
                     .map(|value| SuccessReply(value.to_string()))
                     .ok_or(ValueNotFound)
@@ -713,11 +709,11 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(p_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             let response = if db.has_read_permissions(client_key, &super_admin_list) {
                 let return_value = db
-                    .db_content
+                    .get_content()
                     .read_from_db(p_location.as_key())
                     .expect("RETURN VALUE DID NOT EXIST")
                     .clone();
@@ -760,9 +756,9 @@ impl DBList {
                 let mut db_lock = db.write().unwrap();
 
                 return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                    db_lock.last_access_time = SystemTime::now();
+                    db_lock.update_access_time();
                     Ok(db_lock
-                        .db_content
+                        .get_content_mut()
                         .content
                         .insert(
                             db_location.as_key().to_string(),
@@ -782,11 +778,11 @@ impl DBList {
 
             let mut db = Self::read_db_from_file(db_info)?;
 
-            db.last_access_time = SystemTime::now();
+            db.update_access_time();
 
             if db.has_write_permissions(client_key, &super_admin_list) {
                 let returned_value = db
-                    .db_content
+                    .get_content_mut()
                     .content
                     .insert(
                         db_location.as_key().to_string(),
@@ -840,9 +836,9 @@ impl DBList {
                 return if db_lock.has_list_permissions(client_key, &super_admin_list)
                     || self.is_super_admin(client_key)
                 {
-                    db_lock.last_access_time = SystemTime::now();
+                    db_lock.update_access_time();
 
-                    serde_json::to_string(&db_lock.db_content.content)
+                    serde_json::to_string(&db_lock.get_content().content)
                         .map(SuccessReply)
                         .map_err(|_| SerializationError)
                 } else {
@@ -859,9 +855,9 @@ impl DBList {
             let mut db = Self::read_db_from_file(db_info)?;
 
             if db.has_list_permissions(client_key, &super_admin_list) {
-                db.last_access_time = SystemTime::now();
+                db.update_access_time();
 
-                let returned_value = &db.db_content.content;
+                let returned_value = &db.get_content().content;
 
                 let output_response = serde_json::to_string(returned_value)
                     .map(SuccessReply)
@@ -870,7 +866,7 @@ impl DBList {
 
                 output_response
             } else {
-                db.last_access_time = SystemTime::now();
+                db.update_access_time();
 
                 cache_lock.insert(db_info.clone(), RwLock::from(db));
 

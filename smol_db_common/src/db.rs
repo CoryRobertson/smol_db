@@ -4,14 +4,18 @@ use crate::db_content::DBContent;
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
+use crate::statistics::DBStatistics;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[non_exhaustive]
 /// A struct that represents a specific database, with content, and a recent access time.
 /// This struct is meant to be called into existence when ever a database is un-cached, and needs to be cached.
 pub struct DB {
-    pub db_content: DBContent,
-    pub last_access_time: SystemTime,
-    pub db_settings: DBSettings,
+    db_content: DBContent,
+    last_access_time: SystemTime,
+    db_settings: DBSettings,
+    #[serde(default)]
+    statistics: DBStatistics,
 }
 
 #[derive(PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Eq)]
@@ -29,11 +33,49 @@ impl Default for DB {
             db_content: DBContent::default(),
             last_access_time: SystemTime::now(),
             db_settings: DBSettings::default(),
+            statistics: DBStatistics::default(),
         }
     }
 }
 
 impl DB {
+
+    pub fn new_from_settings(db_settings: DBSettings) -> Self {
+        Self {
+            db_settings,
+            ..Default::default()
+        }
+    }
+
+    pub fn get_settings(&self) -> &DBSettings {
+        &self.db_settings
+    }
+
+    pub fn get_settings_mut(&mut self) -> &mut DBSettings {
+        &mut self.db_settings
+    }
+
+    pub fn set_settings(&mut self, new_settings: DBSettings) {
+        self.db_settings = new_settings;
+    }
+
+    pub fn get_content_mut(&mut self) -> &mut DBContent {
+        &mut self.db_content
+    }
+
+    pub fn get_content(&self) -> &DBContent {
+        &self.db_content
+    }
+
+    pub fn update_access_time(&mut self) {
+        self.statistics.add_new_time(self.last_access_time);
+        self.last_access_time = SystemTime::now();
+    }
+
+    pub fn get_access_time(&self) -> SystemTime {
+        self.last_access_time
+    }
+
     /// Returns the given role the client key falls in.
     pub fn get_role(&self, client_key: &String, super_admin_list: &[String]) -> Role {
         if super_admin_list.contains(client_key) {

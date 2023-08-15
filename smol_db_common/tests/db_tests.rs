@@ -13,39 +13,27 @@ mod tests {
         let other_key = "".to_string();
         let super_admin_key = "super_duper_admin_key".to_string();
         let super_admin_list: Vec<String> = vec![super_admin_key.clone()];
-        let db1 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (false, false, false),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db2 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, false, false),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db3 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, false, false),
-                (false, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
+        let db1 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, false),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db2 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, false, false),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db3 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, false, false),
+            (false, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
 
         assert_eq!(
             db1.has_read_permissions(&other_key, &super_admin_list),
@@ -101,39 +89,27 @@ mod tests {
         let other_key = "".to_string();
         let super_admin_key = "super_duper_admin_key".to_string();
         let super_admin_list: Vec<String> = vec![super_admin_key.clone()];
-        let db1 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (false, false, false),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db2 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, true, false),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db3 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, false, false),
-                (true, false, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
+        let db1 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, false),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db2 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, true, false),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db3 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, false, false),
+            (true, false, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
         assert_eq!(
             db1.has_write_permissions(&other_key, &super_admin_list),
             false
@@ -194,39 +170,27 @@ mod tests {
         let other_key = "".to_string();
         let super_admin_key = "super_duper_admin_key".to_string();
         let super_admin_list: Vec<String> = vec![super_admin_key.clone()];
-        let db1 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (false, false, true),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db2 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, true, false),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
-        let db3 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (true, false, true),
-                (true, false, false),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
+        let db1 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, true),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db2 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, true, false),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
+        let db3 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (true, false, true),
+            (true, false, false),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
         assert_eq!(
             db1.has_list_permissions(&other_key, &super_admin_list),
             true
@@ -281,17 +245,13 @@ mod tests {
         let other_key = "".to_string();
         let super_admin_key = "super_duper_admin_key".to_string();
         let super_admin_list: Vec<String> = vec![super_admin_key.clone()];
-        let db1 = DB {
-            db_content: Default::default(),
-            last_access_time: SystemTime::now(),
-            db_settings: DBSettings::new(
-                Duration::from_secs(30),
-                (false, false, true),
-                (true, true, true),
-                vec![admin_key.clone()],
-                vec![user_key.clone()],
-            ),
-        };
+        let db1 = DB::new_from_settings(DBSettings::new(
+            Duration::from_secs(30),
+            (false, false, true),
+            (true, true, true),
+            vec![admin_key.clone()],
+            vec![user_key.clone()],
+        ));
 
         assert_eq!(db1.get_role(&admin_key, &super_admin_list), Admin);
         assert_eq!(db1.get_role(&user_key, &super_admin_list), User);
