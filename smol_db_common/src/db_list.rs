@@ -8,7 +8,10 @@ use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 #[cfg(not(feature = "statistics"))]
 use crate::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
-use crate::db_packets::db_packet_response::DBPacketResponseError::{DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound};
+use crate::db_packets::db_packet_response::DBPacketResponseError::{
+    DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
+    ValueNotFound,
+};
 use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
@@ -47,8 +50,11 @@ impl DBList {
     }
 
     #[allow(unused_variables)]
-    pub fn get_stats(&self,p_info: &DBPacketInfo, client_key: &String) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
-
+    pub fn get_stats(
+        &self,
+        p_info: &DBPacketInfo,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         #[cfg(not(feature = "statistics"))]
         return Err(BadPacket);
 
@@ -136,8 +142,7 @@ impl DBList {
             db.update_access_time();
 
             let resp = if db.has_write_permissions(client_key, &super_admin_list) {
-                db
-                    .get_content_mut()
+                db.get_content_mut()
                     .content
                     .remove(db_location.as_key())
                     .map(SuccessReply)
@@ -310,7 +315,8 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
+            {
                 db_lock.update_access_time();
 
                 db_lock.get_settings_mut().add_user(new_key);
@@ -327,13 +333,13 @@ impl DBList {
 
             db.update_access_time();
 
-            let response = if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
-            {
-                db.get_settings_mut().add_admin(new_key);
-                Ok(SuccessNoData)
-            } else {
-                Err(InvalidPermissions)
-            };
+            let response =
+                if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                    db.get_settings_mut().add_admin(new_key);
+                    Ok(SuccessNoData)
+                } else {
+                    Err(InvalidPermissions)
+                };
 
             self.cache
                 .write()
@@ -359,7 +365,8 @@ impl DBList {
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
-            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
+            {
                 db_lock.update_access_time();
 
                 if db_lock.get_settings_mut().remove_user(removed_key) {
@@ -379,16 +386,16 @@ impl DBList {
 
             db.update_access_time();
 
-            let response = if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
-            {
-                if db.get_settings_mut().remove_user(removed_key) {
-                    Ok(SuccessNoData)
+            let response =
+                if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                    if db.get_settings_mut().remove_user(removed_key) {
+                        Ok(SuccessNoData)
+                    } else {
+                        Err(UserNotFound)
+                    }
                 } else {
-                    Err(UserNotFound)
-                }
-            } else {
-                Err(InvalidPermissions)
-            };
+                    Err(InvalidPermissions)
+                };
 
             self.cache
                 .write()

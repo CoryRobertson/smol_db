@@ -1,6 +1,7 @@
 //! Binary application that runs a `smol_db` server instance
 use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
+use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
 use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 #[cfg(feature = "logging")]
 use smol_db_common::{
@@ -16,7 +17,6 @@ use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fs, thread};
-use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -434,12 +434,11 @@ fn handle_client(
                                 resp
                             }
                             DBPacket::GetStats(db_name) => {
-                                db_list.read().unwrap().get_stats(&db_name,&client_key)
+                                db_list.read().unwrap().get_stats(&db_name, &client_key)
                             }
                         }
                     }
                     Err(err) => {
-
                         println!("packet serialization error: {}", err);
                         Err(BadPacket)
                         // continue;

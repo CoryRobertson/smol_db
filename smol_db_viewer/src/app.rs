@@ -6,6 +6,7 @@ use crate::app::ProgramState::{
 use smol_db_client::client_error::ClientError;
 use smol_db_client::client_error::ClientError::BadPacket;
 use smol_db_client::db_settings::DBSettings;
+use smol_db_client::prelude::DBStatistics;
 use smol_db_client::DBSuccessResponse;
 use smol_db_client::{DBPacketResponseError, Role, SmolDbClient};
 use std::collections::HashMap;
@@ -14,7 +15,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use smol_db_client::prelude::DBStatistics;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -403,35 +403,33 @@ impl eframe::App for ApplicationState {
                 PromptForKey => {}
                 ChangeDBSettings => {}
                 CreateDB => {}
-                DisplayClient => {
-                    match &self.database_list {
-                        None => {}
-                        Some(list) => {
-                            if let Some(index) = self.selected_database {
-                                if let Some(db) = list.get(index) {
-                                    match &db.statistics {
-                                        NotCached => {}
-                                        Cached(stats) => {
-                                            egui::SidePanel::right("stats_panel").show(ctx,|ui| {
-                                                ui.label(format!("Total request count: {}", stats.get_total_req()));
-                                                ui.label(format!("Average access time gap: {:.2}", stats.get_avg_time()));
-                                            });
-                                        }
-                                        ContentCacheState::Error(_) => {}
+                DisplayClient => match &self.database_list {
+                    None => {}
+                    Some(list) => {
+                        if let Some(index) = self.selected_database {
+                            if let Some(db) = list.get(index) {
+                                match &db.statistics {
+                                    NotCached => {}
+                                    Cached(stats) => {
+                                        egui::SidePanel::right("stats_panel").show(ctx, |ui| {
+                                            ui.label(format!(
+                                                "Total request count: {}",
+                                                stats.get_total_req()
+                                            ));
+                                            ui.label(format!(
+                                                "Average access time gap: {:.2}",
+                                                stats.get_avg_time()
+                                            ));
+                                        });
                                     }
-
-
+                                    ContentCacheState::Error(_) => {}
                                 }
                             }
                         }
                     }
-
-                }
+                },
             }
-
-
         }
-
 
         // side panel block
         {
@@ -613,7 +611,8 @@ impl eframe::App for ApplicationState {
                                                                 item.statistics = Cached(stats);
                                                             }
                                                             Err(err) => {
-                                                                item.statistics = ContentCacheState::Error(err);
+                                                                item.statistics =
+                                                                    ContentCacheState::Error(err);
                                                             }
                                                         }
                                                     }

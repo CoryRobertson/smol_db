@@ -140,10 +140,12 @@ impl SmolDbClient {
 
         match resp {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => match serde_json::from_str::<DBStatistics>(&data) {
-                Ok(statistics) => Ok(statistics),
-                Err(err) => Err(PacketDeserializationError(Error::from(err))),
-            },
+            DBSuccessResponse::SuccessReply(data) => {
+                match serde_json::from_str::<DBStatistics>(&data) {
+                    Ok(statistics) => Ok(statistics),
+                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
+                }
+            }
         }
     }
 

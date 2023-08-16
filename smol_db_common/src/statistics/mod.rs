@@ -1,11 +1,11 @@
 #[cfg(feature = "statistics")]
-use std::time::SystemTime;
-#[cfg(feature = "statistics")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "statistics")]
+use std::time::SystemTime;
 
 const MIN_TIME_DIFFERENCE: f32 = 0.25;
 
-#[derive(Debug,Serialize,Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
 #[cfg(feature = "statistics")]
 pub struct DBStatistics {
@@ -29,19 +29,24 @@ impl DBStatistics {
     }
 
     pub fn add_new_time(&mut self, last_access_time: SystemTime) {
-        self.add_avg_time(SystemTime::now().duration_since(last_access_time).unwrap().as_secs_f32());
+        self.add_avg_time(
+            SystemTime::now()
+                .duration_since(last_access_time)
+                .unwrap()
+                .as_secs_f32(),
+        );
     }
 
     fn add_avg_time(&mut self, new_time_difference: f32) {
         if new_time_difference >= MIN_TIME_DIFFERENCE {
             let cur_avg = self.current_average_time;
             let cur_total = self.total_requests;
-            let new_avg = ((cur_avg * cur_total as f32) + new_time_difference) / (cur_total as f32 + 1.0);
+            let new_avg =
+                ((cur_avg * cur_total as f32) + new_time_difference) / (cur_total as f32 + 1.0);
             self.current_average_time = new_avg;
         }
         self.total_requests += 1;
     }
-
 }
 
 #[cfg(feature = "statistics")]
@@ -69,13 +74,17 @@ mod tests {
         let mut sum = 0;
         let mut avg;
 
-        for (index,num) in (0..10_000).into_iter().enumerate() {
+        for (index, num) in (0..10_000).into_iter().enumerate() {
             total = index + 1;
             sum += num;
             avg = sum as f32 / total as f32;
             s.add_avg_time(num as f32);
-            assert!((avg - s.get_avg_time()).abs() <= 0.2, "{}", format!("[{index}]: {} , {}", avg,s.get_avg_time()));
-            assert_eq!(s.get_total_req(),(index + 1) as u64);
+            assert!(
+                (avg - s.get_avg_time()).abs() <= 0.2,
+                "{}",
+                format!("[{index}]: {} , {}", avg, s.get_avg_time())
+            );
+            assert_eq!(s.get_total_req(), (index + 1) as u64);
         }
     }
 }

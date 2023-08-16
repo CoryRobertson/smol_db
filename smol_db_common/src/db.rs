@@ -2,10 +2,10 @@
 use crate::db::Role::{Admin, Other, SuperAdmin, User};
 use crate::db_content::DBContent;
 use crate::db_packets::db_settings::DBSettings;
-use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
 #[cfg(feature = "statistics")]
 use crate::statistics::DBStatistics;
+use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[non_exhaustive]
@@ -31,7 +31,7 @@ pub enum Role {
 
 impl Role {
     pub fn is_admin(&self) -> bool {
-        matches!(self,Admin | SuperAdmin)
+        matches!(self, Admin | SuperAdmin)
     }
 }
 
@@ -48,7 +48,6 @@ impl Default for DB {
 }
 
 impl DB {
-
     pub fn new_from_settings(db_settings: DBSettings) -> Self {
         Self {
             db_settings,

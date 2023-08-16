@@ -38,7 +38,6 @@ pub enum DBPacket {
 }
 
 impl DBPacket {
-
     #[cfg(feature = "statistics")]
     pub fn new_get_stats(dbname: &str) -> Self {
         Self::GetStats(DBPacketInfo::new(dbname))
