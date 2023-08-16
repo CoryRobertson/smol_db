@@ -35,6 +35,7 @@ pub mod prelude {
     pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse::SuccessNoData;
     pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse::SuccessReply;
     pub use smol_db_common::db_packets::db_settings::DBSettings;
+    pub use smol_db_common::statistics::DBStatistics;
 }
 
 /// `SmolDbClient` struct used for communicating to the database.

@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use smol_db_client::prelude::DBStatistics;
 
 // TODO: potentially make these statistics visible from the viewer, maybe a panel on the right side, as it is a little bare there.
 
@@ -95,6 +96,7 @@ struct DBCached {
     content: ContentCacheState<HashMap<String, String>>,
     role: ContentCacheState<Role>,
     db_settings: ContentCacheState<DBSettings>,
+    statistics: ContentCacheState<DBStatistics>,
 }
 
 #[derive(Debug)]
@@ -392,6 +394,47 @@ impl eframe::App for ApplicationState {
             }
         }
 
+        // stats panel block
+        {
+            let ps_lock = self.program_state.lock().unwrap();
+            match *ps_lock {
+                NoClient => {}
+                PromptForClientDetails => {}
+                ClientConnectionError(_) => {}
+                DBResponseError(_) => {}
+                PromptForKey => {}
+                ChangeDBSettings => {}
+                CreateDB => {}
+                DisplayClient => {
+                    match &self.database_list {
+                        None => {}
+                        Some(list) => {
+                            if let Some(index) = self.selected_database {
+                                if let Some(db) = list.get(index) {
+                                    match &db.statistics {
+                                        NotCached => {}
+                                        Cached(stats) => {
+                                            egui::SidePanel::right("stats_panel").show(ctx,|ui| {
+                                                ui.label(format!("Total request count: {}", stats.get_total_req()));
+                                                ui.label(format!("Average access time gap: {:.2}", stats.get_avg_time()));
+                                            });
+                                        }
+                                        ContentCacheState::Error(_) => {}
+                                    }
+
+
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+
+
+        }
+
+
         // side panel block
         {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
@@ -565,6 +608,21 @@ impl eframe::App for ApplicationState {
                                                     ContentCacheState::Error(_) => {}
                                                 }
 
+                                                match &item.statistics {
+                                                    NotCached => {
+                                                        match client.get_stats(item.name.as_str()) {
+                                                            Ok(stats) => {
+                                                                item.statistics = Cached(stats);
+                                                            }
+                                                            Err(err) => {
+                                                                item.statistics = ContentCacheState::Error(err);
+                                                            }
+                                                        }
+                                                    }
+                                                    Cached(_) => {}
+                                                    ContentCacheState::Error(_) => {}
+                                                }
+
                                                 // set the selected database number in the program state.
                                                 self.selected_database = Some(index);
                                             }
@@ -704,6 +762,7 @@ impl eframe::App for ApplicationState {
                                                         content: NotCached,
                                                         role: NotCached,
                                                         db_settings: NotCached,
+                                                        statistics: NotCached,
                                                     })
                                                     .collect(),
                                             );
@@ -954,6 +1013,7 @@ impl eframe::App for ApplicationState {
                                                                         content: Cached(response),
                                                                         role: NotCached,
                                                                         db_settings: NotCached,
+                                                                        statistics: NotCached,
                                                                     });
                                                                 }
                                                                 Err(err) => {
