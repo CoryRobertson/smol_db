@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="clippy pubcheck" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="clippy --  -W clippy::nursery -W clippy::cargo -W clippy::pedantic" />
+    <option name="command" value="clippy --all-features --  -W clippy::nursery -W clippy::cargo -W clippy::pedantic" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <option name="emulateTerminal" value="false" />
     <option name="channel" value="DEFAULT" />
