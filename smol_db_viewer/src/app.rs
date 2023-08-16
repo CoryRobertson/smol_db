@@ -16,8 +16,6 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use smol_db_client::prelude::DBStatistics;
 
-// TODO: potentially make these statistics visible from the viewer, maybe a panel on the right side, as it is a little bare there.
-
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct ApplicationState {
