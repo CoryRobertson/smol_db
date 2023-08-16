@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[non_exhaustive]
 /// A struct that represents a specific database, with content, and a recent access time.
 /// This struct is meant to be called into existence when ever a database is un-cached, and needs to be cached.
 pub struct DB {
