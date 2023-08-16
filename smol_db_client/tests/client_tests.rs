@@ -6,6 +6,7 @@ mod tests {
     use std::fs::read;
     use std::thread;
     use std::time::Duration;
+    use smol_db_client::client_error::ClientError;
 
     #[test]
     fn test_client() {
@@ -202,9 +203,11 @@ mod tests {
             .unwrap();
         assert_eq!(create_db_response1, SuccessNoData);
 
-        {
-            let r = client.get_stats("test_db_stats").unwrap();
-            assert_eq!(r.get_total_req(), 1);
+        match  client.get_stats("test_db_stats") {
+            Ok(stats) => {
+                assert_eq!(stats.get_total_req(), 1);
+            }
+            Err(_) => {}
         }
 
         {
@@ -212,14 +215,18 @@ mod tests {
             assert_eq!(list.len(), 0);
         }
 
-        {
-            let r = client.get_stats("test_db_stats").unwrap();
-            assert_eq!(r.get_total_req(), 3);
+        match  client.get_stats("test_db_stats") {
+            Ok(stats) => {
+                assert_eq!(stats.get_total_req(), 3);
+            }
+            Err(_) => {}
         }
 
-        {
-            let r = client.get_stats("test_db_stats").unwrap();
-            assert_eq!(r.get_total_req(), 4);
+        match  client.get_stats("test_db_stats") {
+            Ok(stats) => {
+                assert_eq!(stats.get_total_req(), 4);
+            }
+            Err(_) => {}
         }
 
         {

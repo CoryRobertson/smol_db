@@ -8,7 +8,6 @@ const MIN_TIME_DIFFERENCE: f32 = 0.25;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
-#[cfg(feature = "statistics")]
 /// A struct representing the statistics stored from a `DB`
 pub struct DBStatistics {
     /// The total number of requests that have been through the `DB`
@@ -18,7 +17,6 @@ pub struct DBStatistics {
     // avg = ((current average time * num of reqs) + new time) / total number of reqs
 }
 
-#[cfg(feature = "statistics")]
 impl DBStatistics {
     pub fn new() -> Self {
         Self::default()
@@ -57,7 +55,6 @@ impl DBStatistics {
     }
 }
 
-#[cfg(feature = "statistics")]
 impl Default for DBStatistics {
     fn default() -> Self {
         Self {

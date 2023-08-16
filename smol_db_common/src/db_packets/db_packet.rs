@@ -34,6 +34,7 @@ pub enum DBPacket {
     /// GetRole(db to read role from)
     GetRole(DBPacketInfo),
     /// GetStats gets the statistics object if the feature is compiled
+    #[cfg(feature = "statistics")]
     GetStats(DBPacketInfo),
 }
 
