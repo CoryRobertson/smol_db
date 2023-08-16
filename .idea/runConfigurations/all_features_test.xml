@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="all features test" type="CompoundRunConfigurationType">
+    <toRun name="Run smol_db_server ALL FEATURES" type="CargoCommandRunConfiguration" />
+    <toRun name="test ALL FEATURES" type="CargoCommandRunConfiguration" />
+    <method v="2" />
+  </configuration>
+</component>

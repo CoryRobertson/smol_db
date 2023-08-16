@@ -191,6 +191,45 @@ mod tests {
     }
 
     #[test]
+    fn test_get_stats() {
+            let mut client = SmolDbClient::new("localhost:8222").unwrap();
+
+            let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+            assert_eq!(set_key_response, SuccessNoData);
+
+            let create_db_response1 = client
+                .create_db("test_db_stats", DBSettings::default())
+                .unwrap();
+            assert_eq!(create_db_response1, SuccessNoData);
+
+            {
+                let r = client.get_stats("test_db_stats").unwrap();
+                assert_eq!(r.get_total_req(), 1);
+            }
+
+            {
+                let list = client.list_db_contents("test_db_stats").unwrap();
+                assert_eq!(list.len(), 0);
+            }
+
+            {
+                let r = client.get_stats("test_db_stats").unwrap();
+                assert_eq!(r.get_total_req(), 3);
+            }
+
+            {
+                let r = client.get_stats("test_db_stats").unwrap();
+                assert_eq!(r.get_total_req(), 4);
+            }
+
+            {
+                let delete_response = client.delete_db("test_db_stats").unwrap();
+                assert_eq!(delete_response, SuccessNoData);
+            }
+
+    }
+
+    #[test]
     fn test_empty_db_list() {
         let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
