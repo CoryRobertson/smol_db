@@ -1,3 +1,4 @@
+//! Contains the implementation and structure of `DBStatistics`, used as a feature in a `DB`
 #[cfg(feature = "statistics")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "statistics")]
@@ -8,8 +9,11 @@ const MIN_TIME_DIFFERENCE: f32 = 0.25;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]
 #[cfg(feature = "statistics")]
+/// A struct representing the statistics stored from a `DB`
 pub struct DBStatistics {
+    /// The total number of requests that have been through the `DB`
     total_requests: u64,
+    /// The average time between requests on the given `DB`, each request time must be larger than `MIN_TIME_DIFFERENCE`
     current_average_time: f32,
     // avg = ((current average time * num of reqs) + new time) / total number of reqs
 }
@@ -20,14 +24,18 @@ impl DBStatistics {
         Self::default()
     }
 
+    /// Returns the average time between requests from the given `DB`
     pub fn get_avg_time(&self) -> f32 {
         self.current_average_time
     }
 
+    /// Returns the total number of requests the given `DB` has
     pub fn get_total_req(&self) -> u64 {
         self.total_requests
     }
 
+    /// Adds the given system time to the average, provided it is below the `MIN_TIME_DIFFERENCE`
+    /// If so, the `current_average_time` is updated as well as the `total_requests`
     pub fn add_new_time(&mut self, last_access_time: SystemTime) {
         self.add_avg_time(
             SystemTime::now()
