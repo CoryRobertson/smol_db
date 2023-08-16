@@ -50,7 +50,7 @@ impl DBStatistics {
             let cur_avg = self.current_average_time;
             let cur_total = self.total_requests;
             let new_avg =
-                ((cur_avg * cur_total as f32) + new_time_difference) / (cur_total as f32 + 1.0);
+                cur_avg.mul_add(cur_total as f32, new_time_difference) / (cur_total as f32 + 1.0);
             self.current_average_time = new_avg;
         }
         self.total_requests += 1;
@@ -68,7 +68,6 @@ impl Default for DBStatistics {
 }
 
 #[cfg(test)]
-
 mod tests {
     #[cfg(feature = "statistics")]
     use crate::statistics::DBStatistics;
