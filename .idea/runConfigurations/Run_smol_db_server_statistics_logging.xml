@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run smol_db_server ALL FEATURES" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run --package smol_db_server --bin smol_db_server --all-features" />
+  <configuration default="false" name="Run smol_db_server statistics,logging" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run --package smol_db_server --bin smol_db_server --features statistics,logging" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <option name="emulateTerminal" value="false" />
     <option name="channel" value="DEFAULT" />

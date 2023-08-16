@@ -8,15 +8,18 @@ use smol_db_common::{
     logging::log_entry::LogEntry, logging::log_level::LogLevel, logging::log_message::LogMessage,
     logging::logger::Logger,
 };
+#[cfg(not(feature = "no-saving"))]
+use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 #[cfg(feature = "logging")]
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::{Arc, RwLock};
+use std::thread;
 use std::thread::JoinHandle;
+#[cfg(not(feature = "no-saving"))]
 use std::time::Duration;
-use std::{fs, thread};
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -26,6 +29,18 @@ const LOG_FILE_PATH: &str = "./data/log.log";
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8222").expect("Failed to bind to port 8222.");
 
+    {
+        print!("Features enabled:");
+
+        #[cfg(feature = "statistics")]
+        print!(" Statistics");
+        #[cfg(feature = "logging")]
+        print!(" Logging");
+        #[cfg(feature = "no-saving")]
+        print!(" No-Saving");
+        println!();
+    }
+
     #[cfg(feature = "logging")]
     let logger = Arc::new(Logger::new(PathBuf::from(LOG_FILE_PATH)).unwrap());
 
@@ -33,8 +48,10 @@ fn main() {
 
     let db_list: DBListThreadSafe = Arc::new(RwLock::new(DBList::load_db_list()));
 
+    #[cfg(not(feature = "no-saving"))]
     let _ = fs::create_dir("./data");
 
+    #[cfg(not(feature = "no-saving"))]
     fs::read_dir("./data").expect("Data directory ./data must exist"); // the data directory must exist, so we make sure this happens
 
     // control-c handler for saving things before the server shuts down.
@@ -50,9 +67,13 @@ fn main() {
         ));
         let lock = db_list_clone_ctrl_c.read().unwrap();
         println!("{:?}", lock.list.read().unwrap());
-        lock.save_db_list();
-        lock.save_all_db();
-        println!("Saved all db files and db list.");
+
+        #[cfg(not(feature = "no-saving"))]
+        {
+            lock.save_db_list();
+            lock.save_all_db();
+            println!("Saved all db files and db list.");
+        }
         #[cfg(feature = "logging")]
         ctrl_c_logger_clone
             .log(&LogEntry::new(
@@ -65,45 +86,50 @@ fn main() {
     .unwrap();
 
     // thread that continuously checks if caches need to be removed from cache when they get old.
+    #[cfg(not(feature = "no-saving"))]
     let cache_invalidator_thread_db_list = Arc::clone(&db_list);
     #[cfg(feature = "logging")]
+    #[allow(unused_variables)]
     let cache_invalidator_logger = Arc::clone(&logger);
-    let cache_invalidator_thread = thread::spawn(move || loop {
-        let invalidated_caches = cache_invalidator_thread_db_list
-            .read()
-            .unwrap()
-            .sleep_caches();
-
-        cache_invalidator_thread_db_list
-            .read()
-            .unwrap()
-            .save_all_db();
-        cache_invalidator_thread_db_list
-            .read()
-            .unwrap()
-            .save_db_list();
-
-        if invalidated_caches > 0 {
-            let number_of_caches_remaining = cache_invalidator_thread_db_list
+    let cache_invalidator_thread = thread::spawn(move || {
+        #[cfg(not(feature = "no-saving"))]
+        loop {
+            let invalidated_caches = cache_invalidator_thread_db_list
                 .read()
                 .unwrap()
-                .cache
+                .sleep_caches();
+
+            cache_invalidator_thread_db_list
                 .read()
                 .unwrap()
-                .len();
-            let msg = format!(
-                "Slept {} caches, {} caches remain in cache.",
-                invalidated_caches, number_of_caches_remaining
-            );
-            println!("{}", msg);
-            #[cfg(feature = "logging")]
-            let _ = cache_invalidator_logger.log(&LogEntry::new(
-                LogMessage::new(msg.as_str()),
-                LogLevel::Info,
-            ));
+                .save_all_db();
+            cache_invalidator_thread_db_list
+                .read()
+                .unwrap()
+                .save_db_list();
+
+            if invalidated_caches > 0 {
+                let number_of_caches_remaining = cache_invalidator_thread_db_list
+                    .read()
+                    .unwrap()
+                    .cache
+                    .read()
+                    .unwrap()
+                    .len();
+                let msg = format!(
+                    "Slept {} caches, {} caches remain in cache.",
+                    invalidated_caches, number_of_caches_remaining
+                );
+                println!("{}", msg);
+                #[cfg(feature = "logging")]
+                let _ = cache_invalidator_logger.log(&LogEntry::new(
+                    LogMessage::new(msg.as_str()),
+                    LogLevel::Info,
+                ));
+            }
+
+            thread::sleep(Duration::from_secs(10));
         }
-
-        thread::sleep(Duration::from_secs(10));
     });
 
     println!("Waiting for connections on port 8222");
@@ -225,6 +251,7 @@ fn handle_client(
                                     LogLevel::Info,
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 db_list.read().unwrap().save_specific_db(&db_name);
                                 resp
                             }
@@ -235,6 +262,7 @@ fn handle_client(
                                     db_settings.clone(),
                                     &client_key,
                                 );
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_db_list();
 
                                 #[cfg(feature = "logging")]
@@ -243,6 +271,7 @@ fn handle_client(
                                     LogLevel::Info
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_all_db();
                                 resp
                             }
@@ -262,6 +291,7 @@ fn handle_client(
                                     LogLevel::Info,
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 db_list.read().unwrap().save_db_list();
                                 resp
                             }
@@ -318,6 +348,7 @@ fn handle_client(
                                     LogLevel::Info,
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
@@ -337,6 +368,7 @@ fn handle_client(
                                     LogLevel::Info,
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
@@ -393,6 +425,7 @@ fn handle_client(
                                     LogLevel::Info
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
@@ -430,6 +463,7 @@ fn handle_client(
                                     LogLevel::Info,
                                 ));
 
+                                #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
