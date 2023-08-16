@@ -16,13 +16,12 @@ use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fs, thread};
+use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
 #[cfg(feature = "logging")]
 const LOG_FILE_PATH: &str = "./data/log.log";
-
-// TODO: make a "statistics" struct for the server, this struct should keep a list of things like clients connected, number of packets recieved, and such, and store them, this should be saved and loaded from a file.
 
 fn main() {
     let listener = TcpListener::bind("0.0.0.0:8222").expect("Failed to bind to port 8222.");
@@ -434,11 +433,17 @@ fn handle_client(
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
+                            #[cfg(feature = "statistics")]
+                            DBPacket::GetStats(db_name) => {
+                                db_list.read().unwrap().get_stats(&db_name,&client_key)
+                            }
                         }
                     }
                     Err(err) => {
+
                         println!("packet serialization error: {}", err);
-                        continue;
+                        Err(BadPacket)
+                        // continue;
                     }
                 };
 

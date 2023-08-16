@@ -20,3 +20,4 @@ ctrlc = "3.4.0"
 
 [features]
 logging = []
+statistics = ["smol_db_common/statistics"]

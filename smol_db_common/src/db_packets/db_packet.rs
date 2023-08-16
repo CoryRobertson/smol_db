@@ -33,9 +33,18 @@ pub enum DBPacket {
     ChangeDBSettings(DBPacketInfo, DBSettings),
     /// GetRole(db to read role from)
     GetRole(DBPacketInfo),
+    /// GetStats gets the statistics object if the feature is compiled
+    #[cfg(feature = "statistics")]
+    GetStats(DBPacketInfo),
 }
 
 impl DBPacket {
+
+    #[cfg(feature = "statistics")]
+    pub fn new_get_stats(dbname: &str) -> Self {
+        Self::GetStats(DBPacketInfo::new(dbname))
+    }
+
     /// Creates a new Read `DBPacket` from a name of a database and location string to read from.
     pub fn new_read(dbname: &str, location: &str) -> Self {
         Self::Read(DBPacketInfo::new(dbname), DBLocation::new(location))

@@ -4,7 +4,8 @@ use crate::db_content::DBContent;
 use crate::db_packets::db_settings::DBSettings;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
-use crate::statistics::{DBStatistics};
+#[cfg(feature = "statistics")]
+use crate::statistics::DBStatistics;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[non_exhaustive]
@@ -15,6 +16,7 @@ pub struct DB {
     last_access_time: SystemTime,
     db_settings: DBSettings,
     #[serde(default)]
+    #[cfg(feature = "statistics")]
     statistics: DBStatistics,
 }
 
@@ -27,12 +29,19 @@ pub enum Role {
     Other,
 }
 
+impl Role {
+    pub fn is_admin(&self) -> bool {
+        matches!(self,Admin | SuperAdmin)
+    }
+}
+
 impl Default for DB {
     fn default() -> Self {
         Self {
             db_content: DBContent::default(),
             last_access_time: SystemTime::now(),
             db_settings: DBSettings::default(),
+            #[cfg(feature = "statistics")]
             statistics: DBStatistics::default(),
         }
     }
@@ -67,7 +76,13 @@ impl DB {
         &self.db_content
     }
 
+    #[cfg(feature = "statistics")]
+    pub fn get_statistics(&self) -> &DBStatistics {
+        &self.statistics
+    }
+
     pub fn update_access_time(&mut self) {
+        #[cfg(feature = "statistics")]
         self.statistics.add_new_time(self.last_access_time);
         self.last_access_time = SystemTime::now();
     }

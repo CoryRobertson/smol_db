@@ -1,14 +1,18 @@
+#[cfg(feature = "statistics")]
 use std::time::SystemTime;
+#[cfg(feature = "statistics")]
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug,Serialize,Deserialize,Clone)]
 #[non_exhaustive]
+#[cfg(feature = "statistics")]
 pub struct DBStatistics {
     total_requests: u64,
     current_average_time: f32,
     // avg = ((current average time * num of reqs) + new time) / total number of reqs
 }
 
+#[cfg(feature = "statistics")]
 impl DBStatistics {
     pub fn new() -> Self {
         Self::default()
@@ -36,6 +40,7 @@ impl DBStatistics {
 
 }
 
+#[cfg(feature = "statistics")]
 impl Default for DBStatistics {
     fn default() -> Self {
         Self {
@@ -46,10 +51,13 @@ impl Default for DBStatistics {
 }
 
 #[cfg(test)]
+
 mod tests {
+    #[cfg(feature = "statistics")]
     use crate::statistics::DBStatistics;
 
     #[test]
+    #[cfg(feature = "statistics")]
     fn test_avg() {
         let mut s = DBStatistics::default();
 
