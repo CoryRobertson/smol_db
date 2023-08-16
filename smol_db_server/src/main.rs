@@ -433,7 +433,6 @@ fn handle_client(
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
-                            #[cfg(feature = "statistics")]
                             DBPacket::GetStats(db_name) => {
                                 db_list.read().unwrap().get_stats(&db_name,&client_key)
                             }

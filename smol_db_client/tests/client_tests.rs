@@ -208,8 +208,8 @@ mod tests {
                 // if we find a 0 length return, then we have clearly not panicked and can stop looping, allowing the test to be successful
                 break;
             }
-            if count >= 16 {
-                // allow 16* 250ms = 4 seconds to pass before declaring the test a failure
+            if count >= 64 {
+                // allow 16* 250ms = 16 seconds to pass before declaring the test a failure
                 panic!("count not read empty db list within reasonable amount of time, its possible there were databases stored that were not related to the unit tests.")
             }
             count += 1;

@@ -20,6 +20,7 @@ pub use smol_db_common::db::Role;
 pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
 pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
 pub use smol_db_common::db_packets::db_settings;
+use smol_db_common::statistics::DBStatistics;
 
 /// Easy usable module containing everything needed to use the client library normally
 pub mod prelude {
@@ -128,6 +129,21 @@ impl SmolDbClient {
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_data(db_name, db_location);
         self.send_packet(&packet)
+    }
+
+    /// Returns the `DBStatistics` struct if permissions allow it on a given db
+    #[cfg(feature = "statistics")]
+    pub fn get_stats(&mut self, db_name: &str) -> Result<DBStatistics, ClientError> {
+        let packet = DBPacket::new_get_stats(db_name);
+        let resp = self.send_packet(&packet)?;
+
+        match resp {
+            DBSuccessResponse::SuccessNoData => Err(BadPacket),
+            DBSuccessResponse::SuccessReply(data) => match serde_json::from_str::<DBStatistics>(&data) {
+                Ok(statistics) => Ok(statistics),
+                Err(err) => Err(PacketDeserializationError(Error::from(err))),
+            },
+        }
     }
 
     /// Returns the role of the given client in the given db.

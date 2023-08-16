@@ -6,10 +6,9 @@ use crate::db::DB;
 use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
-use crate::db_packets::db_packet_response::DBPacketResponseError::{
-    DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
-    ValueNotFound,
-};
+#[cfg(not(feature = "statistics"))]
+use crate::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
+use crate::db_packets::db_packet_response::DBPacketResponseError::{DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound, ValueNotFound};
 use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
@@ -47,51 +46,58 @@ impl DBList {
         self.super_admin_hash_list.read().unwrap().clone()
     }
 
-    #[cfg(feature = "statistics")]
+    #[allow(unused_variables)]
     pub fn get_stats(&self,p_info: &DBPacketInfo, client_key: &String) -> Result<DBSuccessResponse<String>,DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
 
-        let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
+        #[cfg(not(feature = "statistics"))]
+        return Err(BadPacket);
 
-            db_lock.update_access_time();
+        #[cfg(feature = "statistics")]
+        {
+            let super_admin_list = self.get_super_admin_list();
 
-            return if db_lock.get_role(client_key, &super_admin_list).is_admin() {
-                serde_json::to_string(db_lock.get_statistics())
-                    .map(SuccessReply)
-                    .map_err(|_| SerializationError)
+            let list_lock = self.list.read().unwrap();
+            if let Some(db) = self.cache.read().unwrap().get(p_info) {
+                // cache was hit
+                let mut db_lock = db.write().unwrap();
+
+                db_lock.update_access_time();
+
+                return if db_lock.get_role(client_key, &super_admin_list).is_admin() {
+                    serde_json::to_string(db_lock.get_statistics())
+                        .map(SuccessReply)
+                        .map_err(|_| SerializationError)
+                } else {
+                    Err(InvalidPermissions)
+                };
+            }
+
+            return if list_lock.contains(p_info) {
+                // cache was missed but the db exists on the file system
+
+                let mut db = Self::read_db_from_file(p_info)?;
+
+                db.update_access_time();
+
+                let resp = if db.get_role(client_key, &super_admin_list).is_admin() {
+                    serde_json::to_string(db.get_statistics())
+                        .map(SuccessReply)
+                        .map_err(|_| SerializationError)
+                } else {
+                    Err(InvalidPermissions)
+                };
+
+                self.cache
+                    .write()
+                    .unwrap()
+                    .insert(p_info.clone(), RwLock::from(db));
+
+                resp
             } else {
-                Err(InvalidPermissions)
+                // cache was neither hit, nor did the db exist on the file system
+                Err(DBNotFound)
             };
         }
-
-        return if list_lock.contains(p_info) {
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let resp = if db.get_role(client_key, &super_admin_list).is_admin() {
-                serde_json::to_string(db.get_statistics())
-                    .map(SuccessReply)
-                    .map_err(|_| SerializationError)
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            resp
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
     }
 
     /// Deletes the given data from a db if the user has write permissions
