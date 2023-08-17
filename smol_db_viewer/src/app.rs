@@ -424,8 +424,8 @@ impl eframe::App for ApplicationState {
                                             let times_string = stats.get_usage_time_list()
                                                 .iter()
                                                 .map(|date| display_date(date))
-                                                .reduce(|a,b| {format!("{},{}",a,b)});
-                                            ui.label(format!("Previous access times: {}", times_string.unwrap_or_default()));
+                                                .fold("".to_string(),|a,b| {format!("{}{}\n",a,b)});
+                                            ui.label(format!("Previous access times:\n{}", times_string));
                                         });
                                     }
                                     ContentCacheState::Error(_) => {}
