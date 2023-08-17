@@ -1,11 +1,14 @@
 //! Contains the implementation and structure of `DBStatistics`, used as a feature in a `DB`
+#[cfg(feature = "statistics")]
 use crate::statistics::previous_time_diff::PreviousTimeDifferences;
 #[cfg(feature = "statistics")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "statistics")]
 use std::time::SystemTime;
 
+#[cfg(feature = "statistics")]
 mod previous_time_diff;
+#[cfg(feature = "statistics")]
 pub(self) const MIN_TIME_DIFFERENCE: f32 = 0.25;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
