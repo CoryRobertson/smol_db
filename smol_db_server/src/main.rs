@@ -467,13 +467,9 @@ fn handle_client(
                                 lock.save_specific_db(&db_name);
                                 resp
                             }
-                            #[cfg(feature = "statistics")]
                             DBPacket::GetStats(db_name) => {
                                 db_list.read().unwrap().get_stats(&db_name, &client_key)
                             }
-                            // _ => { // oddily this block seems to be needed only when running cargo check, not cargo build, more research needed
-                            //     Err(BadPacket)
-                            // }
                         }
                     }
                     Err(err) => {
