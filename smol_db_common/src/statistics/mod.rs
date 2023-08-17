@@ -1,9 +1,9 @@
 //! Contains the implementation and structure of `DBStatistics`, used as a feature in a `DB`
+use crate::statistics::previous_time_diff::PreviousTimeDifferences;
 #[cfg(feature = "statistics")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "statistics")]
 use std::time::SystemTime;
-use crate::statistics::previous_time_diff::PreviousTimeDifferences;
 
 mod previous_time_diff;
 pub(self) const MIN_TIME_DIFFERENCE: f32 = 0.25;
@@ -24,7 +24,10 @@ pub struct DBStatistics {
 #[cfg(feature = "statistics")]
 impl DBStatistics {
     pub fn new(rolling_average_length: u32) -> Self {
-        Self{ total_requests: 0, rolling_average: PreviousTimeDifferences::new(rolling_average_length) }
+        Self {
+            total_requests: 0,
+            rolling_average: PreviousTimeDifferences::new(rolling_average_length),
+        }
     }
 
     /// Returns the average time between requests from the given `DB`
@@ -45,7 +48,6 @@ impl DBStatistics {
             self.total_requests += 1;
         }
     }
-
 }
 
 #[cfg(feature = "statistics")]
@@ -61,9 +63,9 @@ impl Default for DBStatistics {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     #[cfg(feature = "statistics")]
     use crate::statistics::DBStatistics;
+    use std::time::Duration;
 
     #[test]
     #[cfg(feature = "statistics")]
@@ -78,7 +80,8 @@ mod tests {
             total = index + 1;
             sum += num;
             avg = sum as f32 / total as f32;
-            s.rolling_average.add_new_time(Duration::from_secs_f32(num as f32));
+            s.rolling_average
+                .add_new_time(Duration::from_secs_f32(num as f32));
             s.total_requests += 1;
             assert!(
                 (avg - s.get_avg_time()).abs() <= 0.5,

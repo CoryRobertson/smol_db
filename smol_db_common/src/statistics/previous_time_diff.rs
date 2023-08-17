@@ -1,9 +1,9 @@
 //! Module containing a private struct for calculating rolling average of access times by the statistics struct
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use crate::statistics::MIN_TIME_DIFFERENCE;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-#[derive(Debug,Serialize,Deserialize,Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(super) struct PreviousTimeDifferences {
     list: Vec<Duration>,
     rolling_average_max: u32,
@@ -11,7 +11,10 @@ pub(super) struct PreviousTimeDifferences {
 
 impl PreviousTimeDifferences {
     pub fn new(rolling_average_max: u32) -> Self {
-        Self { list: vec![], rolling_average_max }
+        Self {
+            list: vec![],
+            rolling_average_max,
+        }
     }
 
     #[allow(dead_code)]
@@ -36,7 +39,6 @@ impl PreviousTimeDifferences {
         let sum: f32 = self.list.iter().map(|dur| dur.as_secs_f32()).sum();
         sum / self.list.len() as f32
     }
-
 }
 
 impl Default for PreviousTimeDifferences {
