@@ -6,6 +6,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
+/// This enum will get breaking changes until **git rev** `1c81904f00a69025aad49091abe3d56fd45e1144` can be fixed, until then, unsure how to avoid it.
+/// Workaround: use an exhaustive pattern match system e.g.:
+/// ```rust
+/// use smol_db_common::db_packets::db_packet::DBPacket;
+///
+/// let p = DBPacket::ListDB;
+/// match p {
+/// DBPacket::ListDB => {}
+///  _ => {} // this line is needed to not have breaking changes
+/// }
+/// ```
 pub enum DBPacket {
     /// Read(db to operate on, key to read the db using)
     Read(DBPacketInfo, DBLocation),
