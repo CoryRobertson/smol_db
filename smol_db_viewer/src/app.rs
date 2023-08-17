@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use chrono::{Datelike, DateTime, Local, Timelike};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -420,6 +421,11 @@ impl eframe::App for ApplicationState {
                                                 "Average access time gap: {:.2}",
                                                 stats.get_avg_time()
                                             ));
+                                            let times_string = stats.get_usage_time_list()
+                                                .iter()
+                                                .map(|date| display_date(date))
+                                                .reduce(|a,b| {format!("{},{}",a,b)});
+                                            ui.label(format!("Previous access times: {}", times_string.unwrap_or_default()));
                                         });
                                     }
                                     ContentCacheState::Error(_) => {}
@@ -1053,4 +1059,8 @@ impl eframe::App for ApplicationState {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
+}
+
+fn display_date(time: &DateTime<Local>) -> String {
+    format!("{}/{}/{} {}:{} {}", time.month(),time.day(),time.year(),time.hour12().1,time.minute(),{ if time.hour12().0 {"PM"} else {"AM"}})
 }
