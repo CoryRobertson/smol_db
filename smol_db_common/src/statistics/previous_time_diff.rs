@@ -10,7 +10,7 @@ pub(super) struct PreviousTimeDifferences {
 }
 
 impl PreviousTimeDifferences {
-    pub fn new(rolling_average_max: u32) -> Self {
+    pub const fn new(rolling_average_max: u32) -> Self {
         Self {
             list: vec![],
             rolling_average_max,
@@ -36,7 +36,7 @@ impl PreviousTimeDifferences {
         if self.list.is_empty() {
             return 0.0;
         }
-        let sum: f32 = self.list.iter().map(|dur| dur.as_secs_f32()).sum();
+        let sum: f32 = self.list.iter().map(Duration::as_secs_f32).sum();
         sum / self.list.len() as f32
     }
 }

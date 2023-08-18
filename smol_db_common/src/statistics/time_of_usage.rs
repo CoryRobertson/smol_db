@@ -14,7 +14,7 @@ pub(super) struct UsageTimeList {
 }
 
 impl UsageTimeList {
-    pub fn new(max_list_length: usize) -> Self {
+    pub const fn new(max_list_length: usize) -> Self {
         Self {
             list: vec![],
             max_list_length,
