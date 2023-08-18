@@ -1,9 +1,7 @@
 #[cfg(test)]
 #[allow(unused_imports)]
 mod tests {
-    use smol_db_common::db::Role::{Admin, Other, SuperAdmin, User};
-    use smol_db_common::db::DB;
-    use smol_db_common::db_packets::db_settings::DBSettings;
+    use smol_db_common::prelude::*;
     use std::time::{Duration, SystemTime};
 
     #[test]

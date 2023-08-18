@@ -1,9 +1,9 @@
 //! Contains the implementation and structure of `DBStatistics`, used as a feature in a `DB`
 use crate::statistics::previous_time_diff::PreviousTimeDifferences;
 use crate::statistics::time_of_usage::UsageTimeList;
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
-use chrono::{DateTime, Local};
 
 mod previous_time_diff;
 mod time_of_usage;

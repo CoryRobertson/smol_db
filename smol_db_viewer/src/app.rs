@@ -1,21 +1,25 @@
-use crate::app::ContentCacheState::{Cached, NotCached};
-use crate::app::ProgramState::{
-    ChangeDBSettings, ClientConnectionError, CreateDB, DBResponseError, DisplayClient, NoClient,
-    PromptForClientDetails, PromptForKey,
+use crate::{
+    app::ContentCacheState::{Cached, NotCached},
+    app::ProgramState::ChangeDBSettings,
+    app::ProgramState::ClientConnectionError,
+    app::ProgramState::CreateDB,
+    app::ProgramState::DBResponseError,
+    app::ProgramState::DisplayClient,
+    app::ProgramState::NoClient,
+    app::ProgramState::PromptForClientDetails,
+    app::ProgramState::PromptForKey,
 };
-use smol_db_client::client_error::ClientError;
-use smol_db_client::client_error::ClientError::BadPacket;
-use smol_db_client::db_settings::DBSettings;
-use smol_db_client::prelude::DBStatistics;
-use smol_db_client::DBSuccessResponse;
-use smol_db_client::{DBPacketResponseError, Role, SmolDbClient};
+use chrono::{DateTime, Datelike, Local, Timelike};
+use smol_db_client::{
+    client_error::ClientError, client_error::ClientError::BadPacket, db_settings::DBSettings,
+    prelude::DBStatistics, DBPacketResponseError, DBSuccessResponse, Role, SmolDbClient,
+};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use chrono::{Datelike, DateTime, Local, Timelike};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -421,11 +425,17 @@ impl eframe::App for ApplicationState {
                                                 "Average access time gap: {:.2}",
                                                 stats.get_avg_time()
                                             ));
-                                            let times_string = stats.get_usage_time_list()
+                                            let times_string = stats
+                                                .get_usage_time_list()
                                                 .iter()
-                                                .map(|date| display_date(date))
-                                                .fold("".to_string(),|a,b| {format!("{}{}\n",a,b)});
-                                            ui.label(format!("Previous access times:\n{}", times_string));
+                                                .map(display_date)
+                                                .fold("".to_string(), |a, b| {
+                                                    format!("{}{}\n", a, b)
+                                                });
+                                            ui.label(format!(
+                                                "Previous access times:\n{}",
+                                                times_string
+                                            ));
                                         });
                                     }
                                     ContentCacheState::Error(_) => {}
@@ -1062,5 +1072,19 @@ impl eframe::App for ApplicationState {
 }
 
 fn display_date(time: &DateTime<Local>) -> String {
-    format!("{}/{}/{} {}:{} {}", time.month(),time.day(),time.year(),time.hour12().1,time.minute(),{ if time.hour12().0 {"PM"} else {"AM"}})
+    format!(
+        "{}/{}/{} {}:{} {}",
+        time.month(),
+        time.day(),
+        time.year(),
+        time.hour12().1,
+        time.minute(),
+        {
+            if time.hour12().0 {
+                "PM"
+            } else {
+                "AM"
+            }
+        }
+    )
 }

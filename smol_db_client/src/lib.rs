@@ -6,22 +6,20 @@ use crate::ClientError::{
     SocketWriteError, UnableToConnect,
 };
 use serde::{Deserialize, Serialize};
-use smol_db_common::db_packets::db_packet::DBPacket;
-use smol_db_common::db_packets::db_packet_info::DBPacketInfo;
-
-use smol_db_common::db_packets::db_settings::DBSettings;
+use smol_db_common::{
+    db_packets::db_packet::DBPacket, db_packets::db_packet_info::DBPacketInfo,
+    db_packets::db_settings::DBSettings, statistics::DBStatistics,
+};
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 
 pub mod client_error;
 use crate::client_error::ClientError::DBResponseError;
-pub use smol_db_common::db::Role;
-pub use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
-pub use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
-pub use smol_db_common::db_packets::db_settings;
-#[cfg(feature = "statistics")]
-use smol_db_common::statistics::DBStatistics;
+pub use smol_db_common::{
+    db::Role, db_packets::db_packet_response::DBPacketResponseError,
+    db_packets::db_packet_response::DBSuccessResponse, db_packets::db_settings,
+};
 
 /// Easy usable module containing everything needed to use the client library normally
 pub mod prelude {
