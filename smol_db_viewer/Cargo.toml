@@ -18,5 +18,5 @@ log = "0.4.18"
 chrono = { version = "0.4.26", features = ["serde"]}
 chrono-tz = { version = "0.8.3", features = ["serde"]}
 env_logger = "0.10.0"
-serde = { version = "1.0.163", features = ["derive"] }
+serde = { version = "1.0.183", features = ["derive"] }
 smol_db_client = { path = "../smol_db_client", version = "1.2.0", features = ["statistics"] }
