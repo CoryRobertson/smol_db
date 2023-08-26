@@ -1,6 +1,6 @@
 [package]
 name = "smol_db_viewer"
-version = "1.2.0"
+version = "1.2.1"
 edition = "2021"
 description = "A viewer and editor application for smol_db"
 license = "GPL-3.0-only"
