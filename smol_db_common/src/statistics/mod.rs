@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 mod previous_time_diff;
 mod time_of_usage;
-pub(self) const MIN_TIME_DIFFERENCE: f32 = 0.25;
+const MIN_TIME_DIFFERENCE: f32 = 0.25;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[non_exhaustive]

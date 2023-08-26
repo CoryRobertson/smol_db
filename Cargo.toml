@@ -5,3 +5,4 @@ members = [
     "smol_db_client",
     "smol_db_viewer",
 ]
+resolver = "2"
