@@ -8,8 +8,12 @@ use crate::ClientError::{
 use serde::{Deserialize, Serialize};
 use smol_db_common::{
     db_packets::db_packet::DBPacket, db_packets::db_packet_info::DBPacketInfo,
-    db_packets::db_settings::DBSettings, statistics::DBStatistics,
+    db_packets::db_settings::DBSettings,
 };
+
+#[cfg(feature = "statistics")]
+use smol_db_common::statistics::DBStatistics;
+
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
