@@ -4,6 +4,9 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/smol_db.iml" filepath="$PROJECT_DIR$/smol_db.iml" />
       <module fileurl="file://$PROJECT_DIR$/smol_db_client/smol_db_client.iml" filepath="$PROJECT_DIR$/smol_db_client/smol_db_client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/smol_db_client_java.iml" filepath="$PROJECT_DIR$/smol_db_client_java.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/smol_db_client_java.main.iml" filepath="$PROJECT_DIR$/.idea/modules/smol_db_client_java.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/smol_db_client_java.test.iml" filepath="$PROJECT_DIR$/.idea/modules/smol_db_client_java.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/smol_db_common/smol_db_common.iml" filepath="$PROJECT_DIR$/smol_db_common/smol_db_common.iml" />
       <module fileurl="file://$PROJECT_DIR$/smol_db_server/smol_db_server.iml" filepath="$PROJECT_DIR$/smol_db_server/smol_db_server.iml" />
       <module fileurl="file://$PROJECT_DIR$/smol_db_viewer/smol_db_viewer.iml" filepath="$PROJECT_DIR$/smol_db_viewer/smol_db_viewer.iml" />

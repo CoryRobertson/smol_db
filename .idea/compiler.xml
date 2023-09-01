@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="smol_db_client_java" target="20" />
+      <module name="smol_db_client_java.main" target="20" />
+      <module name="smol_db_client_java.test" target="20" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

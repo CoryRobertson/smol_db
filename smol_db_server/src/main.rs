@@ -15,6 +15,7 @@ use std::net::{TcpListener, TcpStream};
 #[cfg(feature = "logging")]
 use std::path::PathBuf;
 use std::process::exit;
+use std::str::from_utf8;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::JoinHandle;
@@ -203,6 +204,9 @@ fn handle_client(
     loop {
         // client loop
 
+        #[cfg(debug_assertions)]
+        println!("Waiting for client data");
+
         let read_result = stream.read(&mut buf);
 
         if let Ok(read) = read_result {
@@ -212,7 +216,11 @@ fn handle_client(
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
                     Ok(pack) => {
                         #[cfg(debug_assertions)]
-                        println!("packet data: {:?}", pack); // this is also a debug print
+                        {
+                            println!("packet data: {:?}", pack);
+                            println!("{}", from_utf8(&buf[0..read]).unwrap_or_default());
+                        }
+
                         match pack {
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
@@ -474,12 +482,20 @@ fn handle_client(
                     }
                     Err(err) => {
                         println!("packet serialization error: {}", err);
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("{}", from_utf8(&buf[0..read]).unwrap_or_default());
+                        }
                         Err(BadPacket)
                         // continue;
                     }
                 };
 
                 let ser = serde_json::to_string(&response).unwrap();
+
+                #[cfg(debug_assertions)]
+                println!("Writing to client");
+
                 let write_result = stream.write(ser.as_bytes());
 
                 if write_result.is_err() {

@@ -1,9 +1,12 @@
 <project version="4">
+  <component name="FrameworkDetectionExcludesConfiguration">
+    <file type="web" url="file://$PROJECT_DIR$/smol_db_client_java" />
+  </component>
   <component name="PWA">
     <option name="enabled" value="true" />
     <option name="wasEnabledAtLeastOnce" value="true" />
   </component>
-  <component name="ProjectRootManager">
+  <component name="ProjectRootManager" version="2" project-jdk-name="20" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
 </project>
