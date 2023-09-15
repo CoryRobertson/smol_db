@@ -3,7 +3,8 @@
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use rsa::rand_core::OsRng;
 use crate::db_packets::db_packet::DBPacket;
-use crate::encryption::BIT_LENGTH;
+use crate::encryption::{BIT_LENGTH, EncryptionError};
+use crate::encryption::encrypted_data::EncryptedData;
 
 pub struct ClientKey{
     pri_key: RsaPrivateKey,
@@ -25,8 +26,17 @@ impl ClientKey {
         &self.pub_key
     }
 
-    pub fn encrypt_packet(&mut self, packet: &DBPacket) {
-        let serialized_data = packet.serialize_packet()?;
+    /// Encrypt a packet to be sent to the server
+    pub fn encrypt_packet(&mut self, packet: &DBPacket) -> Result<DBPacket,EncryptionError> {
+        let serialized_data = packet.serialize_packet().map_err(|err| EncryptionError::SerializationError)?;
+        let encrypted_data = self.encrypt(serialized_data.as_bytes()).map_err(|err| EncryptionError::RSAError(err))?;
+        let enc_struct = EncryptedData::new(encrypted_data.as_slice());
+        Ok(DBPacket::Encrypted(enc_struct))
+    }
+
+    /// Decrypt a packet received from the server
+    pub fn decrypt_packet(&self, packet: &EncryptedData) -> Result<DBPacket,EncryptionError> {
+        crate::encryption::decrypt_packet(packet,&self.pri_key)
     }
 
     /// Decrypt data sent from the server encrypted with client public key using client private key
@@ -38,7 +48,7 @@ impl ClientKey {
     /// Encrypt data to be sent to the server using the servers public key
     /// This function is used when encrypting data sent from client -> server
     pub fn encrypt(&mut self, msg: &[u8]) -> rsa::Result<Vec<u8>> {
-        self.server_pub_key.encrypt(&mut self.rng,Pkcs1v15Encrypt,msg)
+        crate::encryption::encrypt(&self.server_pub_key, &mut self.rng, msg)
     }
 
 }

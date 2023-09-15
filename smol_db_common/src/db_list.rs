@@ -22,6 +22,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
+use crate::encryption::server_encrypt::ServerKey;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -36,6 +37,10 @@ pub struct DBList {
 
     /// Vector containing the list of super admins on the server. Super admins have non-restricted access to all parts of the server.
     pub super_admin_hash_list: RwLock<Vec<String>>,
+
+    #[serde(skip)]
+    pub server_key: ServerKey,
+    
 }
 
 impl DBList {
@@ -944,6 +949,7 @@ impl Default for DBList {
             list: RwLock::new(vec![]),
             cache: RwLock::new(HashMap::new()),
             super_admin_hash_list: RwLock::new(vec![]),
+            server_key: ServerKey::new().unwrap(),
         }
     }
 }

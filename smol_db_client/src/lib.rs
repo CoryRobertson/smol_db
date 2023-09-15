@@ -24,6 +24,7 @@ pub use smol_db_common::{
     db::Role, db_packets::db_packet_response::DBPacketResponseError,
     db_packets::db_packet_response::DBSuccessResponse, db_packets::db_settings,
 };
+use smol_db_common::encryption::client_encrypt::ClientKey;
 
 /// Easy usable module containing everything needed to use the client library normally
 pub mod prelude {
@@ -46,6 +47,7 @@ pub mod prelude {
 /// This struct has implementations that allow for end to end communication with the database server.
 pub struct SmolDbClient {
     socket: TcpStream,
+    encryption: Option<ClientKey>,
 }
 
 impl SmolDbClient {
@@ -60,7 +62,12 @@ impl SmolDbClient {
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);
         match socket {
-            Ok(s) => Ok(Self { socket: s }),
+            Ok(s) => {
+                let mut client = Self { socket: s, encryption: None };
+
+
+                Ok(client)
+            },
             Err(err) => Err(UnableToConnect(err)),
         }
     }

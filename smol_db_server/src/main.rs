@@ -20,6 +20,10 @@ use std::thread;
 use std::thread::JoinHandle;
 #[cfg(not(feature = "no-saving"))]
 use std::time::Duration;
+use rsa::rand_core::OsRng;
+use rsa::RsaPublicKey;
+use smol_db_common::encryption::encrypted_data::EncryptedData;
+use smol_db_common::prelude::{DBPacketResponseError, SuccessNoData};
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -200,6 +204,10 @@ fn handle_client(
 
     let mut client_name = format!("Client [{}] [{}]:", ip_address, client_key);
 
+    let mut rng = OsRng::default();
+
+    let mut client_pub_key_opt: Option<RsaPublicKey> = None;
+
     loop {
         // client loop
 
@@ -210,10 +218,26 @@ fn handle_client(
                 #[cfg(debug_assertions)]
                 println!("read size: {}", read); // this is a debug print
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
-                    Ok(pack) => {
+                    Ok(mut pack) => {
                         #[cfg(debug_assertions)]
                         println!("packet data: {:?}", pack); // this is also a debug print
+
+                        match &pack {
+                            DBPacket::Encrypted(data) => {
+                                let unencrypted_data = db_list.read().unwrap().server_key.decrypt_packet(&data).unwrap();
+                                pack = unencrypted_data;
+                            }
+                            _ => {}
+                        }
+
                         match pack {
+                            DBPacket::PubKey(key) => {
+                                client_pub_key_opt = Some(key);
+                                Ok(SuccessNoData)
+                            }
+                            DBPacket::Encrypted(_) => {
+                                Err(BadPacket)
+                            }
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);
@@ -479,8 +503,19 @@ fn handle_client(
                     }
                 };
 
-                let ser = serde_json::to_string(&response).unwrap();
-                let write_result = stream.write(ser.as_bytes());
+                let write_result;
+                if let Some(pubkey_client) = &client_pub_key_opt {
+                    let ser_resp = serde_json::to_string(&response).unwrap();
+
+                    let packet_ser = DBPacket::Encrypted(EncryptedData::new(ser_resp.as_bytes()));
+
+                    let ency = smol_db_common::encryption::encrypt(pubkey_client,&mut rng,packet_ser.serialize_packet().unwrap().as_bytes()).unwrap();
+
+                    write_result = stream.write(ency.as_slice());
+                } else {
+                    let ser = serde_json::to_string(&response).unwrap();
+                    write_result = stream.write(ser.as_bytes());
+                };
 
                 if write_result.is_err() {
                     println!(
