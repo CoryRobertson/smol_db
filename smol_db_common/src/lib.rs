@@ -1,5 +1,7 @@
 //! Common library between the client and server for `smol_db`
 
+// TODO: Use encryption between packets being sent using pubkey and priv key from server to client and client to server
+
 pub mod db;
 pub mod db_content;
 pub mod db_data;
