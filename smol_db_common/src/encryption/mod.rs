@@ -1,4 +1,4 @@
-//! Encryption module for smol_db, used in smol_db_client and smol_db_server
+//! Encryption module for `smol_db`, used in `smol_db_client` and `smol_db_server`
 
 use rsa::rand_core::OsRng;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};

@@ -96,7 +96,7 @@ impl SmolDbClient {
         let pri_key = ClientKey::new(server_pub_key).map_err(KeyGenerationError)?;
         let pub_client_key = pri_key.get_pub_key().clone();
         self.encryption = Some(pri_key);
-        let resp = self.send_packet(&DBPacket::PubKey(pub_client_key.clone()));
+        let resp = self.send_packet(&DBPacket::PubKey(pub_client_key));
         if resp.is_err() {
             self.encryption = None;
         }

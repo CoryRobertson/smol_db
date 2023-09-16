@@ -15,7 +15,7 @@ pub struct ServerKey {
 
 impl Default for ServerKey {
     fn default() -> Self {
-        ServerKey::new().unwrap()
+        Self::new().unwrap()
     }
 }
 
