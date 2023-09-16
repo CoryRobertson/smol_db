@@ -48,10 +48,11 @@ pub enum DBPacket {
     GetRole(DBPacketInfo),
     /// GetStats gets the statistics object if the feature is compiled
     GetStats(DBPacketInfo),
-
+    /// Encrypted packet, used to allow the server to identify when data needs to be decrypted
     Encrypted(EncryptedData),
+    /// Packet used in establishing end to end encryption, requests the server to store the sent public key
     PubKey(RsaPublicKey),
-
+    /// Request the server to setup end to end encryption
     SetupEncryption,
 }
 

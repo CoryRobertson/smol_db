@@ -65,20 +65,14 @@ impl SmolDbClient {
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);
         match socket {
-            Ok(s) => {
-                let client = Self {
-                    socket: s,
-                    encryption: None,
-                };
-
-                Ok(client)
-            }
+            Ok(s) => Ok(Self { socket: s, encryption: None }),
             Err(err) => Err(UnableToConnect(err)),
         }
     }
 
     /// Requests the server to use encryption for communication. Encryption is done both ways, and is done using RSA with a 2048 bit key
     /// This function is slow due to large rsa key size ~1-4 seconds to generate the key
+    /// Encryption is done invisibly.
     /// ```
     /// use smol_db_client::SmolDbClient;
     /// use smol_db_common::prelude::DBSettings;
@@ -86,7 +80,7 @@ impl SmolDbClient {
     /// let key = "test_key_123";
     /// let mut client = SmolDbClient::new("localhost:8222").unwrap();
     /// client.set_access_key(key.to_string()).unwrap();
-    /// client.setup_encryption().unwrap();
+    /// client.setup_encryption().unwrap(); // encryption is done invisibly after it is setup, nothing else is needed :)
     /// client.create_db("docsetup_encryption_test",DBSettings::default()).unwrap();
     /// let _ = client.delete_db("docsetup_encryption_test").unwrap();
     /// ```

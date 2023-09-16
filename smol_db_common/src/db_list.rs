@@ -39,6 +39,7 @@ pub struct DBList {
     pub super_admin_hash_list: RwLock<Vec<String>>,
 
     #[serde(skip)]
+    /// Server key used for encryption when the user requests end to end encryption
     pub server_key: ServerKey,
 }
 
@@ -54,6 +55,7 @@ impl DBList {
     }
 
     #[allow(unused_variables)]
+    /// Returns the db stats used for a given database when permissions allow the user to read them
     pub fn get_stats(
         &self,
         p_info: &DBPacketInfo,

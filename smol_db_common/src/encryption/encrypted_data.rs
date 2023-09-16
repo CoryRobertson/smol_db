@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+/// Struct representing encrypted data, used simply for organization
 pub struct EncryptedData {
     data: Vec<u8>,
 }

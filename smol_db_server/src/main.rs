@@ -202,8 +202,6 @@ fn handle_client(
 
     let mut client_name = format!("Client [{}] [{}]:", ip_address, client_key);
 
-    // let mut rng = OsRng::default();
-
     let mut client_pub_key_opt: Option<RsaPublicKey> = None;
 
     loop {
@@ -220,6 +218,7 @@ fn handle_client(
                         #[cfg(debug_assertions)]
                         println!("packet data: {:?}", pack); // this is also a debug print
 
+                        // overwrite the packet with the unencrypted version if it is encrypted
                         if let DBPacket::Encrypted(data) = &pack {
                             #[cfg(debug_assertions)]
                             println!("Received encrypted data: {:?}", data);

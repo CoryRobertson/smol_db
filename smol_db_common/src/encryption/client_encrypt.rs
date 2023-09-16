@@ -20,6 +20,7 @@ impl ClientKey {
         let mut rng = OsRng;
         let pri_key = RsaPrivateKey::new(&mut rng, BIT_LENGTH)?;
         let pub_key = pri_key.to_public_key();
+
         Ok(Self {
             pri_key,
             pub_key,
