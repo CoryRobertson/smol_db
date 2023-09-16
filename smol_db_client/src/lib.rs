@@ -6,15 +6,9 @@ use crate::ClientError::{
     SocketWriteError, UnableToConnect,
 };
 use serde::{Deserialize, Serialize};
-use smol_db_common::{
-    db_packets::db_packet::DBPacket, db_packets::db_packet_info::DBPacketInfo,
-    db_packets::db_settings::DBSettings,
-};
-
+use smol_db_common::prelude::*;
 #[cfg(feature = "statistics")]
 use smol_db_common::statistics::DBStatistics;
-
-use rsa::RsaPublicKey;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
@@ -65,7 +59,10 @@ impl SmolDbClient {
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);
         match socket {
-            Ok(s) => Ok(Self { socket: s, encryption: None }),
+            Ok(s) => Ok(Self {
+                socket: s,
+                encryption: None,
+            }),
             Err(err) => Err(UnableToConnect(err)),
         }
     }
@@ -187,12 +184,10 @@ impl SmolDbClient {
 
         match resp {
             DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => {
-                match serde_json::from_str::<DBStatistics>(&data) {
-                    Ok(statistics) => Ok(statistics),
-                    Err(err) => Err(PacketDeserializationError(Error::from(err))),
-                }
-            }
+            SuccessReply(data) => match serde_json::from_str::<DBStatistics>(&data) {
+                Ok(statistics) => Ok(statistics),
+                Err(err) => Err(PacketDeserializationError(Error::from(err))),
+            },
         }
     }
 

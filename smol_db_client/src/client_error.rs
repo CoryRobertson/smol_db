@@ -25,7 +25,7 @@ pub enum ClientError {
     /// The server did not respond as expected when encryption was requested
     EncryptionSetupError,
     /// Generating a key pair produced an error
-    KeyGenerationError(rsa::Error),
+    KeyGenerationError(smol_db_common::prelude::Error),
 }
 
 impl PartialEq for ClientError {

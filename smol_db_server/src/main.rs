@@ -1,9 +1,8 @@
 //! Binary application that runs a `smol_db` server instance
-use rsa::RsaPublicKey;
 use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
-use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
+use smol_db_common::prelude::RsaPublicKey;
 use smol_db_common::prelude::{SuccessNoData, SuccessReply};
 #[cfg(feature = "logging")]
 use smol_db_common::{
@@ -258,7 +257,7 @@ fn handle_client(
                                 let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
-                                            "{} sent pubkey {:?} response: {:?}",
+                                            "{} sent pub-key {:?} response: {:?}",
                                             client_name, key, resp
                                         )
                                         .as_str(),
@@ -459,7 +458,7 @@ fn handle_client(
 
                                 client_key = key;
                                 client_name = format!("Client [{}] [{}]:", ip_address, client_key);
-                                Ok(DBSuccessResponse::SuccessNoData)
+                                Ok(SuccessNoData)
                             }
                             DBPacket::GetDBSettings(db_name) => {
                                 let lock = db_list.read().unwrap();
