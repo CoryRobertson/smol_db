@@ -15,6 +15,7 @@ use crate::db_packets::db_packet_response::DBPacketResponseError::{
 use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
+use crate::encryption::server_encrypt::ServerKey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -22,7 +23,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
-use crate::encryption::server_encrypt::ServerKey;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -40,7 +40,6 @@ pub struct DBList {
 
     #[serde(skip)]
     pub server_key: ServerKey,
-    
 }
 
 impl DBList {

@@ -1,8 +1,10 @@
 //! Binary application that runs a `smol_db` server instance
+use rsa::RsaPublicKey;
 use smol_db_common::db_list::DBList;
 use smol_db_common::db_packets::db_packet::DBPacket;
 use smol_db_common::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
 use smol_db_common::db_packets::db_packet_response::DBSuccessResponse;
+use smol_db_common::prelude::{SuccessNoData, SuccessReply};
 #[cfg(feature = "logging")]
 use smol_db_common::{
     logging::log_entry::LogEntry, logging::log_level::LogLevel, logging::log_message::LogMessage,
@@ -20,8 +22,6 @@ use std::thread;
 use std::thread::JoinHandle;
 #[cfg(not(feature = "no-saving"))]
 use std::time::Duration;
-use rsa::RsaPublicKey;
-use smol_db_common::prelude::{SuccessNoData, SuccessReply};
 
 type DBListThreadSafe = Arc<RwLock<DBList>>;
 
@@ -220,29 +220,69 @@ fn handle_client(
                         #[cfg(debug_assertions)]
                         println!("packet data: {:?}", pack); // this is also a debug print
 
-                        match &pack {
-                            DBPacket::Encrypted(data) => {
-                                println!("Recieved encrypted data: {:?}", data);
-                                let unencrypted_data = db_list.read().unwrap().server_key.decrypt_client_packet(&data).unwrap();
-                                pack = unencrypted_data;
-                                println!("Unencrypted data: {:?}", pack);
-                            }
-                            _ => {}
+                        if let DBPacket::Encrypted(data) = &pack {
+                            #[cfg(debug_assertions)]
+                            println!("Received encrypted data: {:?}", data);
+                            let unencrypted_data = db_list
+                                .read()
+                                .unwrap()
+                                .server_key
+                                .decrypt_client_packet(data)
+                                .unwrap();
+                            pack = unencrypted_data;
+                            #[cfg(debug_assertions)]
+                            println!("Unencrypted data: {:?}", pack);
                         }
 
                         match pack {
                             DBPacket::SetupEncryption => {
+                                // non standard conforming implementation of sending a response back, the client is expected to understand this given they requested to establish encryption
                                 let key = db_list.read().unwrap().server_key.get_pub_key().clone();
                                 let ser = serde_json::to_string(&key).unwrap();
-                                Ok(SuccessReply(ser))
+                                let resp = Ok(SuccessReply(ser));
+                                #[cfg(feature = "logging")]
+                                    let _ = logger.log(&LogEntry::new(
+                                    LogMessage::new(
+                                        format!(
+                                            "{} requested to setup encryption, response: {:?}",
+                                            client_name,resp
+                                        )
+                                            .as_str(),
+                                    ),
+                                    LogLevel::Info,
+                                ));
+                                resp
                             }
                             DBPacket::PubKey(key) => {
+                                let resp = Ok(SuccessNoData);
+                                #[cfg(feature = "logging")]
+                                    let _ = logger.log(&LogEntry::new(
+                                    LogMessage::new(
+                                        format!(
+                                            "{} sent pubkey {:?} response: {:?}",
+                                            client_name,key,resp
+                                        )
+                                            .as_str(),
+                                    ),
+                                    LogLevel::Info,
+                                ));
                                 client_pub_key_opt = Some(key);
-                                Ok(SuccessNoData)
+                                resp
                             }
                             DBPacket::Encrypted(_) => {
+                                #[cfg(feature = "logging")]
+                                    let _ = logger.log(&LogEntry::new(
+                                    LogMessage::new(
+                                        format!(
+                                            "{} sent encrypted packet that was not handled properly, report this on github in the issues section of smol_db",
+                                            client_name,
+                                        )
+                                            .as_str(),
+                                    ),
+                                    LogLevel::Error,
+                                ));
                                 Err(BadPacket)
-                            }
+                            },
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);
@@ -510,12 +550,20 @@ fn handle_client(
 
                 let ser = serde_json::to_string(&response).unwrap();
 
+                // check if the client is using encryption in their communication
                 let write_result = match &client_pub_key_opt {
                     None => {
+                        // client is not using encryption, send the raw bytes
                         stream.write(ser.as_bytes())
                     }
                     Some(key) => {
-                        let ency_data = db_list.write().unwrap().server_key.encrypt_packet(&ser,key).unwrap();
+                        // client is using encryption, encrypt the packet then send the encrypted bytes
+                        let ency_data = db_list
+                            .write()
+                            .unwrap()
+                            .server_key
+                            .encrypt_packet(&ser, key)
+                            .unwrap();
                         stream.write(ency_data.get_data())
                     }
                 };

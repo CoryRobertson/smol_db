@@ -14,19 +14,20 @@ use smol_db_common::{
 #[cfg(feature = "statistics")]
 use smol_db_common::statistics::DBStatistics;
 
+use rsa::RsaPublicKey;
 use std::collections::HashMap;
 use std::io::{Error, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
-use rsa::RsaPublicKey;
 
 pub mod client_error;
-use crate::client_error::ClientError::DBResponseError;
+use crate::client_error::ClientError::{
+    DBResponseError, EncryptionSetupError, KeyGenerationError, PacketEncryptionError,
+};
+use smol_db_common::encryption::client_encrypt::ClientKey;
 pub use smol_db_common::{
     db::Role, db_packets::db_packet_response::DBPacketResponseError,
     db_packets::db_packet_response::DBSuccessResponse, db_packets::db_settings,
 };
-use smol_db_common::encryption::client_encrypt::ClientKey;
-use smol_db_common::encryption::encrypted_data::EncryptedData;
 
 /// Easy usable module containing everything needed to use the client library normally
 pub mod prelude {
@@ -65,23 +66,43 @@ impl SmolDbClient {
         let socket = TcpStream::connect(ip);
         match socket {
             Ok(s) => {
-                let client = Self { socket: s, encryption: None };
-
+                let client = Self {
+                    socket: s,
+                    encryption: None,
+                };
 
                 Ok(client)
-            },
+            }
             Err(err) => Err(UnableToConnect(err)),
         }
     }
 
     /// Requests the server to use encryption for communication. Encryption is done both ways, and is done using RSA with a 2048 bit key
-    pub fn setup_encryption(&mut self) {
-        let server_pub_key_ser = self.send_packet(&DBPacket::SetupEncryption).unwrap().into_option().unwrap();
-        let server_pub_key = serde_json::from_str::<RsaPublicKey>(&server_pub_key_ser).unwrap();
-        let pri_key = ClientKey::new(server_pub_key).unwrap();
+    /// This function is slow due to large rsa key size ~1-4 seconds to generate the key
+    /// ```
+    /// use smol_db_client::SmolDbClient;
+    /// use smol_db_common::prelude::DBSettings;
+    ///
+    /// let key = "test_key_123";
+    /// let mut client = SmolDbClient::new("localhost:8222").unwrap();
+    /// client.set_access_key(key.to_string()).unwrap();
+    /// client.setup_encryption().unwrap();
+    /// client.create_db("docsetup_encryption_test",DBSettings::default()).unwrap();
+    /// let _ = client.delete_db("docsetup_encryption_test").unwrap();
+    /// ```
+    pub fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
+        let server_pub_key_ser = self
+            .send_packet(&DBPacket::SetupEncryption)?
+            .as_option()
+            .ok_or(EncryptionSetupError)?
+            .to_string();
+        let server_pub_key = serde_json::from_str::<RsaPublicKey>(&server_pub_key_ser)
+            .map_err(|err| PacketDeserializationError(Error::from(err)))?;
+        // this function is really slow due to long key length generation, this can be modified if needed, but at the moment, this is ok.
+        let pri_key = ClientKey::new(server_pub_key).map_err(KeyGenerationError)?;
         let pub_client_key = pri_key.get_pub_key().clone();
         self.encryption = Some(pri_key);
-        self.send_packet(&DBPacket::PubKey(pub_client_key.clone())).unwrap();
+        self.send_packet(&DBPacket::PubKey(pub_client_key.clone()))
     }
 
     /// Reconnects the client, this will reset the session, which can be used to remove any key that was used.
@@ -290,18 +311,17 @@ impl SmolDbClient {
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let mut buf: [u8; 1024] = [0; 1024];
 
-
+        // branch depending on if we are using encryption with communication
         let ser_packet = match &mut self.encryption {
-            None => {
-                sent_packet
-                    .serialize_packet()
-                    .map_err(|err| PacketSerializationError(Error::from(err)))?
-            }
+            None => sent_packet
+                .serialize_packet()
+                .map_err(|err| PacketSerializationError(Error::from(err)))?,
             Some(client_encrypt) => {
+                // if we are sending a public key packet, we dont encrypt it, since the server needs this to send data back properly
                 if !matches!(sent_packet, DBPacket::PubKey(_)) {
                     client_encrypt
                         .encrypt_packet(sent_packet)
-                        .map_err(|_| BadPacket /* FIXME */)?
+                        .map_err(PacketEncryptionError)?
                         .serialize_packet()
                         .map_err(|err| PacketSerializationError(Error::from(err)))?
                 } else {
@@ -321,13 +341,16 @@ impl SmolDbClient {
         ) {
             Ok(thing) => thing.map_err(DBResponseError),
             Err(err) => {
+                // if we fail to read a packet, check if it is an encrypted packet
                 if let Some(client_private_key) = &self.encryption {
                     client_private_key
-                        .decrypt_server_packet(&buf[0..read_len]).unwrap().map_err(|err| ClientError::DBResponseError(err))
+                        .decrypt_server_packet(&buf[0..read_len])
+                        .unwrap()
+                        .map_err(DBResponseError)
                 } else {
                     Err(PacketDeserializationError(Error::from(err)))
                 }
-            },
+            }
         }
     }
 

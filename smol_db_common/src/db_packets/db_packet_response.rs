@@ -21,8 +21,6 @@ pub enum DBSuccessResponse<T> {
     SuccessNoData,
     /// SuccessReply represents when the operation was successful, and there is data to be replied back
     SuccessReply(T),
-
-
 }
 
 impl<T> From<DBSuccessResponse<T>> for Option<T> {

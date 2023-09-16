@@ -1,5 +1,6 @@
 //! Contains various error enums that a client may return on an operation with a database
 use smol_db_common::db_packets::db_packet_response::DBPacketResponseError;
+use smol_db_common::encryption::EncryptionError;
 use std::io::Error;
 
 #[derive(Debug)]
@@ -19,6 +20,12 @@ pub enum ClientError {
     DBResponseError(DBPacketResponseError),
     /// SmolDbClient received the incorrect packet from a response, this should not happen.
     BadPacket,
+    /// Encryption failed either in decrypting a packet, or encrypting a packet
+    PacketEncryptionError(EncryptionError),
+    /// The server did not respond as expected when encryption was requested
+    EncryptionSetupError,
+    /// Generating a key pair produced an error
+    KeyGenerationError(rsa::Error),
 }
 
 impl PartialEq for ClientError {
@@ -44,6 +51,15 @@ impl PartialEq for ClientError {
             }
             Self::BadPacket => {
                 matches!(other, Self::BadPacket)
+            }
+            Self::PacketEncryptionError(_) => {
+                matches!(other, Self::PacketEncryptionError(_))
+            }
+            Self::EncryptionSetupError => {
+                matches!(other, Self::EncryptionSetupError)
+            }
+            Self::KeyGenerationError(_) => {
+                matches!(other, Self::KeyGenerationError(_))
             }
         }
     }

@@ -29,6 +29,7 @@ mod tests {
             list: RwLock::new(vec![]),
             cache: RwLock::new(HashMap::new()),
             super_admin_hash_list: RwLock::new(vec![]),
+            server_key: Default::default(),
         }
     }
 
