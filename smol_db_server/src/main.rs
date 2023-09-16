@@ -241,13 +241,13 @@ fn handle_client(
                                 let ser = serde_json::to_string(&key).unwrap();
                                 let resp = Ok(SuccessReply(ser));
                                 #[cfg(feature = "logging")]
-                                    let _ = logger.log(&LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} requested to setup encryption, response: {:?}",
-                                            client_name,resp
+                                            client_name, resp
                                         )
-                                            .as_str(),
+                                        .as_str(),
                                     ),
                                     LogLevel::Info,
                                 ));
@@ -256,13 +256,13 @@ fn handle_client(
                             DBPacket::PubKey(key) => {
                                 let resp = Ok(SuccessNoData);
                                 #[cfg(feature = "logging")]
-                                    let _ = logger.log(&LogEntry::new(
+                                let _ = logger.log(&LogEntry::new(
                                     LogMessage::new(
                                         format!(
                                             "{} sent pubkey {:?} response: {:?}",
-                                            client_name,key,resp
+                                            client_name, key, resp
                                         )
-                                            .as_str(),
+                                        .as_str(),
                                     ),
                                     LogLevel::Info,
                                 ));
@@ -282,7 +282,7 @@ fn handle_client(
                                     LogLevel::Error,
                                 ));
                                 Err(BadPacket)
-                            },
+                            }
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);

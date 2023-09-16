@@ -277,11 +277,26 @@ impl eframe::App for ApplicationState {
                         if ui.button("Refresh stored data").clicked() {
                             *self.client.lock().unwrap() = None;
                             *self.program_state.lock().unwrap() = NoClient;
-
                             self.database_list = None;
-
                             self.selected_database = None;
                             self.connection_thread = None;
+                        }
+
+                        let mut client_lock = self.client.lock().unwrap();
+                        if let Some(client) = client_lock.as_mut() {
+                            // only display an encryption switch if the user does not have encryption enabled and the button is clicked
+                            if !client.is_encryption_enabled() {
+                                ui.separator();
+                                if ui.button("Switch to end to end encryption").clicked() {
+                                    match client.setup_encryption() {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            *self.program_state.lock().unwrap() =
+                                                ClientConnectionError(err);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     });
                     if has_client {
@@ -291,6 +306,7 @@ impl eframe::App for ApplicationState {
                             self.selected_database = None;
                         }
                     }
+                    ui.separator();
                 });
             });
         }

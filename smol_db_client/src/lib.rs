@@ -102,7 +102,16 @@ impl SmolDbClient {
         let pri_key = ClientKey::new(server_pub_key).map_err(KeyGenerationError)?;
         let pub_client_key = pri_key.get_pub_key().clone();
         self.encryption = Some(pri_key);
-        self.send_packet(&DBPacket::PubKey(pub_client_key.clone()))
+        let resp = self.send_packet(&DBPacket::PubKey(pub_client_key.clone()));
+        if resp.is_err() {
+            self.encryption = None;
+        }
+        resp
+    }
+
+    /// Returns true if end to end encryption is enabled
+    pub fn is_encryption_enabled(&self) -> bool {
+        self.encryption.is_some()
     }
 
     /// Reconnects the client, this will reset the session, which can be used to remove any key that was used.
