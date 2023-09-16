@@ -1,9 +1,6 @@
 #[cfg(debug_assertions)]
 use smol_db_client::SmolDbClient;
-#[cfg(debug_assertions)]
-use smol_db_common::db_packets::db_settings::DBSettings;
-#[cfg(debug_assertions)]
-use std::time::Instant;
+use smol_db_common::prelude::DBSettings;
 
 fn main() {
     #[cfg(not(debug_assertions))]
@@ -18,6 +15,11 @@ fn main() {
         let key = "test_key_123";
         let mut client = SmolDbClient::new("localhost:8222").unwrap();
         client.set_access_key(key.to_string()).unwrap();
+
+        client.setup_encryption();
+
+        let resp = client.create_db("blah",DBSettings::default());
+        println!("{:?}", resp);
 
 
 

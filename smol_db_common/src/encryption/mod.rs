@@ -2,8 +2,6 @@
 
 use rsa::rand_core::OsRng;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
-use crate::db_packets::db_packet::DBPacket;
-use crate::encryption::encrypted_data::EncryptedData;
 
 pub(self) const BIT_LENGTH: usize  = 2048;
 pub mod server_encrypt;
@@ -23,18 +21,6 @@ pub fn encrypt(key: &RsaPublicKey, mut rng: &mut OsRng, msg: &[u8]) -> rsa::Resu
 pub fn decrypt(pri_key: &RsaPrivateKey, enc_data: &[u8]) -> rsa::Result<Vec<u8>> {
     pri_key.decrypt(Pkcs1v15Encrypt,enc_data)
 }
+// response type from server to client -> Result<DBSuccessResponse<String>, ClientError>
+// response type from client to server -> DBPacket
 
-pub fn decrypt_packet(packet: &EncryptedData, key: &RsaPrivateKey) -> Result<DBPacket, EncryptionError> {
-
-    let msg = decrypt(key,packet.get_data()).map_err(|err| EncryptionError::RSAError(err))?;
-    match serde_json::from_slice::<DBPacket>(&msg) {
-        Ok(packet) => {
-            Ok(packet)
-        }
-        Err(_) => {
-            Err(EncryptionError::SerializationError)
-        }
-    }
-
-
-}

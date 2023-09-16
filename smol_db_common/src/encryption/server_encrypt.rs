@@ -1,9 +1,10 @@
 //! Server encryption module
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{RsaPrivateKey, RsaPublicKey};
 use rsa::rand_core::OsRng;
 use crate::db_packets::db_packet::DBPacket;
-use crate::encryption::{BIT_LENGTH, EncryptionError};
+use crate::encryption::{BIT_LENGTH, decrypt, EncryptionError};
 use crate::encryption::encrypted_data::EncryptedData;
+use crate::prelude::{DBPacketResponseError, DBSuccessResponse};
 
 #[derive(Debug)]
 pub struct ServerKey{
@@ -38,15 +39,24 @@ impl ServerKey {
         crate::encryption::encrypt(&client_pub_key, &mut self.rng, msg)
     }
 
-    pub fn encrypt_packet(&mut self, packet: &DBPacket, client_pub_key: &RsaPublicKey) -> Result<DBPacket,EncryptionError> {
-        let serialized_data = packet.serialize_packet().map_err(|err| EncryptionError::SerializationError)?;
-        let encrypted_data = self.encrypt(client_pub_key,serialized_data.as_bytes()).map_err(|err| EncryptionError::RSAError(err))?;
+    pub fn encrypt_packet(&mut self, packet: &String, client_pub_key: &RsaPublicKey) -> Result<EncryptedData,EncryptionError> {
+        let encrypted_data = self.encrypt(client_pub_key,packet.as_bytes()).map_err(|err| EncryptionError::RSAError(err))?;
         let enc_struct = EncryptedData::new(encrypted_data.as_slice());
-        Ok(DBPacket::Encrypted(enc_struct))
+        Ok(enc_struct)
     }
 
-    pub fn decrypt_packet(&self, packet: &EncryptedData) -> Result<DBPacket,EncryptionError> {
-        crate::encryption::decrypt_packet(packet,&self.pri_key)
+    /// Decrypt a packet send from the client to the server on the server side
+    pub fn decrypt_client_packet(&self,client_packet: &EncryptedData) -> Result<DBPacket, EncryptionError> {
+
+        let msg = decrypt(&self.pri_key, client_packet.get_data()).map_err(|err| EncryptionError::RSAError(err))?;
+        match serde_json::from_slice::<DBPacket>(&msg) {
+            Ok(packet) => {
+                Ok(packet)
+            }
+            Err(_) => {
+                Err(EncryptionError::SerializationError)
+            }
+        }
     }
 
     /// Decrypt data using the servers private key encrypted with the servers public key

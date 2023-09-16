@@ -3,8 +3,9 @@
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use rsa::rand_core::OsRng;
 use crate::db_packets::db_packet::DBPacket;
-use crate::encryption::{BIT_LENGTH, EncryptionError};
+use crate::encryption::{BIT_LENGTH, decrypt, EncryptionError};
 use crate::encryption::encrypted_data::EncryptedData;
+use crate::prelude::{DBPacketResponseError, DBSuccessResponse};
 
 pub struct ClientKey{
     pri_key: RsaPrivateKey,
@@ -28,15 +29,23 @@ impl ClientKey {
 
     /// Encrypt a packet to be sent to the server
     pub fn encrypt_packet(&mut self, packet: &DBPacket) -> Result<DBPacket,EncryptionError> {
-        let serialized_data = packet.serialize_packet().map_err(|err| EncryptionError::SerializationError)?;
+        let serialized_data = packet.serialize_packet().map_err(|_| EncryptionError::SerializationError)?;
         let encrypted_data = self.encrypt(serialized_data.as_bytes()).map_err(|err| EncryptionError::RSAError(err))?;
         let enc_struct = EncryptedData::new(encrypted_data.as_slice());
         Ok(DBPacket::Encrypted(enc_struct))
     }
 
-    /// Decrypt a packet received from the server
-    pub fn decrypt_packet(&self, packet: &EncryptedData) -> Result<DBPacket,EncryptionError> {
-        crate::encryption::decrypt_packet(packet,&self.pri_key)
+    /// Decrypt a packet received from the server on the client
+    pub fn decrypt_server_packet(&self, server_db_response: &[u8]) -> Result<Result<DBSuccessResponse<String>,DBPacketResponseError>, EncryptionError> {
+        let msg = decrypt(&self.pri_key, server_db_response).map_err(|err| EncryptionError::RSAError(err))?;
+        match serde_json::from_slice(&msg) {
+            Ok(packet) => {
+                Ok(packet)
+            }
+            Err(_) => {
+                Err(EncryptionError::SerializationError)
+            }
+        }
     }
 
     /// Decrypt data sent from the server encrypted with client public key using client private key

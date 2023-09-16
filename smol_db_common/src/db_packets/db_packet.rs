@@ -51,6 +51,8 @@ pub enum DBPacket {
 
     Encrypted(EncryptedData),
     PubKey(RsaPublicKey),
+
+    SetupEncryption,
 }
 
 impl DBPacket {
