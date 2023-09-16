@@ -1,5 +1,6 @@
 #[cfg(debug_assertions)]
 use smol_db_client::SmolDbClient;
+#[cfg(debug_assertions)]
 use smol_db_common::prelude::DBSettings;
 
 fn main() {

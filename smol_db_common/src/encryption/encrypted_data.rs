@@ -1,3 +1,4 @@
+//! Simple encrypted data struct module
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
