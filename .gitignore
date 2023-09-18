@@ -93,3 +93,4 @@ fabric.properties
 /fg.svg
 /perf.data
 /perf.data.old
+/flamegraph.svg
