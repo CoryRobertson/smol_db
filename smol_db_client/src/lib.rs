@@ -183,7 +183,7 @@ impl SmolDbClient {
         let resp = self.send_packet(&packet)?;
 
         match resp {
-            DBSuccessResponse::SuccessNoData => Err(BadPacket),
+            SuccessNoData => Err(BadPacket),
             SuccessReply(data) => match serde_json::from_str::<DBStatistics>(&data) {
                 Ok(statistics) => Ok(statistics),
                 Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -214,8 +214,8 @@ impl SmolDbClient {
         let resp = self.send_packet(&packet)?;
 
         match resp {
-            DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => match serde_json::from_str::<Role>(&data) {
+            SuccessNoData => Err(BadPacket),
+            SuccessReply(data) => match serde_json::from_str::<Role>(&data) {
                 Ok(role) => Ok(role),
                 Err(err) => Err(PacketDeserializationError(Error::from(err))),
             },
@@ -244,8 +244,8 @@ impl SmolDbClient {
 
         let resp = self.send_packet(&packet)?;
         match resp {
-            DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => {
+            SuccessNoData => Err(BadPacket),
+            SuccessReply(data) => {
                 match serde_json::from_str::<DBSettings>(&data) {
                     Ok(db_settings) => Ok(db_settings),
                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -491,8 +491,8 @@ impl SmolDbClient {
         let response = self.send_packet(&packet)?;
 
         match response {
-            DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => {
+            SuccessNoData => Err(BadPacket),
+            SuccessReply(data) => {
                 match serde_json::from_str::<Vec<DBPacketInfo>>(&data) {
                     Ok(thing) => Ok(thing),
                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -529,8 +529,8 @@ impl SmolDbClient {
         let response = self.send_packet(&packet)?;
 
         match response {
-            DBSuccessResponse::SuccessNoData => Err(BadPacket),
-            DBSuccessResponse::SuccessReply(data) => {
+            SuccessNoData => Err(BadPacket),
+            SuccessReply(data) => {
                 match serde_json::from_str::<HashMap<String, String>>(&data) {
                     Ok(thing) => Ok(thing),
                     Err(err) => Err(PacketDeserializationError(Error::from(err))),
@@ -575,10 +575,10 @@ impl SmolDbClient {
         match serde_json::to_string(&data) {
             Ok(ser_data) => match self.write_db(db_name, db_location, &ser_data) {
                 Ok(response) => match response {
-                    DBSuccessResponse::SuccessNoData => Ok(DBSuccessResponse::SuccessNoData),
-                    DBSuccessResponse::SuccessReply(data_string) => {
+                    SuccessNoData => Ok(SuccessNoData),
+                    SuccessReply(data_string) => {
                         match serde_json::from_str::<T>(&data_string) {
-                            Ok(thing) => Ok(DBSuccessResponse::SuccessReply(thing)),
+                            Ok(thing) => Ok(SuccessReply(thing)),
                             Err(err) => Err(PacketDeserializationError(Error::from(err))),
                         }
                     }
@@ -600,10 +600,10 @@ impl SmolDbClient {
     {
         match self.read_db(db_name, db_location) {
             Ok(data) => match data {
-                DBSuccessResponse::SuccessNoData => Ok(DBSuccessResponse::SuccessNoData),
-                DBSuccessResponse::SuccessReply(read_data) => {
+                SuccessNoData => Ok(SuccessNoData),
+                SuccessReply(read_data) => {
                     match serde_json::from_str::<T>(&read_data) {
-                        Ok(data) => Ok(DBSuccessResponse::SuccessReply(data)),
+                        Ok(data) => Ok(SuccessReply(data)),
                         Err(err) => Err(PacketDeserializationError(Error::from(err))),
                     }
                 }
