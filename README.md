@@ -19,8 +19,26 @@ An example program that allows the user to connect to a smol_db_server, the prog
 - [cr_tiler_rs](https://github.com/CoryRobertson/cr_tiler_rs) uses the database to store leaderboards information for the game service.
 - Feel free to let me know if you use this database, I would love to know! :)
 
+### Reasons to use smol_db:
+- You want to use a more minimal database program
+- You are me, and enjoy using software you make
+- You want a database program that has no specific ties to operating system services, and has minimal setup requirements
+- You want to contribute to the repository
+- You think the program art is cute. [Crisis](https://kikicat.carrd.co/)
+
+### Notable features:
+- Easy to set up both the server, and the databases within (No fiddling with weird pathing issues or other common annoyances)
+- Simple client library for easy program integration
+- **Mostly** easy to read code, allowing for easy addition of other features
+- Viewing/editing client for at a glance overviews of a database
+- Opt-in RSA-2048 bit packet encryption
+- Databases are stored in ram for a per database amount of time after any interaction from a client
+
 ### Security:
 smol_db is not designed to be extremely secure, most of its use cases are exist on the local network, where security can less necessary. 
+
+While the program has opt-in packet encryption, I still do not recommend this program for any high security applications.
+
 If there are any improvements that can be made to security that come to my mind, I will slowly implement them as I get around to those ideas.
 access keys are not stored in a hash or encrypted format, and therefore should not be assumed to be safe or secure when stored.
 
@@ -66,6 +84,8 @@ fn main() {
     }
 }
 ```
+
+## Images:
 
 ### Connecting:
 ![Image of connecting to a database using the viewing application](https://raw.githubusercontent.com/CoryRobertson/smol_db/main/images/viewer_connect.png)
