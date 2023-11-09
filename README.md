@@ -14,6 +14,8 @@ A library that can be used to interface with the server program.
 A library used to run a server, should the smol_db_server not be adequate, this library consists of everything necessary to build a server that handles requests and process them.
 - **smol_db_viewer**:
 An example program that allows the user to connect to a smol_db_server, the program can connect, view, create, delete, read, and write databases on a given server.
+- **smol_db_dylib**:
+An FFI library ( WIP ) that can be used as an interface with a smol_db_server
 
 ### Programs currently using this database:
 - [cr_tiler_rs](https://github.com/CoryRobertson/cr_tiler_rs) uses the database to store leaderboards information for the game service.
