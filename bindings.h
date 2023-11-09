@@ -1,25 +1,19 @@
-#include <cstdarg>
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
-#include <new>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 
-struct FFISmolDBClient;
+typedef struct FFISmolDBClient FFISmolDBClient;
 
+void smol_db_client_free(struct FFISmolDBClient *client_ptr);
 
-extern "C" {
+struct FFISmolDBClient *smol_db_client_new(const char *ip);
 
-void smol_db_client_free(FFISmolDBClient *client_ptr);
+void smol_db_client_set_key(struct FFISmolDBClient *client_ptr, const char *key_ptr);
 
-SmolDbClient *smol_db_client_new(const char *ip);
-
-void smol_db_client_set_key(FFISmolDBClient *client_ptr, const char *key_ptr);
-
-uint8_t *smol_db_client_write_db(FFISmolDBClient *client_ptr,
+uint8_t *smol_db_client_write_db(struct FFISmolDBClient *client_ptr,
                                  const char *name,
                                  const char *location,
                                  const char *data);
-
-} // extern "C"
