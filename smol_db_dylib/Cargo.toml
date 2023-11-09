@@ -17,3 +17,4 @@ smol_db_client = "1.3.1"
 [lib]
 crate-type = ["cdylib"]
 
+# TODO: probably use cbindgen here? seems really fun
