@@ -1,5 +1,6 @@
 #[cfg(test)]
 #[allow(unused_imports)]
+#[cfg(not(feature = "async"))]
 mod tests {
     use serde::{Deserialize, Serialize};
     use smol_db_client::prelude::*;
@@ -191,6 +192,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "statistics")]
     fn test_get_stats() {
         let mut client = SmolDbClient::new("localhost:8222").unwrap();
 

@@ -55,6 +55,7 @@ impl DBList {
     }
 
     #[allow(unused_variables)]
+    #[allow(clippy::ptr_arg)]
     /// Returns the db stats used for a given database when permissions allow the user to read them
     pub fn get_stats(
         &self,

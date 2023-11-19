@@ -19,7 +19,7 @@ pub struct DBSettings {
 
 impl DBSettings {
     /// Returns a new `DBSettings` given a duration
-    pub fn new(
+    pub const fn new(
         invalidation_time: Duration,
         can_others_rwx: (bool, bool, bool),
         can_users_rwx: (bool, bool, bool),

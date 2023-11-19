@@ -4,6 +4,10 @@ members = [
     "smol_db_server",
     "smol_db_client",
     "smol_db_viewer",
-    "smol_db_dylib",
 ]
 resolver = "2"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = 3
