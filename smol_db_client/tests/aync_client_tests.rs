@@ -1,11 +1,9 @@
-
-
 #[cfg(test)]
 #[cfg(feature = "async")]
 mod tests {
-    use std::time::Duration;
     use smol_db_client::SmolDbClient;
     use smol_db_common::prelude::DBSettings;
+    use std::time::Duration;
 
     const TESTING_IP: &str = "localhost:8222";
     const TESTING_KEY: &str = "test_key_123";
@@ -20,7 +18,9 @@ mod tests {
     async fn test_client_connect() {
         let mut client = get_client_and_set_key().await;
 
-        let f1 = client.create_db("async_connect", DBSettings::default()).await;
+        let f1 = client
+            .create_db("async_connect", DBSettings::default())
+            .await;
 
         let f2 = client.delete_db("async_connect").await;
 
@@ -37,13 +37,24 @@ mod tests {
 
         const DB_NAME: &str = "async_test_write_read";
 
-        assert!(client.create_db(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .create_db(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
         assert!(client.get_role(DB_NAME).await.unwrap().is_admin());
 
-        assert!(client.write_db(DB_NAME,"loc1","d1").await.is_ok());
+        assert!(client.write_db(DB_NAME, "loc1", "d1").await.is_ok());
 
-        assert_eq!(client.read_db(DB_NAME,"loc1").await.unwrap().into_option().unwrap(),"d1".to_string());
+        assert_eq!(
+            client
+                .read_db(DB_NAME, "loc1")
+                .await
+                .unwrap()
+                .into_option()
+                .unwrap(),
+            "d1".to_string()
+        );
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
 
@@ -60,13 +71,24 @@ mod tests {
 
         assert!(client.is_encryption_enabled());
 
-        assert!(client.create_db(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .create_db(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
         assert!(client.get_role(DB_NAME).await.unwrap().is_admin());
 
-        assert!(client.write_db(DB_NAME,"loc1","d1").await.is_ok());
+        assert!(client.write_db(DB_NAME, "loc1", "d1").await.is_ok());
 
-        assert_eq!(client.read_db(DB_NAME,"loc1").await.unwrap().into_option().unwrap(),"d1".to_string());
+        assert_eq!(
+            client
+                .read_db(DB_NAME, "loc1")
+                .await
+                .unwrap()
+                .into_option()
+                .unwrap(),
+            "d1".to_string()
+        );
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
 
@@ -92,17 +114,28 @@ mod tests {
 
         assert!(client.is_encryption_enabled());
 
-        assert!(client.create_db(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .create_db(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
         assert!(client.get_role(DB_NAME).await.unwrap().is_admin());
 
-        assert!(client.write_db(DB_NAME,"loc1","d1").await.is_ok());
+        assert!(client.write_db(DB_NAME, "loc1", "d1").await.is_ok());
 
-        assert_eq!(client.read_db(DB_NAME,"loc1").await.unwrap().into_option().unwrap(),"d1".to_string());
+        assert_eq!(
+            client
+                .read_db(DB_NAME, "loc1")
+                .await
+                .unwrap()
+                .into_option()
+                .unwrap(),
+            "d1".to_string()
+        );
 
         assert!(client.delete_data(DB_NAME, "loc1").await.is_ok());
 
-        assert!(client.read_db(DB_NAME,"loc1").await.is_err());
+        assert!(client.read_db(DB_NAME, "loc1").await.is_err());
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
 
@@ -116,7 +149,10 @@ mod tests {
 
         const DB_NAME: &str = "async_test_stats";
 
-        assert!(client.create_db(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .create_db(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
         assert!(client.get_role(DB_NAME).await.unwrap().is_admin());
 
@@ -125,7 +161,6 @@ mod tests {
         assert!(client.get_stats(DB_NAME).await.is_ok());
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
-
     }
 
     #[tokio::test]
@@ -134,17 +169,29 @@ mod tests {
 
         const DB_NAME: &str = "async_test_settings";
 
-        const SETTINGS: DBSettings = DBSettings::new(Duration::from_secs(22),(false,true,true),(true,false,false),vec![],vec![]);
+        const SETTINGS: DBSettings = DBSettings::new(
+            Duration::from_secs(22),
+            (false, true, true),
+            (true, false, false),
+            vec![],
+            vec![],
+        );
 
         assert!(client.create_db(DB_NAME, SETTINGS).await.is_ok());
 
         assert!(client.get_role(DB_NAME).await.unwrap().is_admin());
 
-        assert_eq!(client.get_db_settings(DB_NAME).await.unwrap(),SETTINGS);
+        assert_eq!(client.get_db_settings(DB_NAME).await.unwrap(), SETTINGS);
 
-        assert!(client.set_db_settings(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .set_db_settings(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
-        assert_eq!(client.get_db_settings(DB_NAME).await.unwrap(),DBSettings::default());
+        assert_eq!(
+            client.get_db_settings(DB_NAME).await.unwrap(),
+            DBSettings::default()
+        );
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
     }
@@ -155,7 +202,10 @@ mod tests {
 
         const DB_NAME: &str = "async_test_list_db";
 
-        assert!(client.create_db(DB_NAME, DBSettings::default()).await.is_ok());
+        assert!(client
+            .create_db(DB_NAME, DBSettings::default())
+            .await
+            .is_ok());
 
         assert!(client.list_db().await.unwrap().len() >= 1);
 
@@ -166,5 +216,4 @@ mod tests {
 
         assert!(client.delete_db(DB_NAME).await.is_ok());
     }
-
 }
