@@ -12,6 +12,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 
 #[allow(clippy::let_and_return)]
+#[tracing::instrument(skip(logger))]
 pub(crate) async fn handle_client(
     mut stream: TcpStream,
     db_list: DBListThreadSafe,

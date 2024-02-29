@@ -14,6 +14,7 @@ pub struct ServerKey {
 }
 
 impl Default for ServerKey {
+    #[tracing::instrument]
     fn default() -> Self {
         Self::new().unwrap()
     }
@@ -21,6 +22,7 @@ impl Default for ServerKey {
 
 impl ServerKey {
     /// Create a new server key
+    #[tracing::instrument]
     pub fn new() -> Result<Self, rsa::Error> {
         let mut rng = OsRng;
         let pri_key = RsaPrivateKey::new(&mut rng, BIT_LENGTH)?;
@@ -33,18 +35,21 @@ impl ServerKey {
     }
 
     /// Gets public key of server
+    #[tracing::instrument]
     pub fn get_pub_key(&self) -> &RsaPublicKey {
         &self.pub_key
     }
 
     /// Encrypt data using the clients public key
     /// This function is used when encrypting data sent from server -> client
+    #[tracing::instrument]
     fn encrypt(&mut self, client_pub_key: &RsaPublicKey, msg: &[u8]) -> rsa::Result<Vec<u8>> {
         crate::encryption::encrypt(client_pub_key, &mut self.rng, msg)
     }
 
     /// Encrypt a packet that has already been serialized into a string
     /// The client will receive an error if the packet is not serialized properly BEFORE encryption
+    #[tracing::instrument]
     pub fn encrypt_packet(
         &mut self,
         packet: &String,
@@ -59,6 +64,7 @@ impl ServerKey {
 
     /// Decrypt a packet send from the client to the server on the server side
     /// converts encrypted data into a db packet
+    #[tracing::instrument]
     pub fn decrypt_client_packet(
         &self,
         client_packet: &EncryptedData,
@@ -73,6 +79,7 @@ impl ServerKey {
 
     /// Decrypt data using the servers private key encrypted with the servers public key
     /// This function is used when decrypting data sent from client -> server
+    #[tracing::instrument]
     pub fn decrypt(&self, enc_data: &[u8]) -> rsa::Result<Vec<u8>> {
         decrypt(&self.pri_key, enc_data)
     }

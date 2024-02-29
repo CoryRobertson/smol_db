@@ -23,6 +23,7 @@ impl UsageTimeList {
 
     /// Add a `SystemTime` to the list, removing the oldest entry if the length exceeds the maximum length
     /// Does not add the new time if the time since the last entry and the added entry is less than `MIN_TIME_DIFFERENCE`
+    #[tracing::instrument]
     pub fn add_time(&mut self, time: SystemTime) {
         if let Some(date) = self.list.last() {
             let added_date: DateTime<Local> = time.into();
@@ -38,18 +39,21 @@ impl UsageTimeList {
     }
 
     /// Return the list of `SystemTime` that have been recorded
+    #[tracing::instrument]
     pub fn get_list(&self) -> &Vec<DateTime<Local>> {
         &self.list
     }
 
     /// Return the maximum number of stored system times
     #[allow(dead_code)]
+    #[tracing::instrument]
     pub fn get_max_length(&self) -> usize {
         self.max_list_length
     }
 }
 
 impl Default for UsageTimeList {
+    #[tracing::instrument]
     fn default() -> Self {
         Self::new(30)
     }

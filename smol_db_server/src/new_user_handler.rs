@@ -10,6 +10,7 @@ use smol_db_common::{
 use std::net::TcpListener;
 use std::sync::{Arc, RwLock};
 
+#[tracing::instrument(skip(logger))]
 pub(crate) async fn user_listener(
     listener: TcpListener,
     #[cfg(feature = "logging")] logger: Arc<Logger>,

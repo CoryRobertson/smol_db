@@ -8,6 +8,7 @@ pub struct DBLocation {
 }
 
 impl Display for DBLocation {
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.location)
     }

@@ -140,6 +140,7 @@ impl Default for ApplicationState {
 }
 
 impl ApplicationState {
+    #[tracing::instrument(skip(cc))]
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         if let Some(storage) = cc.storage {
             let mut loaded_state: Self =
@@ -211,6 +212,8 @@ impl ApplicationState {
 }
 
 impl eframe::App for ApplicationState {
+
+    #[tracing::instrument(skip_all)]
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let Self { .. } = self;
 
@@ -1082,6 +1085,7 @@ impl eframe::App for ApplicationState {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }

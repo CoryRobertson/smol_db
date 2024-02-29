@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::bool_assert_comparison)]
 #[cfg(not(feature = "async"))]
 mod tests {
     use serde::{Deserialize, Serialize};
@@ -81,7 +81,7 @@ mod tests {
                 assert_eq!(resp, InvalidPermissions);
             }
             _ => {
-                assert!(false);
+                unreachable!()
             }
         }
     }

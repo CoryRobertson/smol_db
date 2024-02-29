@@ -8,6 +8,7 @@ pub struct DBPacketInfo {
 }
 
 impl Display for DBPacketInfo {
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.dbname)
     }

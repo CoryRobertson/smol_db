@@ -24,6 +24,7 @@ pub enum DBSuccessResponse<T> {
 }
 
 impl<T> From<DBSuccessResponse<T>> for Option<T> {
+    #[tracing::instrument(skip_all)]
     fn from(value: DBSuccessResponse<T>) -> Self {
         match value {
             DBSuccessResponse::SuccessNoData => None,
@@ -34,6 +35,7 @@ impl<T> From<DBSuccessResponse<T>> for Option<T> {
 
 #[allow(dead_code)]
 impl<T> DBSuccessResponse<T> {
+    #[tracing::instrument(skip_all)]
     pub fn into_option(self) -> Option<T> {
         match self {
             Self::SuccessNoData => None,
@@ -41,6 +43,7 @@ impl<T> DBSuccessResponse<T> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn as_option(&self) -> Option<&T> {
         match self {
             Self::SuccessNoData => None,
@@ -48,6 +51,7 @@ impl<T> DBSuccessResponse<T> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn as_option_mut(&mut self) -> Option<&mut T> {
         match self {
             Self::SuccessNoData => None,
@@ -60,6 +64,8 @@ impl<T> Display for DBSuccessResponse<T>
 where
     T: Display,
 {
+
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::SuccessNoData => {
@@ -77,6 +83,7 @@ impl<T> Display for DBPacketResponse<T>
 where
     T: Display,
 {
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::SuccessNoData => {
@@ -93,6 +100,7 @@ where
 }
 
 impl Display for DBPacketResponseError {
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }

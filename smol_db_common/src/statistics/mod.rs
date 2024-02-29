@@ -25,6 +25,7 @@ pub struct DBStatistics {
 }
 
 impl DBStatistics {
+    #[tracing::instrument]
     pub fn new(rolling_average_length: u32, usage_list_length: usize) -> Self {
         Self {
             total_requests: 0,
@@ -34,22 +35,26 @@ impl DBStatistics {
     }
 
     /// Returns the average time between requests from the given `DB`
+    #[tracing::instrument]
     pub fn get_avg_time(&self) -> f32 {
         self.rolling_average.get_rolling_average()
     }
 
     /// Returns the total number of requests the given `DB` has
+    #[tracing::instrument]
     pub fn get_total_req(&self) -> u64 {
         self.total_requests
     }
 
     /// Returns a list of system times that were recorded at a request time in this statistics struct
+    #[tracing::instrument]
     pub fn get_usage_time_list(&self) -> &Vec<DateTime<Local>> {
         self.usage_time_list.get_list()
     }
 
     /// Adds the given system time to the average, provided it is below the `MIN_TIME_DIFFERENCE`
     /// If so, the `current_average_time` is updated as well as the `total_requests`
+    #[tracing::instrument]
     pub fn add_new_time(&mut self, last_access_time: SystemTime) {
         if let Ok(dur) = SystemTime::now().duration_since(last_access_time) {
             self.rolling_average.add_new_time(dur);
@@ -61,6 +66,7 @@ impl DBStatistics {
 
 #[allow(clippy::derivable_impls)]
 impl Default for DBStatistics {
+    #[tracing::instrument]
     fn default() -> Self {
         Self {
             total_requests: 0,
@@ -84,7 +90,7 @@ mod tests {
         let mut sum = 0;
         let mut avg;
 
-        for (index, num) in (0..10_000).into_iter().enumerate() {
+        for (index, num) in (0..10_000).enumerate() {
             total = index + 1;
             sum += num;
             avg = sum as f32 / total as f32;

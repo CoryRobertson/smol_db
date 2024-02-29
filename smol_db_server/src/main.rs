@@ -17,6 +17,8 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::{Arc, RwLock};
+#[cfg(feature = "tracing")]
+use tracing_subscriber::layer::SubscriberExt;
 
 #[cfg(not(feature = "no-saving"))]
 mod cache_invalidator;
@@ -28,7 +30,14 @@ type DBListThreadSafe = Arc<RwLock<DBList>>;
 #[cfg(feature = "logging")]
 const LOG_FILE_PATH: &str = "./data/log.log";
 
+
 fn main() {
+
+    #[cfg(feature = "tracing")]
+    tracing::subscriber::set_global_default(
+        tracing_subscriber::registry().with(tracing_tracy::TracyLayer::default())
+    ).expect("setup tracy layer");
+
     let listener = TcpListener::bind("0.0.0.0:8222").expect("Failed to bind to port 8222.");
 
     let thread_pool = ThreadPoolBuilder::new()
@@ -38,7 +47,8 @@ fn main() {
 
     {
         print!("Features enabled:");
-
+        #[cfg(feature = "tracing")]
+        print!(" Tracing");
         #[cfg(feature = "statistics")]
         print!(" Statistics");
         #[cfg(feature = "logging")]
@@ -92,6 +102,7 @@ fn main() {
     });
 }
 
+#[tracing::instrument(skip(logger))]
 fn setup_control_c_handler(
     #[cfg(feature = "logging")] logger: Arc<Logger>,
     db_list: DBListThreadSafe,

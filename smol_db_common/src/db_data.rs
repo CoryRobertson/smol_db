@@ -9,6 +9,7 @@ pub struct DBData {
 }
 
 impl Display for DBData {
+    #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.data)
     }
@@ -21,6 +22,7 @@ impl DBData {
     }
 
     /// Getter function for the data inside the `DBData` struct.
+    #[tracing::instrument]
     pub fn get_data(&self) -> &str {
         &self.data
     }

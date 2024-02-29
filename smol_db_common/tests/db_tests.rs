@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::bool_assert_comparison)]
 mod tests {
     use smol_db_common::prelude::*;
     use std::time::{Duration, SystemTime};

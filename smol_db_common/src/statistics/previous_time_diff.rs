@@ -18,11 +18,13 @@ impl PreviousTimeDifferences {
     }
 
     #[allow(dead_code)]
+    #[tracing::instrument]
     pub fn get_limit(&self) -> u32 {
         self.rolling_average_max
     }
 
     /// Adds a new time to the rolling average
+    #[tracing::instrument]
     pub fn add_new_time(&mut self, time: Duration) {
         if time.as_secs_f32() >= MIN_TIME_DIFFERENCE {
             self.list.push(time);
@@ -32,6 +34,7 @@ impl PreviousTimeDifferences {
         }
     }
 
+    #[tracing::instrument]
     pub fn get_rolling_average(&self) -> f32 {
         if self.list.is_empty() {
             return 0.0;
@@ -42,6 +45,7 @@ impl PreviousTimeDifferences {
 }
 
 impl Default for PreviousTimeDifferences {
+    #[tracing::instrument]
     fn default() -> Self {
         Self::new(100)
     }

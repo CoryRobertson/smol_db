@@ -8,11 +8,14 @@ pub struct EncryptedData {
 }
 
 impl EncryptedData {
+    #[tracing::instrument]
     pub fn new(data: &[u8]) -> Self {
         Self {
             data: data.to_vec(),
         }
     }
+
+    #[tracing::instrument]
     pub fn get_data(&self) -> &[u8] {
         self.data.as_slice()
     }

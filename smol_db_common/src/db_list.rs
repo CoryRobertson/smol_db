@@ -45,11 +45,13 @@ pub struct DBList {
 
 impl DBList {
     /// Returns true if the given hash is a super admin hash
+    #[tracing::instrument]
     pub fn is_super_admin(&self, hash: &String) -> bool {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
     /// Returns the super admin list
+    #[tracing::instrument]
     fn get_super_admin_list(&self) -> Vec<String> {
         self.super_admin_hash_list.read().unwrap().clone()
     }
@@ -57,6 +59,7 @@ impl DBList {
     #[allow(unused_variables)]
     #[allow(clippy::ptr_arg)]
     /// Returns the db stats used for a given database when permissions allow the user to read them
+    #[tracing::instrument]
     pub fn get_stats(
         &self,
         p_info: &DBPacketInfo,
@@ -114,6 +117,7 @@ impl DBList {
     }
 
     /// Deletes the given data from a db if the user has write permissions
+    #[tracing::instrument]
     pub fn delete_data(
         &self,
         p_info: &DBPacketInfo,
@@ -171,6 +175,7 @@ impl DBList {
     }
 
     /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
+    #[tracing::instrument]
     pub fn get_role(
         &self,
         p_info: &DBPacketInfo,
@@ -221,6 +226,7 @@ impl DBList {
 
     /// Replaces `DBSettings` for a given DB, requires super admin privileges.
     /// Returns `SuccessNoData` when successful
+    #[tracing::instrument]
     pub fn change_db_settings(
         &self,
         p_info: &DBPacketInfo,
@@ -265,6 +271,7 @@ impl DBList {
 
     /// Returns the `DBSettings` serialized as a string
     /// Only super admins can get the db settings
+    #[tracing::instrument]
     pub fn get_db_settings(
         &self,
         p_info: &DBPacketInfo,
@@ -311,6 +318,7 @@ impl DBList {
     }
 
     /// Adds a user to a given DB, requires admin privileges or super admin privileges.
+    #[tracing::instrument]
     pub fn add_user(
         &self,
         p_info: &DBPacketInfo,
@@ -361,6 +369,7 @@ impl DBList {
     }
 
     /// Removes a user from a given DB, requires admin privileges
+    #[tracing::instrument]
     pub fn remove_user(
         &self,
         p_info: &DBPacketInfo,
@@ -417,6 +426,7 @@ impl DBList {
     }
 
     /// Remove an admin from given DB, requires super admin permissions.
+    #[tracing::instrument]
     pub fn remove_admin(
         &self,
         p_info: &DBPacketInfo,
@@ -470,6 +480,7 @@ impl DBList {
     }
 
     /// Adds an admin to a given database, requires super admin permissions to perform.
+    #[tracing::instrument]
     pub fn add_admin(
         &self,
         p_info: &DBPacketInfo,
@@ -515,6 +526,7 @@ impl DBList {
     /// Removes all caches which last access time exceeds their invalidation time.
     /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
     /// Returns the number of caches removed.
+    #[tracing::instrument]
     pub fn sleep_caches(&self) -> usize {
         // prepare a list of invalid caches
         let invalid_cache_names: Vec<DBPacketInfo> = {
@@ -550,6 +562,7 @@ impl DBList {
     }
 
     /// Saves all db instances to a file.
+    #[tracing::instrument]
     pub fn save_all_db(&self) {
         let list = self.cache.read().unwrap();
         for (db_name, db) in list.iter() {
@@ -570,6 +583,7 @@ impl DBList {
 
     /// Saves a specific db by name to file.
     /// Read locks the cache.
+    #[tracing::instrument]
     pub fn save_specific_db(&self, db_name: &DBPacketInfo) {
         let list = self.cache.read().unwrap();
         match list.get(db_name) {
@@ -594,6 +608,7 @@ impl DBList {
     }
 
     /// Saves all db names to a file.
+    #[tracing::instrument]
     pub fn save_db_list(&self) {
         let mut db_list_file =
             File::create("./data/db_list.ser").expect("Unable to save db_list.ser");
@@ -604,6 +619,7 @@ impl DBList {
     }
 
     /// Loads all db names from the db list file.
+    #[tracing::instrument]
     pub fn load_db_list() -> Self {
         match File::open("./data/db_list.ser") {
             Ok(mut f) => {
@@ -623,6 +639,7 @@ impl DBList {
     }
 
     /// Returns true if the given db exists.
+    #[tracing::instrument]
     fn db_name_exists(&self, db_name: &str) -> bool {
         self.list
             .read()
@@ -632,6 +649,7 @@ impl DBList {
 
     /// Creates a DB given a name, the packet is not needed, only the name.
     /// Requires super admin privileges
+    #[tracing::instrument]
     pub fn create_db(
         &self,
         db_name: &str,
@@ -682,6 +700,7 @@ impl DBList {
 
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
+    #[tracing::instrument]
     pub fn delete_db(
         &self,
         db_name: &str,
@@ -726,6 +745,7 @@ impl DBList {
 
     /// Reads a db from a db packet info.
     /// Err on db not existing as a file: `DBFileSystemError`
+    #[tracing::instrument]
     fn read_db_from_file(p_info: &DBPacketInfo) -> Result<DB, DBPacketResponseError> {
         let mut db_file = match File::open(format!("./data/{}", p_info.get_db_name())) {
             Ok(f) => f,
@@ -744,6 +764,7 @@ impl DBList {
     }
 
     /// Reads a database given a packet, returns the value if it was found.
+    #[tracing::instrument]
     pub fn read_db(
         &self,
         p_info: &DBPacketInfo,
@@ -802,6 +823,7 @@ impl DBList {
     }
 
     /// Writes to a db given a `DBPacket`
+    #[tracing::instrument]
     pub fn write_db(
         &self,
         db_info: &DBPacketInfo,
@@ -870,6 +892,7 @@ impl DBList {
     }
 
     /// Returns the db list in a serialized form of Vec : `DBPacketInfo`
+    #[tracing::instrument]
     pub fn list_db(&self) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list = self.list.read().unwrap();
         serde_json::to_string(&list.clone())
@@ -878,6 +901,7 @@ impl DBList {
     }
 
     /// Returns the db contents in a serialized form of HashMap<String, String>
+    #[tracing::instrument]
     pub fn list_db_contents(
         &self,
         db_info: &DBPacketInfo,
@@ -946,6 +970,7 @@ impl DBList {
 }
 
 impl Default for DBList {
+    #[tracing::instrument]
     fn default() -> Self {
         Self {
             list: RwLock::new(vec![]),

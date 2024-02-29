@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::bool_assert_comparison)]
 mod tests {
 
     use smol_db_common::prelude::*;
@@ -123,11 +123,8 @@ mod tests {
         let delete_response = db_list.delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string());
         assert_eq!(delete_response.unwrap(), SuccessNoData);
 
-        match File::open(PathBuf::from("./data").join(db_name)) {
-            Ok(f) => {
-                panic!("db not deleted {:?}", f)
-            }
-            Err(_) => {}
+        if let Ok(f) = File::open(PathBuf::from("./data").join(db_name)) {
+            panic!("db not deleted {:?}", f)
         }
 
         let delete_response_not_listed =
@@ -581,7 +578,7 @@ mod tests {
                 db_list.get_db_settings(&db_pack_info, &TEST_SUPER_ADMIN_KEY.to_string());
             match original_db_settings.unwrap() {
                 SuccessNoData => {
-                    assert!(false);
+                    unreachable!()
                 }
                 SuccessReply(data) => {
                     let received_original_db_settings: DBSettings =
@@ -635,7 +632,7 @@ mod tests {
 
             match original_db_settings.unwrap() {
                 SuccessNoData => {
-                    assert!(false);
+                    unreachable!()
                 }
                 SuccessReply(data) => {
                     let received_original_db_settings: DBSettings =

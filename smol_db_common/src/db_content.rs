@@ -10,11 +10,13 @@ pub struct DBContent {
 
 impl DBContent {
     /// Reads serialized version of a `DBContent` struct from a string (read from a file most likely) into a `DBContent` struct itself.
+    #[tracing::instrument]
     pub fn read_ser_data(data: &str) -> serde_json::Result<Self> {
         serde_json::from_str(data)
     }
 
     /// Reads from the db using the key, returning an optional of either the retrieved content, or nothing.
+    #[tracing::instrument]
     pub fn read_from_db(&self, key: &str) -> Option<&String> {
         self.content.get(key)
     }
@@ -23,6 +25,7 @@ impl DBContent {
 #[allow(clippy::derivable_impls)] // This lint is allowed so we can later make default not simply have the default impl
 impl Default for DBContent {
     /// Returns a default empty `HashMap`.
+    #[tracing::instrument]
     fn default() -> Self {
         Self {
             content: HashMap::default(),

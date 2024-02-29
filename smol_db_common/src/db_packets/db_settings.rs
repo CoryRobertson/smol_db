@@ -46,17 +46,20 @@ impl DBSettings {
     }
 
     /// Adds an admin to the DB
+    #[tracing::instrument]
     pub fn add_admin(&mut self, hash: String) {
         self.admins.push(hash);
     }
 
     /// Adds a user to a DB
+    #[tracing::instrument]
     pub fn add_user(&mut self, hash: String) {
         self.users.push(hash);
     }
 
     /// Removes a user from the db settings
     /// Returns true if it found the users hash, false if the users hash was not found
+    #[tracing::instrument]
     pub fn remove_user(&mut self, hash: &str) -> bool {
         let it = self.users.clone();
         let mut removed = false;
@@ -71,6 +74,7 @@ impl DBSettings {
 
     /// Removes an admin from the db settings
     /// Returns true if the given admin was removed, false if not.
+    #[tracing::instrument]
     pub fn remove_admin(&mut self, hash: &str) -> bool {
         let it = self.admins.clone();
         let mut removed = false;
@@ -84,11 +88,13 @@ impl DBSettings {
     }
 
     /// Returns true if the given key is an admin key
+    #[tracing::instrument]
     pub fn is_admin(&self, client_key: &String) -> bool {
         self.admins.contains(client_key)
     }
 
     /// Returns true if the given key is a user key
+    #[tracing::instrument]
     pub fn is_user(&self, client_key: &String) -> bool {
         self.users.contains(client_key)
     }

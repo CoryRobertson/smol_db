@@ -8,6 +8,7 @@ use smol_db_common::{
 };
 use std::sync::{Arc, RwLock};
 
+#[tracing::instrument(skip_all)]
 pub(crate) async fn cache_invalidator(
     #[cfg(feature = "logging")] logger: Arc<Logger>,
     db_list: Arc<RwLock<DBList>>,

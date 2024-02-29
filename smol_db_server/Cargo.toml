@@ -19,9 +19,13 @@ rand = "0.8.5"
 ctrlc = "3.4.1"
 futures = { version = "0.3.30", features = ["io-compat", "thread-pool", "executor"] }
 futures-time = "3.0.0"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", optional = true}
+tracing-tracy = { version = "0.11.0", optional = true}
 
 [features]
 logging = []
 statistics = ["smol_db_common/statistics"]
 no-saving = []
+tracing = ["dep:tracing-subscriber","dep:tracing-tracy"]
 

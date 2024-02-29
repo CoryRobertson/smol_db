@@ -54,6 +54,7 @@ pub mod prelude {
 
 /// `SmolDbClient` struct used for communicating to the database.
 /// This struct has implementations that allow for end to end communication with the database server.
+#[derive(Debug)]
 pub struct SmolDbClient {
     socket: TcpStream,
     encryption: Option<ClientKey>,
@@ -69,6 +70,7 @@ impl SmolDbClient {
     /// // client should be functional provided a database server was able to be connected to at the given location
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip);
         match socket {
@@ -81,6 +83,7 @@ impl SmolDbClient {
     }
 
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn new(ip: &str) -> Result<Self, ClientError> {
         let socket = TcpStream::connect(ip).await;
         match socket {
@@ -107,6 +110,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("docsetup_encryption_test").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
         let server_pub_key_ser = self
             .send_packet(&DBPacket::SetupEncryption)?
@@ -127,6 +131,7 @@ impl SmolDbClient {
     }
 
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
         let server_pub_key_ser = self
             .send_packet(&DBPacket::SetupEncryption)
@@ -148,6 +153,7 @@ impl SmolDbClient {
     }
 
     /// Returns true if end to end encryption is enabled
+    #[tracing::instrument]
     pub fn is_encryption_enabled(&self) -> bool {
         self.encryption.is_some()
     }
@@ -168,6 +174,7 @@ impl SmolDbClient {
     ///
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn reconnect(&mut self) -> Result<(), ClientError> {
         let ip = self.socket.peer_addr().map_err(UnableToConnect)?;
         let new_socket = TcpStream::connect(ip).map_err(UnableToConnect)?;
@@ -178,6 +185,7 @@ impl SmolDbClient {
     /// Reconnects the client, this will reset the session, which can be used to remove any key that was used.
     /// Or to reconnect in the event of a loss of connection
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn reconnect(&mut self) -> Result<(), ClientError> {
         let ip = self.socket.peer_addr().map_err(UnableToConnect)?;
         let new_socket = TcpStream::connect(ip).await.map_err(UnableToConnect)?;
@@ -186,6 +194,7 @@ impl SmolDbClient {
     }
 
     /// Returns a result containing the peer address of this client
+    #[tracing::instrument]
     pub fn get_connected_ip(&self) -> std::io::Result<SocketAddr> {
         self.socket.peer_addr()
     }
@@ -200,12 +209,14 @@ impl SmolDbClient {
     /// let _ = client.disconnect().expect("Failed to disconnect socket");
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn disconnect(&self) -> std::io::Result<()> {
         self.socket.shutdown(Shutdown::Both)
     }
 
     /// Disconnects the socket from the database.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn disconnect(&mut self) -> std::io::Result<()> {
         self.socket.shutdown().await
     }
@@ -233,6 +244,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_delete_data").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn delete_data(
         &mut self,
         db_name: &str,
@@ -244,6 +256,7 @@ impl SmolDbClient {
 
     /// Deletes the data at the given db location, requires permissions to do so.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn delete_data(
         &mut self,
         db_name: &str,
@@ -256,6 +269,7 @@ impl SmolDbClient {
     /// Returns the `DBStatistics` struct if permissions allow it on a given db
     #[cfg(feature = "statistics")]
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn get_stats(&mut self, db_name: &str) -> Result<DBStatistics, ClientError> {
         let packet = DBPacket::new_get_stats(db_name);
         let resp = self.send_packet(&packet)?;
@@ -272,6 +286,7 @@ impl SmolDbClient {
     /// Returns the `DBStatistics` struct if permissions allow it on a given db
     #[cfg(feature = "statistics")]
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn get_stats(&mut self, db_name: &str) -> Result<DBStatistics, ClientError> {
         let packet = DBPacket::new_get_stats(db_name);
         let resp = self.send_packet(&packet).await?;
@@ -303,6 +318,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_get_role").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
         let packet = DBPacket::new_get_role(db_name);
 
@@ -319,6 +335,7 @@ impl SmolDbClient {
 
     /// Returns the role of the given client in the given db.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
         let packet = DBPacket::new_get_role(db_name);
 
@@ -351,6 +368,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_get_db_settings").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
         let packet = DBPacket::new_get_db_settings(db_name);
 
@@ -367,6 +385,7 @@ impl SmolDbClient {
     /// Gets the `DBSettings` of the given DB.
     /// Error on IO error, or when database name does not exist, or when the user lacks permissions to view `DBSettings`.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
         let packet = DBPacket::new_get_db_settings(db_name);
 
@@ -402,6 +421,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_set_db_settings").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn set_db_settings(
         &mut self,
         db_name: &str,
@@ -414,6 +434,7 @@ impl SmolDbClient {
     /// Sets the `DBSettings` of a given DB
     /// Error on IO Error, or when database does not exist, or when the user lacks permissions to set `DBSettings`
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn set_db_settings(
         &mut self,
         db_name: &str,
@@ -434,6 +455,7 @@ impl SmolDbClient {
     /// let _ = client.set_access_key("test_key_123".to_string()).unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn set_access_key(
         &mut self,
         key: String,
@@ -444,6 +466,7 @@ impl SmolDbClient {
 
     /// Sets this clients access key within the DB Server. The server will persist the key until the session is disconnected, or connection is lost.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn set_access_key(
         &mut self,
         key: String,
@@ -454,7 +477,7 @@ impl SmolDbClient {
 
     /// Sends a packet to the clients currently connected database and returns the result
     #[cfg(not(feature = "async"))]
-
+    #[tracing::instrument]
     fn send_packet(
         &mut self,
         sent_packet: &DBPacket,
@@ -506,6 +529,7 @@ impl SmolDbClient {
 
     /// Sends a packet to the clients currently connected database and returns the result
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     async fn send_packet(
         &mut self,
         sent_packet: &DBPacket,
@@ -571,6 +595,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_create_db").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn create_db(
         &mut self,
         db_name: &str,
@@ -585,6 +610,7 @@ impl SmolDbClient {
     /// Creates a db through the client with the given name.
     /// Error on IO Error, or when the user lacks permissions to create a DB
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn create_db(
         &mut self,
         db_name: &str,
@@ -617,6 +643,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_write_data").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn write_db(
         &mut self,
         db_name: &str,
@@ -632,6 +659,7 @@ impl SmolDbClient {
     /// Returns the data in the location that was over written if there was any.
     /// Requires permissions to write to the given DB
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn write_db(
         &mut self,
         db_name: &str,
@@ -664,6 +692,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_read_db").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn read_db(
         &mut self,
         db_name: &str,
@@ -678,6 +707,7 @@ impl SmolDbClient {
     /// Returns an error if there is no data in the location.
     /// Requires permissions to read from the given DB
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn read_db(
         &mut self,
         db_name: &str,
@@ -703,6 +733,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_delete_db").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn delete_db(&mut self, db_name: &str) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_db(db_name);
 
@@ -712,6 +743,7 @@ impl SmolDbClient {
     /// Deletes the given db by name.
     /// Requires super admin privileges on the given DB Server
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn delete_db(
         &mut self,
         db_name: &str,
@@ -749,6 +781,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_list_db2").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let packet = DBPacket::new_list_db();
 
@@ -766,6 +799,7 @@ impl SmolDbClient {
     /// Lists all the current databases available by name from the server
     /// Only error on IO Error
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let packet = DBPacket::new_list_db();
 
@@ -800,6 +834,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_list_cont_db").unwrap();
     /// ```
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn list_db_contents(
         &mut self,
         db_name: &str,
@@ -820,6 +855,7 @@ impl SmolDbClient {
     /// Get the hashmap of the contents of a database. Contents are always String:String for the hashmap.
     /// Requires list permissions on the given DB
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn list_db_contents(
         &mut self,
         db_name: &str,
@@ -839,6 +875,7 @@ impl SmolDbClient {
 
     /// Lists the given db's contents, deserializing the contents into a hash map.
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn list_db_contents_generic<T>(
         &mut self,
         db_name: &str,
@@ -863,6 +900,7 @@ impl SmolDbClient {
 
     /// Lists the given db's contents, deserializing the contents into a hash map.
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn list_db_contents_generic<T>(
         &mut self,
         db_name: &str,
@@ -887,6 +925,7 @@ impl SmolDbClient {
 
     /// Writes to the db while serializing the given data, returning the data at the location given and deserialized to the same type.
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument(skip(data))]
     pub fn write_db_generic<T>(
         &mut self,
         db_name: &str,
@@ -913,6 +952,7 @@ impl SmolDbClient {
 
     /// Writes to the db while serializing the given data, returning the data at the location given and deserialized to the same type.
     #[cfg(feature = "async")]
+    #[tracing::instrument(skip(data))]
     pub async fn write_db_generic<T>(
         &mut self,
         db_name: &str,
@@ -939,6 +979,7 @@ impl SmolDbClient {
 
     /// Reads from db and tries to deserialize the content at the location to the given generic
     #[cfg(not(feature = "async"))]
+    #[tracing::instrument]
     pub fn read_db_generic<T>(
         &mut self,
         db_name: &str,
@@ -961,6 +1002,7 @@ impl SmolDbClient {
 
     /// Reads from db and tries to deserialize the content at the location to the given generic
     #[cfg(feature = "async")]
+    #[tracing::instrument]
     pub async fn read_db_generic<T>(
         &mut self,
         db_name: &str,

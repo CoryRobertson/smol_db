@@ -29,6 +29,8 @@ pub enum ClientError {
 }
 
 impl PartialEq for ClientError {
+
+    #[tracing::instrument]
     fn eq(&self, other: &Self) -> bool {
         match self {
             Self::UnableToConnect(_) => {
