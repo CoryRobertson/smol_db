@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use egui::ViewportCommand;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -213,7 +214,7 @@ impl ApplicationState {
 
 impl eframe::App for ApplicationState {
     #[tracing::instrument(skip_all)]
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self { .. } = self;
 
         // top panel block
@@ -223,7 +224,7 @@ impl eframe::App for ApplicationState {
                     let has_client = self.client.lock().unwrap().is_some();
                     ui.menu_button("File", |ui| {
                         if ui.button("Quit").clicked() {
-                            frame.close();
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
                         }
                     });
                     ui.separator();
