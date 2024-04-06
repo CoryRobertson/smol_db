@@ -1,6 +1,7 @@
 //! Module containing a `DBSettings` struct, a struct that represents the various settings a database has.
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::info;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 /// Struct describing settings used when creating a db.
@@ -48,12 +49,14 @@ impl DBSettings {
     /// Adds an admin to the DB
     #[tracing::instrument]
     pub fn add_admin(&mut self, hash: String) {
+        info!("Adding admin to db settings");
         self.admins.push(hash);
     }
 
     /// Adds a user to a DB
     #[tracing::instrument]
     pub fn add_user(&mut self, hash: String) {
+        info!("Adding user to db settings");
         self.users.push(hash);
     }
 
@@ -61,30 +64,22 @@ impl DBSettings {
     /// Returns true if it found the users hash, false if the users hash was not found
     #[tracing::instrument]
     pub fn remove_user(&mut self, hash: &str) -> bool {
-        let it = self.users.clone();
-        let mut removed = false;
-        for (index, item) in it.iter().enumerate() {
-            if hash == item {
-                self.users.remove(index);
-                removed = true;
-            }
-        }
-        removed
+        info!("Removing user from db settings");
+        let len_old = self.users.len();
+        self.users.retain(|item| item.ne(hash));
+        let len_new = self.users.len();
+        len_old > len_new
     }
 
     /// Removes an admin from the db settings
     /// Returns true if the given admin was removed, false if not.
     #[tracing::instrument]
     pub fn remove_admin(&mut self, hash: &str) -> bool {
-        let it = self.admins.clone();
-        let mut removed = false;
-        for (index, item) in it.iter().enumerate() {
-            if hash == item {
-                self.admins.remove(index);
-                removed = true;
-            }
-        }
-        removed
+        info!("Removing admin from db settings");
+        let len_old = self.admins.len();
+        self.admins.retain(|item| item.ne(hash));
+        let len_new = self.admins.len();
+        len_old > len_new
     }
 
     /// Returns true if the given key is an admin key

@@ -1,23 +1,14 @@
 use crate::DBListThreadSafe;
 use smol_db_common::prelude::DBPacketResponseError::BadPacket;
 use smol_db_common::prelude::{DBPacket, RsaPublicKey, SuccessNoData, SuccessReply};
-#[cfg(feature = "logging")]
-use smol_db_common::{
-    logging::log_entry::LogEntry, logging::log_level::LogLevel, logging::log_message::LogMessage,
-    logging::logger::Logger,
-};
 use std::io::{Read, Write};
 use std::net::TcpStream;
-#[cfg(feature = "logging")]
-use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 #[allow(clippy::let_and_return)]
-#[tracing::instrument(skip(logger))]
-pub(crate) async fn handle_client(
-    mut stream: TcpStream,
-    db_list: DBListThreadSafe,
-    #[cfg(feature = "logging")] logger: Arc<Logger>,
-) {
+#[tracing::instrument(skip(db_list))]
+pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
+    info!("New client connected");
     let ip_address = stream.peer_addr().unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     let mut client_key = String::new();
@@ -29,21 +20,19 @@ pub(crate) async fn handle_client(
     loop {
         // client loop
 
+        info!("Awaiting packet information from: {}", client_name);
         let read_result = stream.read(&mut buf);
 
         if let Ok(read) = read_result {
             if read != 0 {
-                #[cfg(debug_assertions)]
-                println!("read size: {}", read); // this is a debug print
+                debug!("Read size: {}", read);
                 let response = match DBPacket::deserialize_packet(&buf[0..read]) {
                     Ok(mut pack) => {
-                        #[cfg(debug_assertions)]
-                        println!("packet data: {:?}", pack); // this is also a debug print
+                        debug!("Packet data: {:?}", pack);
 
                         // overwrite the packet with the unencrypted version if it is encrypted
                         if let DBPacket::Encrypted(data) = &pack {
-                            #[cfg(debug_assertions)]
-                            println!("Received encrypted data: {:?}", data);
+                            debug!("Received encrypted data: {:?}", data);
                             let unencrypted_data = db_list
                                 .read()
                                 .unwrap()
@@ -51,8 +40,8 @@ pub(crate) async fn handle_client(
                                 .decrypt_client_packet(data)
                                 .unwrap();
                             pack = unencrypted_data;
-                            #[cfg(debug_assertions)]
-                            println!("Unencrypted data: {:?}", pack);
+
+                            debug!("Unencrypted data: {:?}", pack);
                         }
 
                         match pack {
@@ -61,63 +50,32 @@ pub(crate) async fn handle_client(
                                 let key = db_list.read().unwrap().server_key.get_pub_key().clone();
                                 let ser = serde_json::to_string(&key).unwrap();
                                 let resp = Ok(SuccessReply(ser));
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} requested to setup encryption, response: {:?}",
-                                            client_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} requested to setup encryption, response: {:?}",
+                                    client_name, resp
+                                );
                                 resp
                             }
                             DBPacket::PubKey(key) => {
                                 let resp = Ok(SuccessNoData);
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} sent pub-key {:?} response: {:?}",
-                                            client_name, key, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} sent pub-key {:?} response: {:?}",
+                                    client_name, key, resp
+                                );
                                 client_pub_key_opt = Some(key);
                                 resp
                             }
                             DBPacket::Encrypted(_) => {
-                                #[cfg(feature = "logging")]
-                                    let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} sent encrypted packet that was not handled properly, report this on github in the issues section of smol_db",
-                                            client_name,
-                                        )
-                                            .as_str(),
-                                    ),
-                                    LogLevel::Error,
-                                ));
+                                warn!("{} sent encrypted packet that was not handled properly, report this on github in the issues section of smol_db",client_name);
                                 Err(BadPacket)
                             }
                             DBPacket::Read(db_name, db_location) => {
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.read_db(&db_name, &db_location, &client_key);
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} read \"{}\" in \"{}\", response: {:?}",
-                                            client_name, db_location, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} read \"{}\" in \"{}\", response: {:?}",
+                                    client_name, db_location, db_name, resp
+                                );
                                 resp
                             }
                             DBPacket::Write(db_name, db_location, db_write_value) => {
@@ -129,17 +87,10 @@ pub(crate) async fn handle_client(
                                     &client_key,
                                 );
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} wrote \"{}\" to \"{}\" in \"{}\", response: {:?}",
-                                            client_name, db_write_value, db_location, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} wrote \"{}\" to \"{}\" in \"{}\", response: {:?}",
+                                    client_name, db_write_value, db_location, db_name, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 db_list.read().unwrap().save_specific_db(&db_name);
@@ -155,11 +106,7 @@ pub(crate) async fn handle_client(
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_db_list();
 
-                                #[cfg(feature = "logging")]
-                                    let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(format!("{} created database \"{}\" with settings \"{:?}\", response: {:?}",client_name,db_name,db_settings, resp).as_str()),
-                                    LogLevel::Info
-                                ));
+                                info!("{} created database \"{}\" with settings \"{:?}\", response: {:?}",client_name,db_name,db_settings, resp);
 
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_all_db();
@@ -169,17 +116,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.delete_db(db_name.get_db_name(), &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} deleted database \"{}\", response: {:?}",
-                                            client_name, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} deleted database \"{}\", response: {:?}",
+                                    client_name, db_name, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 db_list.read().unwrap().save_db_list();
@@ -189,17 +129,7 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.list_db();
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} listed databases, response: {:?}",
-                                            client_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!("{} listed databases, response: {:?}", client_name, resp);
 
                                 resp
                             }
@@ -207,17 +137,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.list_db_contents(&db_name, &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} listed database contents of \"{}\", response: {:?}",
-                                            client_name, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} listed database contents of \"{}\", response: {:?}",
+                                    client_name, db_name, resp
+                                );
 
                                 resp
                             }
@@ -226,17 +149,10 @@ pub(crate) async fn handle_client(
                                 let resp =
                                     lock.add_admin(&db_name, admin_hash.clone(), &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} added an admin \"{}\" to \"{}\", response: {:?}",
-                                            client_name, admin_hash, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} added an admin \"{}\" to \"{}\", response: {:?}",
+                                    client_name, admin_hash, db_name, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
@@ -246,17 +162,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.add_user(&db_name, user_hash.clone(), &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} added an admin \"{}\" to \"{}\" response: {:?}",
-                                            client_name, user_hash, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} added an admin \"{}\" to \"{}\" response: {:?}",
+                                    client_name, user_hash, db_name, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
@@ -271,13 +180,7 @@ pub(crate) async fn handle_client(
                                     super_admin_list_lock.push(key.clone());
                                 }
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!("{} set key to \"{}\"", client_name, key).as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!("{} set key to \"{}\"", client_name, key);
 
                                 client_key = key;
                                 client_name = format!("Client [{}] [{}]:", ip_address, client_key);
@@ -287,17 +190,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.get_db_settings(&db_name, &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} got db settings from \"{}\", response: {:?}",
-                                            client_name, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} got db settings from \"{}\", response: {:?}",
+                                    client_name, db_name, resp
+                                );
 
                                 resp
                             }
@@ -309,11 +205,10 @@ pub(crate) async fn handle_client(
                                     &client_key,
                                 );
 
-                                #[cfg(feature = "logging")]
-                                    let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(format!("{} changed db settings of \"{}\" to \"{:?}\", response: {:?}",client_name,db_name,db_settings,resp).as_str()),
-                                    LogLevel::Info
-                                ));
+                                info!(
+                                    "{} changed db settings of \"{}\" to \"{:?}\", response: {:?}",
+                                    client_name, db_name, db_settings, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
@@ -323,17 +218,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.get_role(&db_name, &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} got role from \"{}\", response: {:?}",
-                                            client_name, db_name, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} got role from \"{}\", response: {:?}",
+                                    client_name, db_name, resp
+                                );
 
                                 resp
                             }
@@ -341,17 +229,10 @@ pub(crate) async fn handle_client(
                                 let lock = db_list.read().unwrap();
                                 let resp = lock.delete_data(&db_name, &db_location, &client_key);
 
-                                #[cfg(feature = "logging")]
-                                let _ = logger.log(&LogEntry::new(
-                                    LogMessage::new(
-                                        format!(
-                                            "{} deleted data from \"{}\" in \"{}\", response: {:?}",
-                                            client_name, db_name, db_location, resp
-                                        )
-                                        .as_str(),
-                                    ),
-                                    LogLevel::Info,
-                                ));
+                                info!(
+                                    "{} deleted data from \"{}\" in \"{}\", response: {:?}",
+                                    client_name, db_name, db_location, resp
+                                );
 
                                 #[cfg(not(feature = "no-saving"))]
                                 lock.save_specific_db(&db_name);
@@ -363,7 +244,7 @@ pub(crate) async fn handle_client(
                         }
                     }
                     Err(err) => {
-                        println!("packet serialization error: {}", err);
+                        error!("packet serialization error: {}", err);
                         Err(BadPacket)
                         // continue;
                     }
@@ -390,21 +271,21 @@ pub(crate) async fn handle_client(
                 };
 
                 if write_result.is_err() {
-                    println!(
+                    info!(
                         "{} dropped. Unable to write socket data. {:?}",
                         client_name, stream
                     );
                     break;
                 }
             } else {
-                println!(
+                info!(
                     "{} dropped. Read 0 bytes from socket. {:?}",
                     client_name, stream
                 );
                 break;
             }
         } else {
-            println!(
+            info!(
                 "{} dropped. Unable to read socket data. {:?}",
                 client_name, stream
             );

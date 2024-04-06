@@ -6,6 +6,8 @@ use crate::encryption::{decrypt, EncryptionError, BIT_LENGTH};
 use crate::prelude::{DBPacketResponseError, DBSuccessResponse};
 use rsa::rand_core::OsRng;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use tracing::{error, info};
+
 #[derive(Debug)]
 /// A client rsa key pair, along with a server public key used for end to end encryption
 pub struct ClientKey {
@@ -18,6 +20,7 @@ pub struct ClientKey {
 impl ClientKey {
     #[tracing::instrument]
     pub fn new(server_pub_key: RsaPublicKey) -> Result<Self, rsa::Error> {
+        info!("Generating client key from server public key");
         let mut rng = OsRng;
         let pri_key = RsaPrivateKey::new(&mut rng, BIT_LENGTH)?;
         let pub_key = pri_key.to_public_key();
@@ -50,15 +53,21 @@ impl ClientKey {
     }
 
     /// Decrypt a packet received from the server on the client
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn decrypt_server_packet(
         &self,
         server_db_response: &[u8],
     ) -> Result<Result<DBSuccessResponse<String>, DBPacketResponseError>, EncryptionError> {
         let msg = decrypt(&self.pri_key, server_db_response).map_err(EncryptionError::RSAError)?;
         match serde_json::from_slice(&msg) {
-            Ok(packet) => Ok(packet),
-            Err(_) => Err(EncryptionError::SerializationError),
+            Ok(packet) => {
+                info!("Successfully decrypted packet");
+                Ok(packet)
+            }
+            Err(e) => {
+                error!("Error deserializing encrypted packet from server: {}", e);
+                Err(EncryptionError::SerializationError)
+            }
         }
     }
 

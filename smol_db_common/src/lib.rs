@@ -8,8 +8,6 @@ pub mod db_packets;
 pub mod encryption;
 #[cfg(feature = "statistics")]
 pub mod statistics;
-/// Public exposing of the `simple_logger_rs` logging library for use from dependants on `smol_db_common`
-pub use simple_logger_rs::logging;
 
 pub mod prelude {
     pub use crate::db::Role;

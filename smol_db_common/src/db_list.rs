@@ -23,6 +23,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::RwLock;
 use std::time::SystemTime;
+use tracing::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -45,13 +46,13 @@ pub struct DBList {
 
 impl DBList {
     /// Returns true if the given hash is a super admin hash
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn is_super_admin(&self, hash: &String) -> bool {
         self.super_admin_hash_list.read().unwrap().contains(hash)
     }
 
     /// Returns the super admin list
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     fn get_super_admin_list(&self) -> Vec<String> {
         self.super_admin_hash_list.read().unwrap().clone()
     }
@@ -59,14 +60,17 @@ impl DBList {
     #[allow(unused_variables)]
     #[allow(clippy::ptr_arg)]
     /// Returns the db stats used for a given database when permissions allow the user to read them
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_stats(
         &self,
         p_info: &DBPacketInfo,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         #[cfg(not(feature = "statistics"))]
-        return Err(BadPacket);
+        {
+            warn!("Statistics packet received, however statistics is not enabled on this server");
+            return Err(BadPacket);
+        }
 
         #[cfg(feature = "statistics")]
         {
@@ -74,6 +78,7 @@ impl DBList {
 
             let list_lock = self.list.read().unwrap();
             if let Some(db) = self.cache.read().unwrap().get(p_info) {
+                info!("DB Cache hit");
                 // cache was hit
                 let mut db_lock = db.write().unwrap();
 
@@ -89,6 +94,7 @@ impl DBList {
             }
 
             return if list_lock.contains(p_info) {
+                info!("DB Cache missed");
                 // cache was missed but the db exists on the file system
 
                 let mut db = Self::read_db_from_file(p_info)?;
@@ -111,13 +117,14 @@ impl DBList {
                 resp
             } else {
                 // cache was neither hit, nor did the db exist on the file system
+                info!("Database not found {}", p_info);
                 Err(DBNotFound)
             };
         }
     }
 
     /// Deletes the given data from a db if the user has write permissions
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn delete_data(
         &self,
         p_info: &DBPacketInfo,
@@ -128,6 +135,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -146,6 +154,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -170,12 +179,13 @@ impl DBList {
             resp
         } else {
             // cache was neither hit, nor did the db exist on the file system
+            info!("Database not found {}", p_info);
             Err(DBNotFound)
         };
     }
 
     /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_role(
         &self,
         p_info: &DBPacketInfo,
@@ -184,6 +194,7 @@ impl DBList {
         let super_admin_list = self.get_super_admin_list();
 
         if super_admin_list.contains(client_key) {
+            info!("User was super admin");
             // early return super admin if their key is a super admin key.
             return Ok(SuccessReply(serde_json::to_string(&SuperAdmin).unwrap()));
         }
@@ -191,6 +202,7 @@ impl DBList {
         let list_lock = self.list.read().unwrap();
 
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -203,6 +215,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -220,13 +233,14 @@ impl DBList {
             Ok(SuccessReply(serialized_role))
         } else {
             // cache was neither hit, nor did the db exist on the file system
+            info!("Database not found {}", p_info);
             Err(DBNotFound)
         };
     }
 
     /// Replaces `DBSettings` for a given DB, requires super admin privileges.
     /// Returns `SuccessNoData` when successful
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn change_db_settings(
         &self,
         p_info: &DBPacketInfo,
@@ -235,11 +249,13 @@ impl DBList {
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
             // change settings requires super admin, early return if the user is not a super admin
+            info!("User was not super admin");
             return Err(InvalidPermissions);
         }
 
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -251,6 +267,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -265,25 +282,29 @@ impl DBList {
             Ok(SuccessNoData)
         } else {
             // cache was neither hit, nor did the db exist on the file system
+            info!("Database not found {}", p_info);
             Err(DBNotFound)
         };
     }
 
     /// Returns the `DBSettings` serialized as a string
     /// Only super admins can get the db settings
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_db_settings(
         &self,
         p_info: &DBPacketInfo,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
+            info!("Client is not super admin");
             // change settings requires super admin, early return if the user is not a super admin
             return Err(InvalidPermissions);
         }
 
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
+
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -295,6 +316,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -318,7 +340,7 @@ impl DBList {
     }
 
     /// Adds a user to a given DB, requires admin privileges or super admin privileges.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn add_user(
         &self,
         p_info: &DBPacketInfo,
@@ -327,6 +349,7 @@ impl DBList {
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -342,6 +365,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -369,7 +393,7 @@ impl DBList {
     }
 
     /// Removes a user from a given DB, requires admin privileges
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn remove_user(
         &self,
         p_info: &DBPacketInfo,
@@ -378,6 +402,7 @@ impl DBList {
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -396,6 +421,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -426,7 +452,7 @@ impl DBList {
     }
 
     /// Remove an admin from given DB, requires super admin permissions.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn remove_admin(
         &self,
         p_info: &DBPacketInfo,
@@ -440,6 +466,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
 
@@ -453,6 +480,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -480,7 +508,7 @@ impl DBList {
     }
 
     /// Adds an admin to a given database, requires super admin permissions to perform.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn add_admin(
         &self,
         p_info: &DBPacketInfo,
@@ -488,12 +516,14 @@ impl DBList {
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         if !self.is_super_admin(client_key) {
+            info!("User is not a super admin");
             // to add an admin, you must be a super admin first, else you have invalid permissions
             return Err(InvalidPermissions);
         }
 
         let list_lock = self.list.read().unwrap();
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             let mut db_lock = db.write().unwrap();
             db_lock.update_access_time();
@@ -504,6 +534,7 @@ impl DBList {
         }
 
         return if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -526,7 +557,7 @@ impl DBList {
     /// Removes all caches which last access time exceeds their invalidation time.
     /// Read locks the cache list, will Write lock the cache list if there are caches to be removed.
     /// Returns the number of caches removed.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn sleep_caches(&self) -> usize {
         // prepare a list of invalid caches
         let invalid_cache_names: Vec<DBPacketInfo> = {
@@ -550,11 +581,14 @@ impl DBList {
                 .map(|(db_name, _)| db_name.clone()) // there has to be a way to get rid of this clone -_-
                 .collect()
         };
+        info!("DB sleep list: {:?}", invalid_cache_names);
+        info!("Putting {} databases to sleep", invalid_cache_names.len());
 
         if !invalid_cache_names.is_empty() {
             // only write lock the cache if we have caches to remove.
             let mut write_lock = self.cache.write().unwrap();
             for invalid_cache_name in &invalid_cache_names {
+                info!("DB being put to sleep: {}", invalid_cache_name);
                 write_lock.remove(invalid_cache_name);
             }
         }
@@ -562,32 +596,65 @@ impl DBList {
     }
 
     /// Saves all db instances to a file.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn save_all_db(&self) {
+        info!("Saving all databases");
         let list = self.cache.read().unwrap();
         for (db_name, db) in list.iter() {
-            let mut db_file = File::create(format!("./data/{}", db_name.get_db_name())).expect(
-                &format!("Unable to create db file: {}", db_name.get_db_name()),
-            );
+            let mut db_file = match File::create(format!("./data/{}", db_name.get_db_name())) {
+                Ok(f) => {
+                    info!("DB file created for DB: {}", db_name);
+                    f
+                }
+                Err(e) => {
+                    let log_message =
+                        format!("Unable to create db file: {}, {}", db_name.get_db_name(), e);
+                    error!("{}", log_message);
+                    panic!("{}", log_message);
+                }
+            };
+
             let db_lock = db.read().unwrap();
-            let ser = serde_json::to_string(&db_lock.clone()).expect(&format!(
-                "Unable to serialize db file: {}",
-                db_name.get_db_name()
-            ));
-            let _ = db_file.write(ser.as_bytes()).expect(&format!(
-                "Unable to write to db file: {}",
-                db_name.get_db_name()
-            ));
+            let ser = match serde_json::to_string(&db_lock.clone()) {
+                Ok(s) => {
+                    info!("Successfully serialized database");
+                    s
+                }
+                Err(e) => {
+                    let log_message = format!(
+                        "Unable to serialize db file: {}, {}",
+                        db_name.get_db_name(),
+                        e
+                    );
+                    error!("{}", log_message);
+                    panic!("{}", log_message)
+                }
+            };
+            match db_file.write(ser.as_bytes()) {
+                Ok(len) => {
+                    info!("Successfully wrote {} to file with size: {}", db_name, len);
+                }
+                Err(e) => {
+                    let log_message = format!(
+                        "Unable to write to db file: {}, {}",
+                        db_name.get_db_name(),
+                        e
+                    );
+                    error!("{}", log_message);
+                    panic!("{}", log_message);
+                }
+            }
         }
     }
 
     /// Saves a specific db by name to file.
     /// Read locks the cache.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn save_specific_db(&self, db_name: &DBPacketInfo) {
         let list = self.cache.read().unwrap();
         match list.get(db_name) {
             Some(db_lock) => {
+                info!("Database exists, saving to file");
                 let mut db_file = File::create(format!("./data/{}", db_name.get_db_name())).expect(
                     &format!("Unable to create db file: {}", db_name.get_db_name()),
                 );
@@ -597,30 +664,36 @@ impl DBList {
                     "Unable to write to db file: {}",
                     db_name.get_db_name()
                 ));
+                info!("Database successfully saved");
             }
             None => {
-                panic!(
+                let log_message = format!(
                     "Unable to save db: {}, db not found in list?",
                     db_name.get_db_name()
                 );
+                error!("{}", log_message);
+                panic!("{}", log_message);
             }
         }
     }
 
     /// Saves all db names to a file.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn save_db_list(&self) {
+        info!("Saving database list");
         let mut db_list_file =
             File::create("./data/db_list.ser").expect("Unable to save db_list.ser");
         let ser_data = serde_json::to_string(&self).expect("Unable to serialize self.");
         let _ = db_list_file
             .write(ser_data.as_bytes())
             .expect("Unable to write bytes to db_list.ser");
+        info!("Successfully saved database list");
     }
 
     /// Loads all db names from the db list file.
     #[tracing::instrument]
     pub fn load_db_list() -> Self {
+        info!("Loading database list");
         match File::open("./data/db_list.ser") {
             Ok(mut f) => {
                 // file found, load from file data
@@ -629,9 +702,11 @@ impl DBList {
                     .expect("Unable to read db_list.ser to string");
                 let db_list: Self =
                     serde_json::from_str(&ser).expect("Unable to deserialize db_list.ser");
+                info!("Successfully opened database list and deserialized");
                 db_list
             }
-            Err(_) => {
+            Err(e) => {
+                warn!("No database list found, making one. This could be an error or is the first startup of the server. {}",e);
                 // no file found, load default
                 Self::default()
             }
@@ -639,7 +714,7 @@ impl DBList {
     }
 
     /// Returns true if the given db exists.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     fn db_name_exists(&self, db_name: &str) -> bool {
         self.list
             .read()
@@ -649,7 +724,7 @@ impl DBList {
 
     /// Creates a DB given a name, the packet is not needed, only the name.
     /// Requires super admin privileges
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn create_db(
         &self,
         db_name: &str,
@@ -687,10 +762,12 @@ impl DBList {
                         cache_write_lock.insert(db_packet_info.clone(), RwLock::from(db));
                         list_write_lock.push(db_packet_info);
                         drop(cache_write_lock);
+                        info!("Successfully created DB file");
                         Ok(SuccessNoData)
                     }
-                    Err(_) => {
+                    Err(e) => {
                         // db file was unable to be created
+                        error!("Unable to create DB file: {}", e);
                         Err(DBFileSystemError)
                     }
                 }
@@ -700,7 +777,7 @@ impl DBList {
 
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn delete_db(
         &self,
         db_name: &str,
@@ -737,9 +814,14 @@ impl DBList {
                     // if no db was removed from the list, then we should tell the user that this deletion failed in some way.
                     return Err(DBFileSystemError);
                 }
+
+                info!("Successfully deleted database: {}", db_name);
                 Ok(SuccessNoData)
             }
-            Err(_) => Err(DBFileSystemError),
+            Err(e) => {
+                error!("Unable to delete database file: {}", e);
+                Err(DBFileSystemError)
+            }
         }
     }
 
@@ -749,7 +831,8 @@ impl DBList {
     fn read_db_from_file(p_info: &DBPacketInfo) -> Result<DB, DBPacketResponseError> {
         let mut db_file = match File::open(format!("./data/{}", p_info.get_db_name())) {
             Ok(f) => f,
-            Err(_) => {
+            Err(e) => {
+                error!("Unable to read database from file: {}", e);
                 // early return db file system error when no file was able to be opened, should never happen due to the db file being in a list of known working db files.
                 return Err(DBFileSystemError);
             }
@@ -764,7 +847,7 @@ impl DBList {
     }
 
     /// Reads a database given a packet, returns the value if it was found.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn read_db(
         &self,
         p_info: &DBPacketInfo,
@@ -776,6 +859,7 @@ impl DBList {
         let list_lock = self.list.read().unwrap();
 
         if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
             // cache was hit
             db.write().unwrap().update_access_time();
 
@@ -793,6 +877,7 @@ impl DBList {
         }
 
         if list_lock.contains(p_info) {
+            info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
             let mut db = Self::read_db_from_file(p_info)?;
@@ -823,7 +908,7 @@ impl DBList {
     }
 
     /// Writes to a db given a `DBPacket`
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn write_db(
         &self,
         db_info: &DBPacketInfo,
@@ -840,6 +925,7 @@ impl DBList {
             let cache_lock = self.cache.read().unwrap();
 
             if let Some(db) = cache_lock.get(db_info) {
+                info!("DB Cache hit");
                 // cache is hit, db is currently loaded
 
                 let mut db_lock = db.write().unwrap();
@@ -861,6 +947,7 @@ impl DBList {
         }
 
         if list_lock.contains(db_info) {
+            info!("DB Cache missed");
             // cache was missed, but the requested database did in fact exist
 
             let mut cache_lock = self.cache.write().unwrap();
@@ -892,7 +979,7 @@ impl DBList {
     }
 
     /// Returns the db list in a serialized form of Vec : `DBPacketInfo`
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn list_db(&self) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list = self.list.read().unwrap();
         serde_json::to_string(&list.clone())
@@ -901,7 +988,7 @@ impl DBList {
     }
 
     /// Returns the db contents in a serialized form of HashMap<String, String>
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn list_db_contents(
         &self,
         db_info: &DBPacketInfo,
@@ -920,6 +1007,7 @@ impl DBList {
             let cache_lock = self.cache.read().unwrap();
 
             if let Some(db) = cache_lock.get(db_info) {
+                info!("DB Cache hit");
                 // cache is hit, db is currently loaded
 
                 let mut db_lock = db.write().unwrap();
@@ -939,6 +1027,7 @@ impl DBList {
         }
 
         if list_lock.contains(db_info) {
+            info!("DB Cache missed");
             // cache was missed, but the requested database did in fact exist
 
             let mut cache_lock = self.cache.write().unwrap();

@@ -6,6 +6,7 @@ use crate::db_packets::db_settings::DBSettings;
 use crate::statistics::DBStatistics;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
+use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A struct that represents a specific database, with content, and a recent access time.
@@ -29,7 +30,6 @@ pub enum Role {
 }
 
 impl Role {
-
     #[tracing::instrument]
     pub fn is_admin(&self) -> bool {
         matches!(self, Admin | SuperAdmin)
@@ -50,7 +50,6 @@ impl Default for DB {
 }
 
 impl DB {
-
     #[tracing::instrument]
     pub fn new_from_settings(db_settings: DBSettings) -> Self {
         Self {
@@ -92,6 +91,7 @@ impl DB {
 
     #[tracing::instrument]
     pub fn update_access_time(&mut self) {
+        info!("Updating access time of database to now");
         #[cfg(feature = "statistics")]
         self.statistics.add_new_time(self.last_access_time);
         self.last_access_time = SystemTime::now();
@@ -105,7 +105,7 @@ impl DB {
     /// Returns the given role the client key falls in.
     #[tracing::instrument]
     pub fn get_role(&self, client_key: &String, super_admin_list: &[String]) -> Role {
-        if super_admin_list.contains(client_key) {
+        let client_role = if super_admin_list.contains(client_key) {
             SuperAdmin
         } else if self.db_settings.is_admin(client_key) {
             Admin
@@ -113,7 +113,14 @@ impl DB {
             User
         } else {
             Other
-        }
+        };
+
+        info!(
+            "Getting role for client key: {}, role found: {:?}",
+            client_key, client_role
+        );
+
+        client_role
     }
 
     /// Returns true if the given key has list permissions

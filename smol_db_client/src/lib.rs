@@ -24,6 +24,7 @@ use std::net::TcpStream;
 
 #[cfg(feature = "async")]
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
+use tracing::{error, info, warn};
 
 pub mod client_error;
 use crate::client_error::ClientError::{
@@ -72,26 +73,34 @@ impl SmolDbClient {
     #[cfg(not(feature = "async"))]
     #[tracing::instrument]
     pub fn new(ip: &str) -> Result<Self, ClientError> {
+        info!("Creating new client");
         let socket = TcpStream::connect(ip);
         match socket {
             Ok(s) => Ok(Self {
                 socket: s,
                 encryption: None,
             }),
-            Err(err) => Err(UnableToConnect(err)),
+            Err(err) => {
+                error!("Error creating client: {}", err);
+                Err(UnableToConnect(err))
+            }
         }
     }
 
     #[cfg(feature = "async")]
     #[tracing::instrument]
     pub async fn new(ip: &str) -> Result<Self, ClientError> {
+        info!("Creating new client");
         let socket = TcpStream::connect(ip).await;
         match socket {
             Ok(s) => Ok(Self {
                 socket: s,
                 encryption: None,
             }),
-            Err(err) => Err(UnableToConnect(err)),
+            Err(err) => {
+                error!("Error creating client: {}", err);
+                Err(UnableToConnect(err))
+            }
         }
     }
 
@@ -112,6 +121,7 @@ impl SmolDbClient {
     #[cfg(not(feature = "async"))]
     #[tracing::instrument]
     pub fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
+        info!("Setting up encryption on client");
         let server_pub_key_ser = self
             .send_packet(&DBPacket::SetupEncryption)?
             .as_option()
@@ -126,6 +136,9 @@ impl SmolDbClient {
         let resp = self.send_packet(&DBPacket::PubKey(pub_client_key));
         if resp.is_err() {
             self.encryption = None;
+            error!("Response from server: {:?}", resp);
+        } else {
+            info!("Response from server: {:?}", resp);
         }
         resp
     }
@@ -133,6 +146,7 @@ impl SmolDbClient {
     #[cfg(feature = "async")]
     #[tracing::instrument]
     pub async fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
+        info!("Setting up encryption on client");
         let server_pub_key_ser = self
             .send_packet(&DBPacket::SetupEncryption)
             .await?
@@ -147,7 +161,10 @@ impl SmolDbClient {
         self.encryption = Some(pri_key);
         let resp = self.send_packet(&DBPacket::PubKey(pub_client_key)).await;
         if resp.is_err() {
+            error!("Response from server: {:?}", resp);
             self.encryption = None;
+        } else {
+            info!("Response from server: {:?}", resp);
         }
         resp
     }
@@ -176,6 +193,7 @@ impl SmolDbClient {
     #[cfg(not(feature = "async"))]
     #[tracing::instrument]
     pub fn reconnect(&mut self) -> Result<(), ClientError> {
+        info!("Reconnecting client to database");
         let ip = self.socket.peer_addr().map_err(UnableToConnect)?;
         let new_socket = TcpStream::connect(ip).map_err(UnableToConnect)?;
         self.socket = new_socket;
@@ -187,6 +205,7 @@ impl SmolDbClient {
     #[cfg(feature = "async")]
     #[tracing::instrument]
     pub async fn reconnect(&mut self) -> Result<(), ClientError> {
+        info!("Reconnecting client to database");
         let ip = self.socket.peer_addr().map_err(UnableToConnect)?;
         let new_socket = TcpStream::connect(ip).await.map_err(UnableToConnect)?;
         self.socket = new_socket;
@@ -211,6 +230,7 @@ impl SmolDbClient {
     #[cfg(not(feature = "async"))]
     #[tracing::instrument]
     pub fn disconnect(&self) -> std::io::Result<()> {
+        info!("Disconnecting client from database");
         self.socket.shutdown(Shutdown::Both)
     }
 
@@ -218,6 +238,7 @@ impl SmolDbClient {
     #[cfg(feature = "async")]
     #[tracing::instrument]
     pub async fn disconnect(&mut self) -> std::io::Result<()> {
+        info!("Disconnecting client from database");
         self.socket.shutdown().await
     }
 
@@ -486,41 +507,129 @@ impl SmolDbClient {
 
         // branch depending on if we are using encryption with communication
         let ser_packet = match &mut self.encryption {
-            None => sent_packet
-                .serialize_packet()
-                .map_err(|err| PacketSerializationError(Error::from(err)))?,
+            None => {
+                let p = sent_packet
+                    .serialize_packet()
+                    .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                match p.as_ref() {
+                    Ok(_) => {
+                        info!("Successfully serialized packet");
+                    }
+                    Err(e) => {
+                        error!("Failed to serialize packet: {:?}", e);
+                    }
+                }
+
+                p?
+            }
             Some(client_encrypt) => {
-                // if we are sending a public key packet, we dont encrypt it, since the server needs this to send data back properly
+                // if we are sending a public key packet, we don't encrypt it, since the server needs this to send data back properly
                 if !matches!(sent_packet, DBPacket::PubKey(_)) {
-                    client_encrypt
+                    let p = client_encrypt
                         .encrypt_packet(sent_packet)
                         .map_err(PacketEncryptionError)?
                         .serialize_packet()
-                        .map_err(|err| PacketSerializationError(Error::from(err)))?
+                        .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                    match p.as_ref() {
+                        Ok(_) => {
+                            info!("Successfully encrypted packet");
+                        }
+                        Err(e) => {
+                            error!("Failed to encrypt packet: {:?}", e);
+                        }
+                    }
+
+                    p?
                 } else {
-                    sent_packet
+                    let p = sent_packet
                         .serialize_packet()
-                        .map_err(|err| PacketSerializationError(Error::from(err)))?
+                        .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                    match p.as_ref() {
+                        Ok(_) => {
+                            info!("Successfully serialized public key packet");
+                        }
+                        Err(e) => {
+                            error!("Failed to serialize public key packet: {:?}", e);
+                        }
+                    }
+
+                    p?
                 }
             }
         };
 
-        self.socket
+        let s_res = self
+            .socket
             .write(ser_packet.as_bytes())
-            .map_err(SocketWriteError)?;
-        let read_len = self.socket.read(&mut buf).map_err(SocketReadError)?;
+            .map_err(SocketWriteError);
+
+        match s_res.as_ref() {
+            Ok(len) => {
+                info!("Successfully wrote {len} bytes to socket");
+            }
+            Err(e) => {
+                error!("Failed to write packet to socket: {:?}", e);
+            }
+        }
+
+        s_res?;
+
+        let read_len_res = self.socket.read(&mut buf).map_err(SocketReadError);
+
+        match read_len_res.as_ref() {
+            Ok(len) => {
+                info!("Successfully read {len} bytes from socket");
+            }
+            Err(e) => {
+                error!("Failed to read packet from socket: {:?}", e);
+            }
+        }
+
+        let read_len = read_len_res?;
+
         match serde_json::from_slice::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(
             &buf[0..read_len],
         ) {
-            Ok(thing) => thing.map_err(DBResponseError),
+            Ok(thing) => {
+                match thing.as_ref() {
+                    Ok(response) => {
+                        info!("Successful response from server: {}", response);
+                    }
+                    Err(err) => {
+                        error!("Error response from server: {}", err);
+                    }
+                }
+                thing.map_err(DBResponseError)
+            }
             Err(err) => {
                 // if we fail to read a packet, check if it is an encrypted packet
                 if let Some(client_private_key) = &self.encryption {
-                    client_private_key
+                    match client_private_key
                         .decrypt_server_packet(&buf[0..read_len])
-                        .unwrap()
-                        .map_err(DBResponseError)
+                        .map_err(PacketEncryptionError)
+                    {
+                        Ok(decrypted) => {
+                            info!("Successfully decrypted data from server packet");
+                            match decrypted.as_ref() {
+                                Ok(response) => {
+                                    info!("Successful response from server: {}", response);
+                                }
+                                Err(err) => {
+                                    error!("Error response from server: {}", err);
+                                }
+                            }
+                            decrypted.map_err(DBResponseError)
+                        }
+                        Err(err) => {
+                            error!("Error decrypting server packet: {:?}", err);
+                            return Err(err);
+                        }
+                    }
                 } else {
+                    error!("Packet deserialization error: {}", err);
                     Err(PacketDeserializationError(Error::from(err)))
                 }
             }
@@ -538,42 +647,130 @@ impl SmolDbClient {
 
         // branch depending on if we are using encryption with communication
         let ser_packet = match &mut self.encryption {
-            None => sent_packet
-                .serialize_packet()
-                .map_err(|err| PacketSerializationError(Error::from(err)))?,
+            None => {
+                let p = sent_packet
+                    .serialize_packet()
+                    .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                match p.as_ref() {
+                    Ok(_) => {
+                        info!("Successfully serialized packet");
+                    }
+                    Err(e) => {
+                        error!("Failed to serialize packet: {:?}", e);
+                    }
+                }
+
+                p?
+            }
             Some(client_encrypt) => {
-                // if we are sending a public key packet, we dont encrypt it, since the server needs this to send data back properly
+                // if we are sending a public key packet, we don't encrypt it, since the server needs this to send data back properly
                 if !matches!(sent_packet, DBPacket::PubKey(_)) {
-                    client_encrypt
+                    let p = client_encrypt
                         .encrypt_packet(sent_packet)
                         .map_err(PacketEncryptionError)?
                         .serialize_packet()
-                        .map_err(|err| PacketSerializationError(Error::from(err)))?
+                        .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                    match p.as_ref() {
+                        Ok(_) => {
+                            info!("Successfully encrypted packet");
+                        }
+                        Err(e) => {
+                            error!("Failed to encrypt packet: {:?}", e);
+                        }
+                    }
+
+                    p?
                 } else {
-                    sent_packet
+                    let p = sent_packet
                         .serialize_packet()
-                        .map_err(|err| PacketSerializationError(Error::from(err)))?
+                        .map_err(|err| PacketSerializationError(Error::from(err)));
+
+                    match p.as_ref() {
+                        Ok(_) => {
+                            info!("Successfully serialized public key packet");
+                        }
+                        Err(e) => {
+                            error!("Failed to serialize public key packet: {:?}", e);
+                        }
+                    }
+
+                    p?
                 }
             }
         };
 
-        self.socket
+        let s_res = self
+            .socket
             .write(ser_packet.as_bytes())
             .await
-            .map_err(SocketWriteError)?;
-        let read_len = self.socket.read(&mut buf).await.map_err(SocketReadError)?;
+            .map_err(SocketWriteError);
+
+        match s_res.as_ref() {
+            Ok(len) => {
+                info!("Successfully wrote {len} bytes to socket");
+            }
+            Err(e) => {
+                error!("Failed to write packet to socket: {:?}", e);
+            }
+        }
+
+        s_res?;
+
+        let read_len_res = self.socket.read(&mut buf).await.map_err(SocketReadError);
+
+        match read_len_res.as_ref() {
+            Ok(len) => {
+                info!("Successfully read {len} bytes from socket");
+            }
+            Err(e) => {
+                error!("Failed to read packet from socket: {:?}", e);
+            }
+        }
+
+        let read_len = read_len_res?;
+
         match serde_json::from_slice::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(
             &buf[0..read_len],
         ) {
-            Ok(thing) => thing.map_err(DBResponseError),
+            Ok(thing) => {
+                match thing.as_ref() {
+                    Ok(response) => {
+                        info!("Successful response from server: {}", response);
+                    }
+                    Err(err) => {
+                        error!("Error response from server: {}", err);
+                    }
+                }
+                thing.map_err(DBResponseError)
+            }
             Err(err) => {
                 // if we fail to read a packet, check if it is an encrypted packet
                 if let Some(client_private_key) = &self.encryption {
-                    client_private_key
+                    match client_private_key
                         .decrypt_server_packet(&buf[0..read_len])
-                        .unwrap()
-                        .map_err(DBResponseError)
+                        .map_err(PacketEncryptionError)
+                    {
+                        Ok(decrypted) => {
+                            info!("Successfully decrypted data from server packet");
+                            match decrypted.as_ref() {
+                                Ok(response) => {
+                                    info!("Successful response from server: {}", response);
+                                }
+                                Err(err) => {
+                                    error!("Error response from server: {}", err);
+                                }
+                            }
+                            decrypted.map_err(DBResponseError)
+                        }
+                        Err(err) => {
+                            error!("Error decrypting server packet: {:?}", err);
+                            return Err(err);
+                        }
+                    }
                 } else {
+                    error!("Packet deserialization error: {}", err);
                     Err(PacketDeserializationError(Error::from(err)))
                 }
             }

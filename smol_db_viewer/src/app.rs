@@ -212,7 +212,6 @@ impl ApplicationState {
 }
 
 impl eframe::App for ApplicationState {
-
     #[tracing::instrument(skip_all)]
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let Self { .. } = self;

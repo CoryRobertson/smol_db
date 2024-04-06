@@ -4,6 +4,7 @@ use crate::encryption::encrypted_data::EncryptedData;
 use crate::encryption::{decrypt, EncryptionError, BIT_LENGTH};
 use rsa::rand_core::OsRng;
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use tracing::info;
 
 #[derive(Debug)]
 /// Struct containing a server encryption key pair used to encrypt data sent from the server and to the server for end to end encryption
@@ -24,6 +25,7 @@ impl ServerKey {
     /// Create a new server key
     #[tracing::instrument]
     pub fn new() -> Result<Self, rsa::Error> {
+        info!("Generating server key");
         let mut rng = OsRng;
         let pri_key = RsaPrivateKey::new(&mut rng, BIT_LENGTH)?;
         let pub_key = pri_key.to_public_key();

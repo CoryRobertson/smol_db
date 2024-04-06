@@ -64,7 +64,6 @@ impl<T> Display for DBSuccessResponse<T>
 where
     T: Display,
 {
-
     #[tracing::instrument(skip_all)]
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
