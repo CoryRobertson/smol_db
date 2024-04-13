@@ -45,6 +45,8 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
 
                         match pack {
+                            // TODO: handle a "open a stream" packet here, where we enter a special loop for this case specifically
+                            //  The end of the stream should return a special packet denoting that the stream has ended for its data sending
                             DBPacket::SetupEncryption => {
                                 // non standard conforming implementation of sending a response back, the client is expected to understand this given they requested to establish encryption
                                 let key = db_list.read().unwrap().server_key.get_pub_key().clone();
@@ -253,22 +255,7 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                 let ser = serde_json::to_string(&response).unwrap();
 
                 // check if the client is using encryption in their communication
-                let write_result = match &client_pub_key_opt {
-                    None => {
-                        // client is not using encryption, send the raw bytes
-                        stream.write(ser.as_bytes())
-                    }
-                    Some(key) => {
-                        // client is using encryption, encrypt the packet then send the encrypted bytes
-                        let ency_data = db_list
-                            .write()
-                            .unwrap()
-                            .server_key
-                            .encrypt_packet(&ser, key)
-                            .unwrap();
-                        stream.write(ency_data.get_data())
-                    }
-                };
+                let write_result = write_to_client(&mut stream, client_pub_key_opt.as_ref(),ser,&db_list);
 
                 if write_result.is_err() {
                     info!(
@@ -290,6 +277,25 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                 client_name, stream
             );
             break;
+        }
+    }
+}
+
+fn write_to_client(stream: &mut TcpStream, client_pub_key_opt: Option<&RsaPublicKey>, ser: String, db_list: &DBListThreadSafe) -> std::io::Result<usize> {
+    match &client_pub_key_opt {
+        None => {
+            // client is not using encryption, send the raw bytes
+            stream.write(ser.as_bytes())
+        }
+        Some(key) => {
+            // client is using encryption, encrypt the packet then send the encrypted bytes
+            let ency_data = db_list
+                .write()
+                .unwrap()
+                .server_key
+                .encrypt_packet(&ser, key)
+                .unwrap();
+            stream.write(ency_data.get_data())
         }
     }
 }

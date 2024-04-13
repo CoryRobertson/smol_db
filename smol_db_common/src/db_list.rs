@@ -45,6 +45,10 @@ pub struct DBList {
 }
 
 impl DBList {
+
+    // TODO: open stream function handler should be about here, it should return an iterator over an entire table,
+    //  probably cloning the table at the start so the lock on the table can be dropped quickly?
+
     /// Returns true if the given hash is a super admin hash
     #[tracing::instrument(skip(self))]
     pub fn is_super_admin(&self, hash: &String) -> bool {

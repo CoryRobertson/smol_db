@@ -10,6 +10,7 @@ use crate::{
     app::ProgramState::PromptForKey,
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
+use egui::ViewportCommand;
 use smol_db_client::{
     client_error::ClientError, client_error::ClientError::BadPacket, db_settings::DBSettings,
     prelude::DBStatistics, DBPacketResponseError, DBSuccessResponse, Role, SmolDbClient,
@@ -20,7 +21,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use egui::ViewportCommand;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]

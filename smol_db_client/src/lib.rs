@@ -53,6 +53,12 @@ pub mod prelude {
     pub use smol_db_common::statistics::DBStatistics;
 }
 
+// TODO: client stream should be a struct that is made from a SmolDbClient with an input of a table name,
+//      the function returns the stream iterator which will iterate over the values of the server
+//      the server should natively support this without supporting packets, and instead the server will enter a state
+//      where it only sends data relating to the iterator, until it returns None,
+//      then it breaks and enters its normal waiting for packets state
+
 /// `SmolDbClient` struct used for communicating to the database.
 /// This struct has implementations that allow for end to end communication with the database server.
 #[derive(Debug)]
