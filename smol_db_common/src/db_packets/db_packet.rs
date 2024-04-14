@@ -54,13 +54,15 @@ pub enum DBPacket {
     PubKey(RsaPublicKey),
     /// Request the server to setup end to end encryption
     SetupEncryption,
-
+    /// Request the server to begin streaming values from a given DB to the user
     StreamReadDb(DBPacketInfo),
+    /// Request the next item in the stream, if one is open
     ReadyForNextItem,
+    /// Tell the server that the client wants to stop streaming values from a DB
+    EndStreamRead,
 }
 
 impl DBPacket {
-
     pub fn new_stream_table(dbname: &str) -> Self {
         Self::StreamReadDb(DBPacketInfo::new(dbname))
     }

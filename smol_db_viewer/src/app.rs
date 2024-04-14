@@ -11,9 +11,10 @@ use crate::{
 };
 use chrono::{DateTime, Datelike, Local, Timelike};
 use egui::ViewportCommand;
+use smol_db_client::prelude::SmolDbClient;
 use smol_db_client::{
     client_error::ClientError, client_error::ClientError::BadPacket, db_settings::DBSettings,
-    prelude::DBStatistics, DBPacketResponseError, DBSuccessResponse, Role, SmolDbClient,
+    prelude::DBStatistics, DBPacketResponseError, DBSuccessResponse, Role,
 };
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};

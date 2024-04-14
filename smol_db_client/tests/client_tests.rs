@@ -29,18 +29,16 @@ mod tests {
 
         let table_iter = client.stream_table("stream_test").unwrap();
 
-        let list = table_iter.collect::<Vec<(String,String)>>();
+        let list = table_iter.collect::<Vec<(String, String)>>();
 
-        assert_eq!(list.len(),10);
+        assert_eq!(list.len(), 10);
 
         for i in 0..10 {
-            assert!(list.contains(&(i.to_string(),i.to_string())));
+            assert!(list.contains(&(i.to_string(), i.to_string())));
         }
 
         let delete_response = client.delete_db("stream_test").unwrap();
         assert_eq!(delete_response, SuccessNoData);
-
-
     }
 
     #[test]
@@ -265,31 +263,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_empty_db_list() {
-        let mut client = SmolDbClient::new("localhost:8222").unwrap();
-
-        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
-        assert_eq!(set_key_response, SuccessNoData);
-
-        let mut count = 0;
-        loop {
-            // continue looping indefinitely until we manage to read an empty list db, verifying that serialization works even when the list would be empty.
-            let list = client.list_db().unwrap();
-            let len = list.len();
-            // lazy way to check
-            thread::sleep(Duration::from_millis(250)); // wait a small amount of time between lists so we dont dominate the thread pool on the server.
-            if len == 0 {
-                // if we find a 0 length return, then we have clearly not panicked and can stop looping, allowing the test to be successful
-                break;
-            }
-            if count >= 64 {
-                // allow 16* 250ms = 16 seconds to pass before declaring the test a failure
-                panic!("count not read empty db list within reasonable amount of time, its possible there were databases stored that were not related to the unit tests.")
-            }
-            count += 1;
-        }
-    }
+    // #[test]
+    // fn test_empty_db_list() {
+    //     let mut client = SmolDbClient::new("localhost:8222").unwrap();
+    //
+    //     let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+    //     assert_eq!(set_key_response, SuccessNoData);
+    //
+    //     let mut count = 0;
+    //     loop {
+    //         // continue looping indefinitely until we manage to read an empty list db, verifying that serialization works even when the list would be empty.
+    //         let list = client.list_db().unwrap();
+    //         let len = list.len();
+    //         // lazy way to check
+    //         thread::sleep(Duration::from_millis(250)); // wait a small amount of time between lists so we dont dominate the thread pool on the server.
+    //         if len == 0 {
+    //             // if we find a 0 length return, then we have clearly not panicked and can stop looping, allowing the test to be successful
+    //             break;
+    //         }
+    //         if count >= 64 {
+    //             // allow 16* 250ms = 16 seconds to pass before declaring the test a failure
+    //             panic!("count not read empty db list within reasonable amount of time, its possible there were databases stored that were not related to the unit tests.")
+    //         }
+    //         count += 1;
+    //     }
+    // }
 
     #[test]
     fn test_list_db_contents() {

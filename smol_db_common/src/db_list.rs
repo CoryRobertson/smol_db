@@ -3,19 +3,19 @@
 //! Also handles what to do when packets are received that modify any database that does or does not exist.
 use crate::db::Role::SuperAdmin;
 use crate::db::DB;
+use crate::db_content::DBContent;
 use crate::db_data::DBData;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
-#[cfg(not(feature = "statistics"))]
-use crate::db_packets::db_packet_response::DBPacketResponseError::BadPacket;
 use crate::db_packets::db_packet_response::DBPacketResponseError::{
-    DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
+    BadPacket, DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
     ValueNotFound,
 };
 use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
 use crate::encryption::server_encrypt::ServerKey;
+use crate::prelude::DBPacket;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -25,8 +25,6 @@ use std::net::TcpStream;
 use std::sync::RwLock;
 use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
-use crate::db_content::DBContent;
-use crate::prelude::DBPacket;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -48,25 +46,33 @@ pub struct DBList {
 }
 
 impl DBList {
-
-    fn handle_stream(&self, client_stream: &mut TcpStream, db_table: &DBContent) -> Result<(), DBPacketResponseError> {
+    #[tracing::instrument(skip(self, db_table))]
+    fn handle_stream(
+        &self,
+        client_stream: &mut TcpStream,
+        db_table: &DBContent,
+    ) -> Result<(), DBPacketResponseError> {
         for item in db_table.content.iter() {
             let mut buf: [u8; 1024] = [0; 1024];
             debug!("Waiting for client to await next item");
-            let mut read_client = String::new();
-            client_stream.read(&mut buf).unwrap();
+            let read_len = client_stream.read(&mut buf).unwrap();
 
-            read_client = String::from_utf8(buf.to_vec()).unwrap();
+            let read_client = String::from_utf8(buf.to_vec()).unwrap();
 
-            match serde_json::from_str::<DBPacket>(&read_client) {
+            match serde_json::from_str::<DBPacket>(&read_client[0..read_len]) {
                 Ok(packet) => {
                     debug!("Packet read: {:?}", packet);
-                    if !matches!(packet,DBPacket::ReadyForNextItem) {
-                        return Err(DBPacketResponseError::BadPacket);
+
+                    // two cases where packets come during a stream, ending the stream, and asking for the next item
+                    if matches!(packet, DBPacket::EndStreamRead) {
+                        info!("Stream ended early intentionally.");
+                        break;
+                    } else if !matches!(packet, DBPacket::ReadyForNextItem) {
+                        return Err(BadPacket);
                     }
                 }
                 Err(err) => {
-                    error!("err: {}",err);
+                    error!("err: {} {}", read_client, err);
                 }
             }
 
@@ -95,82 +101,45 @@ impl DBList {
         let super_admin_list = self.get_super_admin_list();
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(&packet) {
+        if let Some(db) = self.cache.read().unwrap().get(packet) {
             info!("DB Cache hit");
             // cache was hit
             db.write().unwrap().update_access_time();
 
             let db_lock = db.read().unwrap();
 
-            if db_lock.has_read_permissions(&client_key, &super_admin_list) {
+            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
                 let db_table = db_lock.get_content().clone();
                 drop(db_lock);
 
-                let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
-                let starting_packet = serde_json::to_string(&s).unwrap();
-                client_stream.write(starting_packet.as_bytes()).unwrap();
+                let _ = self
+                    .send_stream_starting_packet(client_stream)
+                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
 
-                let _ = self.handle_stream(client_stream,&db_table)?;
+                self.handle_stream(client_stream, &db_table)?;
 
-                return Ok(SuccessNoData);
+                Ok(SuccessNoData)
             } else {
-                return Err(InvalidPermissions);
+                Err(InvalidPermissions)
             };
         }
 
-        if list_lock.contains(&packet) {
+        if list_lock.contains(packet) {
             info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
-            let mut db = Self::read_db_from_file(&packet)?;
+            let mut db = Self::read_db_from_file(packet)?;
 
             db.update_access_time();
 
-            if db.has_read_permissions(&client_key, &super_admin_list) {
-
+            if db.has_read_permissions(client_key, &super_admin_list) {
                 let db_table = db.get_content();
-                let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
-                let starting_packet = serde_json::to_string(&s).unwrap();
-                client_stream.write(starting_packet.as_bytes()).unwrap();
 
-                for item in db_table.content.iter() {
-                    let mut buf: [u8; 1024] = [0; 1024];
-                    debug!("Waiting for client to await next item");
-                    let mut read_client = String::new();
-                    client_stream.read(&mut buf).unwrap();
+                let _ = self
+                    .send_stream_starting_packet(client_stream)
+                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
 
-                    read_client = String::from_utf8(buf.to_vec()).unwrap();
-
-                    match serde_json::from_str::<DBPacket>(&read_client) {
-                        Ok(packet) => {
-                            debug!("Packet read: {:?}", packet);
-                            if !matches!(packet,DBPacket::ReadyForNextItem) {
-                                return Err(DBPacketResponseError::BadPacket);
-                            }
-                        }
-                        Err(err) => {
-                            error!("err: {}",err);
-                        }
-                    }
-
-                    // if !serde_json::from_str::<DBPacket>(&read_client).is_ok_and(|packet| {
-                    //     debug!("Packet read: {:?}", packet);
-                    //     matches!(packet,DBPacket::ReadyForNextItem) }) {
-                    //     return Err(DBPacketResponseError::BadPacket);
-                    // }
-
-                    debug!("Client requested next item");
-
-                    let _ = client_stream.write(item.0.as_bytes()).map_err(|err| {
-                        error!("{}", err);
-                        DBPacketResponseError::StreamClosedUnexpectedly
-                    })?;
-                    let _ = client_stream.write(item.1.as_bytes()).map_err(|err| {
-                        error!("{}", err);
-                        DBPacketResponseError::StreamClosedUnexpectedly
-                    })?;
-                    info!("Wrote key value pair to stream");
-                }
+                self.handle_stream(client_stream, db_table)?;
             } else {
                 return Err(InvalidPermissions);
             };
@@ -185,6 +154,13 @@ impl DBList {
             // cache was neither hit, nor did the db exist on the file system
             return Err(DBNotFound);
         }
+    }
+
+    fn send_stream_starting_packet(&self, client_stream: &mut TcpStream) -> std::io::Result<()> {
+        let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
+        let starting_packet = serde_json::to_string(&s)?;
+        let _ = client_stream.write(starting_packet.as_bytes())?;
+        Ok(())
     }
 
     // TODO: open stream function handler should be about here, it should return an iterator over an entire table,

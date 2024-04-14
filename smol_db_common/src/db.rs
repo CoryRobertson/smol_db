@@ -58,38 +58,38 @@ impl DB {
         }
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_settings(&self) -> &DBSettings {
         &self.db_settings
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_settings_mut(&mut self) -> &mut DBSettings {
         &mut self.db_settings
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn set_settings(&mut self, new_settings: DBSettings) {
         self.db_settings = new_settings;
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_content_mut(&mut self) -> &mut DBContent {
         &mut self.db_content
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_content(&self) -> &DBContent {
         &self.db_content
     }
 
     #[cfg(feature = "statistics")]
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_statistics(&self) -> &DBStatistics {
         &self.statistics
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn update_access_time(&mut self) {
         info!("Updating access time of database to now");
         #[cfg(feature = "statistics")]
@@ -97,13 +97,13 @@ impl DB {
         self.last_access_time = SystemTime::now();
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self))]
     pub fn get_access_time(&self) -> SystemTime {
         self.last_access_time
     }
 
     /// Returns the given role the client key falls in.
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, super_admin_list))]
     pub fn get_role(&self, client_key: &String, super_admin_list: &[String]) -> Role {
         let client_role = if super_admin_list.contains(client_key) {
             SuperAdmin
@@ -125,7 +125,7 @@ impl DB {
 
     /// Returns true if the given key has list permissions
     /// Checks which role the user might fit into depending on `DBSettings`
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, super_admin_list))]
     pub fn has_list_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
         match self.get_role(client_key, super_admin_list) {
             Admin | SuperAdmin => true,
@@ -136,7 +136,7 @@ impl DB {
 
     /// Returns true if the given key has read permissions
     /// Checks which role the user might fit into depending on `DBSettings`
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, super_admin_list))]
     pub fn has_read_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
         match self.get_role(client_key, super_admin_list) {
             Admin | SuperAdmin => true,
@@ -147,7 +147,7 @@ impl DB {
 
     /// Returns true if the given key has write permissions
     /// Checks which role the user might fit into depending on `DBSettings`
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self, super_admin_list))]
     pub fn has_write_permissions(&self, client_key: &String, super_admin_list: &[String]) -> bool {
         match self.get_role(client_key, super_admin_list) {
             Admin | SuperAdmin => true,

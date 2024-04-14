@@ -1,6 +1,6 @@
 use crate::DBListThreadSafe;
 use smol_db_common::prelude::DBPacketResponseError::BadPacket;
-use smol_db_common::prelude::{DBPacket, DBSuccessResponse, RsaPublicKey, SuccessNoData, SuccessReply};
+use smol_db_common::prelude::{DBPacket, RsaPublicKey, SuccessNoData, SuccessReply};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use tracing::{debug, error, info, warn};
@@ -45,10 +45,17 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
 
                         match pack {
+                            DBPacket::EndStreamRead => {
+                                warn!("Client requested to end stream when no stream was active: {}, {:?}", client_name, pack);
+                                // its possible we receive this packet after a stream is read all the way to its end,
+                                // meaning the user didn't know the stream ended, this is perfectly ok, we just don't respond.
+                                continue;
+                            }
                             DBPacket::ReadyForNextItem => {
-                                // warn!("Client requested stream item when no stream was active");
+                                warn!("Client requested stream item when no stream was active: {}, {:?}", client_name, pack);
                                 // user requested next item when there was no item left in stream, this is ok it seems ?
-                                Ok(DBSuccessResponse::SuccessNoData)
+
+                                Err(BadPacket)
                             }
                             DBPacket::StreamReadDb(packet) => {
                                 let lock = db_list.read().unwrap();
