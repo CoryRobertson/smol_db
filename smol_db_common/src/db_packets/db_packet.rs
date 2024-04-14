@@ -54,9 +54,17 @@ pub enum DBPacket {
     PubKey(RsaPublicKey),
     /// Request the server to setup end to end encryption
     SetupEncryption,
+
+    StreamReadDb(DBPacketInfo),
+    ReadyForNextItem,
 }
 
 impl DBPacket {
+
+    pub fn new_stream_table(dbname: &str) -> Self {
+        Self::StreamReadDb(DBPacketInfo::new(dbname))
+    }
+
     #[cfg(feature = "statistics")]
     pub fn new_get_stats(dbname: &str) -> Self {
         Self::GetStats(DBPacketInfo::new(dbname))

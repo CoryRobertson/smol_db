@@ -21,9 +21,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::sync::RwLock;
 use std::time::SystemTime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
+use crate::db_content::DBContent;
+use crate::prelude::DBPacket;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -45,6 +48,144 @@ pub struct DBList {
 }
 
 impl DBList {
+
+    fn handle_stream(&self, client_stream: &mut TcpStream, db_table: &DBContent) -> Result<(), DBPacketResponseError> {
+        for item in db_table.content.iter() {
+            let mut buf: [u8; 1024] = [0; 1024];
+            debug!("Waiting for client to await next item");
+            let mut read_client = String::new();
+            client_stream.read(&mut buf).unwrap();
+
+            read_client = String::from_utf8(buf.to_vec()).unwrap();
+
+            match serde_json::from_str::<DBPacket>(&read_client) {
+                Ok(packet) => {
+                    debug!("Packet read: {:?}", packet);
+                    if !matches!(packet,DBPacket::ReadyForNextItem) {
+                        return Err(DBPacketResponseError::BadPacket);
+                    }
+                }
+                Err(err) => {
+                    error!("err: {}",err);
+                }
+            }
+
+            debug!("Client requested next item");
+
+            let _ = client_stream.write(item.0.as_bytes()).map_err(|err| {
+                error!("{}", err);
+                DBPacketResponseError::StreamClosedUnexpectedly
+            })?;
+            let _ = client_stream.write(item.1.as_bytes()).map_err(|err| {
+                error!("{}", err);
+                DBPacketResponseError::StreamClosedUnexpectedly
+            })?;
+            info!("Wrote key value pair to stream");
+        }
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn stream_table(
+        &self,
+        packet: &DBPacketInfo,
+        client_key: &String,
+        client_stream: &mut TcpStream,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(&packet) {
+            info!("DB Cache hit");
+            // cache was hit
+            db.write().unwrap().update_access_time();
+
+            let db_lock = db.read().unwrap();
+
+            if db_lock.has_read_permissions(&client_key, &super_admin_list) {
+                let db_table = db_lock.get_content().clone();
+                drop(db_lock);
+
+                let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
+                let starting_packet = serde_json::to_string(&s).unwrap();
+                client_stream.write(starting_packet.as_bytes()).unwrap();
+
+                let _ = self.handle_stream(client_stream,&db_table)?;
+
+                return Ok(SuccessNoData);
+            } else {
+                return Err(InvalidPermissions);
+            };
+        }
+
+        if list_lock.contains(&packet) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(&packet)?;
+
+            db.update_access_time();
+
+            if db.has_read_permissions(&client_key, &super_admin_list) {
+
+                let db_table = db.get_content();
+                let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
+                let starting_packet = serde_json::to_string(&s).unwrap();
+                client_stream.write(starting_packet.as_bytes()).unwrap();
+
+                for item in db_table.content.iter() {
+                    let mut buf: [u8; 1024] = [0; 1024];
+                    debug!("Waiting for client to await next item");
+                    let mut read_client = String::new();
+                    client_stream.read(&mut buf).unwrap();
+
+                    read_client = String::from_utf8(buf.to_vec()).unwrap();
+
+                    match serde_json::from_str::<DBPacket>(&read_client) {
+                        Ok(packet) => {
+                            debug!("Packet read: {:?}", packet);
+                            if !matches!(packet,DBPacket::ReadyForNextItem) {
+                                return Err(DBPacketResponseError::BadPacket);
+                            }
+                        }
+                        Err(err) => {
+                            error!("err: {}",err);
+                        }
+                    }
+
+                    // if !serde_json::from_str::<DBPacket>(&read_client).is_ok_and(|packet| {
+                    //     debug!("Packet read: {:?}", packet);
+                    //     matches!(packet,DBPacket::ReadyForNextItem) }) {
+                    //     return Err(DBPacketResponseError::BadPacket);
+                    // }
+
+                    debug!("Client requested next item");
+
+                    let _ = client_stream.write(item.0.as_bytes()).map_err(|err| {
+                        error!("{}", err);
+                        DBPacketResponseError::StreamClosedUnexpectedly
+                    })?;
+                    let _ = client_stream.write(item.1.as_bytes()).map_err(|err| {
+                        error!("{}", err);
+                        DBPacketResponseError::StreamClosedUnexpectedly
+                    })?;
+                    info!("Wrote key value pair to stream");
+                }
+            } else {
+                return Err(InvalidPermissions);
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(packet.clone(), RwLock::from(db));
+
+            return Ok(SuccessNoData);
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            return Err(DBNotFound);
+        }
+    }
 
     // TODO: open stream function handler should be about here, it should return an iterator over an entire table,
     //  probably cloning the table at the start so the lock on the table can be dropped quickly?

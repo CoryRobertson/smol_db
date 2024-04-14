@@ -126,6 +126,8 @@ pub enum DBPacketResponseError {
     InvalidPermissions,
     /// A user was attempted to be read, and was not found
     UserNotFound,
+
+    StreamClosedUnexpectedly,
 }
 
 #[allow(deprecated)]

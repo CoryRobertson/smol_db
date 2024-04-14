@@ -1,6 +1,6 @@
 use crate::DBListThreadSafe;
 use smol_db_common::prelude::DBPacketResponseError::BadPacket;
-use smol_db_common::prelude::{DBPacket, RsaPublicKey, SuccessNoData, SuccessReply};
+use smol_db_common::prelude::{DBPacket, DBSuccessResponse, RsaPublicKey, SuccessNoData, SuccessReply};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use tracing::{debug, error, info, warn};
@@ -45,6 +45,22 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
 
                         match pack {
+                            DBPacket::ReadyForNextItem => {
+                                // warn!("Client requested stream item when no stream was active");
+                                // user requested next item when there was no item left in stream, this is ok it seems ?
+                                Ok(DBSuccessResponse::SuccessNoData)
+                            }
+                            DBPacket::StreamReadDb(packet) => {
+                                let lock = db_list.read().unwrap();
+                                info!("Client beginning stream");
+                                let resp = lock.stream_table(&packet, &client_key, &mut stream);
+                                info!(
+                                    "{} streamed \"{}\", response: {:?}",
+                                    client_name, packet, resp
+                                );
+
+                                resp
+                            }
                             // TODO: handle a "open a stream" packet here, where we enter a special loop for this case specifically
                             //  The end of the stream should return a special packet denoting that the stream has ended for its data sending
                             DBPacket::SetupEncryption => {
@@ -255,7 +271,8 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                 let ser = serde_json::to_string(&response).unwrap();
 
                 // check if the client is using encryption in their communication
-                let write_result = write_to_client(&mut stream, client_pub_key_opt.as_ref(),ser,&db_list);
+                let write_result =
+                    write_to_client(&mut stream, client_pub_key_opt.as_ref(), ser, &db_list);
 
                 if write_result.is_err() {
                     info!(
@@ -281,7 +298,12 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
     }
 }
 
-fn write_to_client(stream: &mut TcpStream, client_pub_key_opt: Option<&RsaPublicKey>, ser: String, db_list: &DBListThreadSafe) -> std::io::Result<usize> {
+fn write_to_client(
+    stream: &mut TcpStream,
+    client_pub_key_opt: Option<&RsaPublicKey>,
+    ser: String,
+    db_list: &DBListThreadSafe,
+) -> std::io::Result<usize> {
     match &client_pub_key_opt {
         None => {
             // client is not using encryption, send the raw bytes

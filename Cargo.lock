@@ -3163,6 +3163,7 @@ dependencies = [
  "smol_db_common",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -24,7 +24,7 @@ use std::net::TcpStream;
 
 #[cfg(feature = "async")]
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub mod client_error;
 use crate::client_error::ClientError::{
@@ -67,7 +67,65 @@ pub struct SmolDbClient {
     encryption: Option<ClientKey>,
 }
 
+pub struct TableIter<'a>(&'a mut SmolDbClient);
+
+impl Iterator for TableIter<'_> {
+    type Item = (String,String);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut buf: [u8; 1024] = [0; 1024];
+
+        // FIXME: this sends an extra readyfornextitem packet even if
+
+        let request_new_packet = serde_json::to_string(&DBPacket::ReadyForNextItem).unwrap();
+
+        self.0.socket.write(request_new_packet.as_bytes()).ok()?;
+
+
+        debug!("Reading from sockets");
+
+        let mut key = String::new();
+        let read_len1 = self.0.socket.read(&mut buf).ok()?;
+
+        key = String::from_utf8(buf[0..read_len1].to_vec()).unwrap();
+
+        if serde_json::from_str::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(&key[0..read_len1]).is_ok() {
+            info!("Table iter returned none in key read");
+            return None;
+        }
+
+        let mut buf: [u8; 1024] = [0; 1024];
+
+        let mut value = String::new();
+        let read_len2 = self.0.socket.read(&mut buf).ok()?;
+
+        value = String::from_utf8(buf[0..read_len2].to_vec()).unwrap();
+        if serde_json::from_str::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(&value[0..read_len2]).is_ok() {
+            info!("Table iter returned none in value read");
+            return None;
+        }
+
+        debug!("{:?}", (&key,&value));
+
+        Some((key,value))
+    }
+}
+
 impl SmolDbClient {
+
+    pub fn stream_table(&mut self, table_name: &str) -> Result<TableIter, ClientError> {
+        let packet = DBPacket::new_stream_table(table_name);
+
+        debug!("Sending packet");
+
+        let resp = self.send_packet(&packet)?;
+
+        debug!("Sent packet: {}",resp);
+        let table_iter = TableIter(self);
+
+        Ok(table_iter)
+    }
+
     /// Creates a new `SmolDBClient` struct connected to the ip address given.
     /// ```
     /// use smol_db_client::SmolDbClient;
@@ -574,7 +632,7 @@ impl SmolDbClient {
 
         match s_res.as_ref() {
             Ok(len) => {
-                info!("Successfully wrote {len} bytes to socket");
+                info!("Successfully wrote {len} bytes to socket: {}", ser_packet);
             }
             Err(e) => {
                 error!("Failed to write packet to socket: {:?}", e);
