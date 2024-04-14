@@ -70,7 +70,7 @@ fn main() {
     #[cfg(feature = "no-saving")]
     let cache_invalidator_future = async {};
 
-    let user_listener = user_listener(listener, db_list.clone(), &thread_pool);
+    let user_listener = user_listener(listener, db_list, &thread_pool);
 
     info!("Waiting for connections on port 8222");
 

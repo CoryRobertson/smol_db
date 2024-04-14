@@ -1,5 +1,11 @@
 use crate::prelude::SmolDbClient;
-use smol_db_common::prelude::{DBPacket, DBPacketResponseError, DBSuccessResponse};
+#[cfg(not(feature = "async"))]
+use smol_db_common::{
+    prelude::DBPacketResponseError,
+    prelude::DBSuccessResponse
+};
+use smol_db_common::prelude::DBPacket;
+#[cfg(not(feature = "async"))]
 use std::io::{Read, Write};
 use tracing::{debug, info};
 
@@ -9,11 +15,13 @@ pub struct TableIter<'a>(pub(crate) &'a mut SmolDbClient);
 impl Drop for TableIter<'_> {
     fn drop(&mut self) {
         debug!("Table iter dropped");
+        #[allow(clippy::let_underscore_future)] // this never happens if async feature is enabled
         let _ = self.0.send_packet(&DBPacket::EndStreamRead); // attempt to end the read stream when the table iter is dropped
                                                               // we don't care if this fails, it's just nice if it doesn't
     }
 }
 
+#[cfg(not(feature = "async"))]
 impl Iterator for TableIter<'_> {
     type Item = (String, String);
 

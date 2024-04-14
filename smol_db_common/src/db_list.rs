@@ -52,7 +52,7 @@ impl DBList {
         client_stream: &mut TcpStream,
         db_table: &DBContent,
     ) -> Result<(), DBPacketResponseError> {
-        for item in db_table.content.iter() {
+        for item in &db_table.content {
             let mut buf: [u8; 1024] = [0; 1024];
             debug!("Waiting for client to await next item");
             let read_len = client_stream.read(&mut buf).unwrap();
@@ -124,7 +124,7 @@ impl DBList {
             };
         }
 
-        if list_lock.contains(packet) {
+        return if list_lock.contains(packet) {
             info!("DB Cache missed");
             // cache was missed but the db exists on the file system
 
@@ -149,11 +149,11 @@ impl DBList {
                 .unwrap()
                 .insert(packet.clone(), RwLock::from(db));
 
-            return Ok(SuccessNoData);
+            Ok(SuccessNoData)
         } else {
             // cache was neither hit, nor did the db exist on the file system
-            return Err(DBNotFound);
-        }
+            Err(DBNotFound)
+        };
     }
 
     fn send_stream_starting_packet(&self, client_stream: &mut TcpStream) -> std::io::Result<()> {

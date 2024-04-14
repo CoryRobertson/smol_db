@@ -4,7 +4,9 @@ use crate::client_error::ClientError::{
     PacketEncryptionError, PacketSerializationError, SocketReadError, SocketWriteError,
     UnableToConnect,
 };
-use crate::prelude::{DBResponseError, TableIter};
+#[cfg(not(feature = "async"))]
+use crate::prelude::TableIter;
+use crate::prelude::{DBResponseError};
 use serde::{Deserialize, Serialize};
 use smol_db_common::db::Role;
 use smol_db_common::encryption::client_encrypt::ClientKey;
@@ -25,7 +27,9 @@ use std::net::SocketAddr;
 
 #[cfg(feature = "async")]
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
+#[cfg(not(feature = "async"))]
+use tracing::debug;
 
 #[cfg(not(feature = "async"))]
 use std::net::TcpStream;
@@ -39,10 +43,13 @@ pub struct SmolDbClient {
 }
 
 impl SmolDbClient {
+
+    #[allow(dead_code)]
     pub(crate) fn get_socket(&mut self) -> &mut TcpStream {
         &mut self.socket
     }
 
+    #[cfg(not(feature = "async"))]
     pub fn stream_table(&mut self, table_name: &str) -> Result<TableIter, ClientError> {
         let packet = DBPacket::new_stream_table(table_name);
 
