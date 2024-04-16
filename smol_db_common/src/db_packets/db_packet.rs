@@ -5,6 +5,7 @@ use crate::db_packets::db_settings::DBSettings;
 use crate::encryption::encrypted_data::EncryptedData;
 use rsa::RsaPublicKey;
 use serde::{Deserialize, Serialize};
+use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
@@ -60,6 +61,11 @@ pub enum DBPacket {
     ReadyForNextItem,
     /// Tell the server that the client wants to stop streaming values from a DB
     EndStreamRead,
+
+    AddToList(DBPacketInfo,DBKeyedListLocation,DBData),
+    ReadFromList(DBPacketInfo,DBKeyedListLocation),
+    RemoveFromList(DBPacketInfo,DBKeyedListLocation),
+    StreamList(DBPacketInfo,DBKeyedListLocation),
 }
 
 impl DBPacket {

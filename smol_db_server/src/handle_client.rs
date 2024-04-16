@@ -45,6 +45,18 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
 
                         match pack {
+                            DBPacket::AddToList(a,b,c) => {
+                                todo!()
+                            }
+                            DBPacket::RemoveFromList(a,b) => {
+                                todo!()
+                            }
+                            DBPacket::ReadFromList(a,b) => {
+                                todo!()
+                            }
+                            DBPacket::StreamList(a,b) => {
+                                todo!()
+                            }
                             DBPacket::EndStreamRead => {
                                 warn!("Client requested to end stream when no stream was active: {}, {:?}", client_name, pack);
                                 // its possible we receive this packet after a stream is read all the way to its end,
@@ -68,8 +80,6 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
 
                                 resp
                             }
-                            // TODO: handle a "open a stream" packet here, where we enter a special loop for this case specifically
-                            //  The end of the stream should return a special packet denoting that the stream has ended for its data sending
                             DBPacket::SetupEncryption => {
                                 // non standard conforming implementation of sending a response back, the client is expected to understand this given they requested to establish encryption
                                 let key = db_list.read().unwrap().server_key.get_pub_key().clone();

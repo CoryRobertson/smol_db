@@ -163,10 +163,6 @@ impl DBList {
         Ok(())
     }
 
-    // TODO: open stream function handler should be about here, it should return an iterator over an entire table,
-    //  probably cloning the table at the start so the lock on the table can be dropped quickly?
-    // TODO: we probably want a "streaming read" and a "streaming write" function and packet system
-
     /// Returns true if the given hash is a super admin hash
     #[tracing::instrument(skip(self))]
     pub fn is_super_admin(&self, hash: &String) -> bool {

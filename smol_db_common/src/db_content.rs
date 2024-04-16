@@ -6,6 +6,7 @@ use std::collections::HashMap;
 /// Struct denoting the content structure itself of a database. Which is a hash map.
 pub struct DBContent {
     pub content: HashMap<String, String>,
+    keyed_list: HashMap<String, Vec<String>>,
 }
 
 impl DBContent {
@@ -14,6 +15,11 @@ impl DBContent {
     pub fn read_ser_data(data: &str) -> serde_json::Result<Self> {
         serde_json::from_str(data)
     }
+
+    pub fn get_list_from_key(&self, key: &str) -> Option<&[String]> {
+        self.keyed_list.get(key).map(|list| list.as_slice())
+    }
+
 
     /// Reads from the db using the key, returning an optional of either the retrieved content, or nothing.
     #[tracing::instrument]
@@ -29,6 +35,7 @@ impl Default for DBContent {
     fn default() -> Self {
         Self {
             content: HashMap::default(),
+            keyed_list: Default::default(),
         }
     }
 }
