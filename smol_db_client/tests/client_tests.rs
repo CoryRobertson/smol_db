@@ -23,13 +23,20 @@ mod tests {
         for i in 0..10 {
             let data = format!("{i}");
             client
-                .add_item_to_list("stream_list_test","stream_listing_test", None,data.as_str()).unwrap();
+                .add_item_to_list(
+                    "stream_list_test",
+                    "stream_listing_test",
+                    None,
+                    data.as_str(),
+                )
+                .unwrap();
         }
 
-        let list_iter = client.stream_db_list_content("stream_list_test", "stream_listing_test", None).unwrap();
+        let list_iter = client
+            .stream_db_list_content("stream_list_test", "stream_listing_test", None)
+            .unwrap();
 
-        let list = list_iter
-            .collect::<Vec<String>>();
+        let list = list_iter.collect::<Vec<String>>();
 
         assert_eq!(list.len(), 10);
 

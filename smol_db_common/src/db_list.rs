@@ -5,28 +5,28 @@ use crate::db::Role::SuperAdmin;
 use crate::db::DB;
 use crate::db_content::DBContent;
 use crate::db_data::DBData;
+use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_packet_response::DBPacketResponseError::{
-    BadPacket, DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, UserNotFound,
-    ValueNotFound,
+    BadPacket, DBFileSystemError, DBNotFound, InvalidPermissions, SerializationError, ValueNotFound,
 };
 use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, SuccessReply};
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
 use crate::encryption::server_encrypt::ServerKey;
-use crate::prelude::DBPacket;
+use crate::prelude::{DBPacket, UserNotFound};
+use crate::prelude::DBPacketResponseError::ListNotFound;
 use serde::{Deserialize, Serialize};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
-use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
-use crate::prelude::DBPacketResponseError::ListNotFound;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -48,24 +48,125 @@ pub struct DBList {
 }
 
 impl DBList {
+    fn load_and_read_database(
+        &self,
+        db_name: &DBPacketInfo,
+        list_lock: &Vec<DBPacketInfo>,
+        client_key: &String,
+        needs_any_permissions: bool, // This is a hacky way to allow get_role() to work, since that needs to return even if the user does not have any permissions
+        f: impl Fn(&DBContent, &DB) -> Result<DBSuccessResponse<String>, DBPacketResponseError>,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
 
+        if let Some(db) = self.cache.read().unwrap().get(db_name) {
+            info!("DB Cache hit");
+            // cache was hit
+            db.write().unwrap().update_access_time();
+
+            let db_lock = db.read().unwrap();
+
+            return if db_lock.has_read_permissions(client_key, &super_admin_list)
+                || needs_any_permissions
+            {
+                let db_table = db_lock.get_content();
+
+                f(&db_table, &*db_lock)
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        return if list_lock.contains(db_name) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(db_name)?;
+
+            db.update_access_time();
+
+            let resp = if db.has_read_permissions(client_key, &super_admin_list) {
+                let db_table = db.get_content();
+
+                f(&db_table, &db)
+            } else {
+                Err(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(db_name.clone(), RwLock::from(db));
+
+            resp
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Err(DBNotFound)
+        };
+    }
+
+    fn load_and_write_database(
+        &self,
+        db_name: &DBPacketInfo,
+        list_lock: &Vec<DBPacketInfo>,
+        client_key: &String,
+        f: impl Fn(&mut DB) -> Result<DBSuccessResponse<String>, DBPacketResponseError>,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+
+        if let Some(db) = self.cache.read().unwrap().get(db_name) {
+            info!("DB Cache hit");
+            // cache was hit
+            db.write().unwrap().update_access_time();
+
+            let mut db_lock = db.write().unwrap();
+
+            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
+                f(&mut *db_lock)
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        return if list_lock.contains(db_name) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(db_name)?;
+
+            db.update_access_time();
+
+            let resp = if db.has_write_permissions(client_key, &super_admin_list) {
+                f(&mut db)
+            } else {
+                Err(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(db_name.clone(), RwLock::from(db));
+
+            resp
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Err(DBNotFound)
+        };
+    }
+
+    //FIXME: sometimes while streaming a list or table, the server will not flush the stream. low priority
 
     #[tracing::instrument(skip(self, db_table))]
     fn handle_stream_list(
         &self,
         client_stream: &mut TcpStream,
         db_table: &DBContent,
-        location: &DBKeyedListLocation
+        location: &DBKeyedListLocation,
     ) -> Result<(), DBPacketResponseError> {
-
         let s = db_table.get_list_from_key(location.get_key());
-        debug!("DB list streamed: {:?}",s);
+        debug!("DB list streamed: {:?}", s);
         match s {
-            None => {
-                Err(ListNotFound)
-            }
+            None => Err(ListNotFound),
             Some(list) => {
-
                 let starting_index = location.get_index().unwrap_or(0);
 
                 for item in &list[starting_index..] {
@@ -158,62 +259,20 @@ impl DBList {
         client_key: &String,
         client_stream: &mut TcpStream,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(packet) {
-            info!("DB Cache hit");
-            // cache was hit
-            db.write().unwrap().update_access_time();
+        let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
 
-            let db_lock = db.read().unwrap();
+        return self.load_and_read_database(packet, &*list_lock, client_key, false, |cont, _| {
+            let s = arc.take().unwrap();
+            let _ = self
+                .send_stream_starting_packet(s)
+                .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
 
-            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
-                let db_table = db_lock.get_content().clone();
-                drop(db_lock);
-
-                let _ = self
-                    .send_stream_starting_packet(client_stream)
-                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
-
-                self.handle_stream(client_stream, &db_table)?;
-
-                Ok(SuccessNoData)
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        return if list_lock.contains(packet) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(packet)?;
-
-            db.update_access_time();
-
-            if db.has_read_permissions(client_key, &super_admin_list) {
-                let db_table = db.get_content();
-
-                let _ = self
-                    .send_stream_starting_packet(client_stream)
-                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
-
-                self.handle_stream(client_stream, db_table)?;
-            } else {
-                return Err(InvalidPermissions);
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(packet.clone(), RwLock::from(db));
+            self.handle_stream(s, cont)?;
 
             Ok(SuccessNoData)
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        });
     }
 
     #[tracing::instrument(skip(self))]
@@ -224,64 +283,21 @@ impl DBList {
         client_key: &String,
         client_stream: &mut TcpStream,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(packet) {
-            info!("DB Cache hit");
-            // cache was hit
-            db.write().unwrap().update_access_time();
+        let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
 
-            let db_lock = db.read().unwrap();
+        return self.load_and_read_database(packet, &*list_lock, client_key, false, |cont, _| {
+            let s = arc.take().unwrap();
+            let _ = self
+                .send_stream_starting_packet(s)
+                .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
 
-            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
-                let db_table = db_lock.get_content().clone();
-                drop(db_lock);
-
-                let _ = self
-                    .send_stream_starting_packet(client_stream)
-                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
-
-                self.handle_stream_list(client_stream, &db_table,location)?;
-
-                Ok(SuccessNoData)
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        return if list_lock.contains(packet) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(packet)?;
-
-            db.update_access_time();
-
-            if db.has_read_permissions(client_key, &super_admin_list) {
-                let db_table = db.get_content();
-
-                let _ = self
-                    .send_stream_starting_packet(client_stream)
-                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
-
-                self.handle_stream_list(client_stream, db_table,location)?;
-            } else {
-                return Err(InvalidPermissions);
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(packet.clone(), RwLock::from(db));
+            self.handle_stream_list(s, cont, location)?;
 
             Ok(SuccessNoData)
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        });
     }
-
 
     fn send_stream_starting_packet(&self, client_stream: &mut TcpStream) -> std::io::Result<()> {
         let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
@@ -322,49 +338,22 @@ impl DBList {
             let super_admin_list = self.get_super_admin_list();
 
             let list_lock = self.list.read().unwrap();
-            if let Some(db) = self.cache.read().unwrap().get(p_info) {
-                info!("DB Cache hit");
-                // cache was hit
-                let mut db_lock = db.write().unwrap();
 
-                db_lock.update_access_time();
-
-                return if db_lock.get_role(client_key, &super_admin_list).is_admin() {
-                    serde_json::to_string(db_lock.get_statistics())
-                        .map(SuccessReply)
-                        .map_err(|_| SerializationError)
-                } else {
-                    Err(InvalidPermissions)
-                };
-            }
-
-            return if list_lock.contains(p_info) {
-                info!("DB Cache missed");
-                // cache was missed but the db exists on the file system
-
-                let mut db = Self::read_db_from_file(p_info)?;
-
-                db.update_access_time();
-
-                let resp = if db.get_role(client_key, &super_admin_list).is_admin() {
-                    serde_json::to_string(db.get_statistics())
-                        .map(SuccessReply)
-                        .map_err(|_| SerializationError)
-                } else {
-                    Err(InvalidPermissions)
-                };
-
-                self.cache
-                    .write()
-                    .unwrap()
-                    .insert(p_info.clone(), RwLock::from(db));
-
-                resp
-            } else {
-                // cache was neither hit, nor did the db exist on the file system
-                info!("Database not found {}", p_info);
-                Err(DBNotFound)
-            };
+            return self.load_and_read_database(
+                p_info,
+                &*list_lock,
+                client_key,
+                false,
+                |db_content, db| {
+                    if db.get_role(client_key, &super_admin_list).is_admin() {
+                        serde_json::to_string(db.get_statistics())
+                            .map(SuccessReply)
+                            .map_err(|_| SerializationError)
+                    } else {
+                        Err(InvalidPermissions)
+                    }
+                },
+            );
         }
     }
 
@@ -376,57 +365,15 @@ impl DBList {
         db_location: &DBLocation,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
 
-            db_lock.update_access_time();
-
-            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                db_lock
-                    .get_content_mut()
-                    .content
-                    .remove(db_location.as_key())
-                    .map(SuccessReply)
-                    .ok_or(ValueNotFound)
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let resp = if db.has_write_permissions(client_key, &super_admin_list) {
-                db.get_content_mut()
-                    .content
-                    .remove(db_location.as_key())
-                    .map(SuccessReply)
-                    .ok_or(ValueNotFound)
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            resp
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            info!("Database not found {}", p_info);
-            Err(DBNotFound)
-        };
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.get_content_mut()
+                .content
+                .remove(db_location.as_key())
+                .map(SuccessReply)
+                .ok_or(ValueNotFound)
+        });
     }
 
     /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
@@ -446,41 +393,12 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
-
-            db_lock.update_access_time();
-
-            let serialized_role =
-                serde_json::to_string(&db_lock.get_role(client_key, &super_admin_list)).unwrap();
-
-            return Ok(SuccessReply(serialized_role));
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
+        return self.load_and_read_database(p_info, &*list_lock, client_key, true, |_cont, db| {
             let serialized_role =
                 serde_json::to_string(&db.get_role(client_key, &super_admin_list)).unwrap();
 
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            Ok(SuccessReply(serialized_role))
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            info!("Database not found {}", p_info);
-            Err(DBNotFound)
-        };
+            return Ok(SuccessReply(serialized_role));
+        });
     }
 
     /// Replaces `DBSettings` for a given DB, requires super admin privileges.
@@ -499,37 +417,11 @@ impl DBList {
         }
 
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
 
-            db_lock.update_access_time();
-
-            db_lock.set_settings(new_db_settings);
-            drop(db_lock);
-            return Ok(SuccessNoData);
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.set_settings(new_db_settings.clone());
             Ok(SuccessNoData)
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            info!("Database not found {}", p_info);
-            Err(DBNotFound)
-        };
+        });
     }
 
     /// Returns the `DBSettings` serialized as a string
@@ -547,41 +439,12 @@ impl DBList {
         }
 
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
 
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
-
-            db_lock.update_access_time();
-
-            return serde_json::to_string(&db_lock.get_settings())
+        return self.load_and_read_database(p_info, &*list_lock, client_key, false, |_, db| {
+            serde_json::to_string(&db.get_settings())
                 .map(SuccessReply)
-                .map_err(|_| SerializationError);
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = serde_json::to_string(&db.get_settings())
-                .map(SuccessReply)
-                .map_err(|_| SerializationError);
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+                .map_err(|_| SerializationError)
+        });
     }
 
     /// Adds a user to a given DB, requires admin privileges or super admin privileges.
@@ -593,48 +456,15 @@ impl DBList {
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
 
-            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
-            {
-                db_lock.update_access_time();
-
-                db_lock.get_settings_mut().add_user(new_key);
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            return if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                db.get_settings_mut().add_user(new_key.clone());
                 Ok(SuccessNoData)
             } else {
                 Err(InvalidPermissions)
             };
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response =
-                if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
-                    db.get_settings_mut().add_admin(new_key);
-                    Ok(SuccessNoData)
-                } else {
-                    Err(InvalidPermissions)
-                };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        });
     }
 
     /// Removes a user from a given DB, requires admin privileges
@@ -646,16 +476,10 @@ impl DBList {
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
 
-            return if db_lock.get_settings().is_admin(client_key) || self.is_super_admin(client_key)
-            {
-                db_lock.update_access_time();
-
-                if db_lock.get_settings_mut().remove_user(removed_key) {
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            return if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+                if db.get_settings_mut().remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
                     Err(UserNotFound)
@@ -663,37 +487,7 @@ impl DBList {
             } else {
                 Err(InvalidPermissions)
             };
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response =
-                if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
-                    if db.get_settings_mut().remove_user(removed_key) {
-                        Ok(SuccessNoData)
-                    } else {
-                        Err(UserNotFound)
-                    }
-                } else {
-                    Err(InvalidPermissions)
-                };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        });
     }
 
     /// Remove an admin from given DB, requires super admin permissions.
@@ -710,46 +504,11 @@ impl DBList {
         }
 
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
 
-            db_lock.update_access_time();
-
-            return if db_lock.get_settings_mut().remove_admin(removed_key) {
-                Ok(SuccessNoData)
-            } else {
-                Err(UserNotFound)
-            };
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = {
-                if db.get_settings_mut().remove_admin(removed_key) {
-                    Ok(SuccessNoData)
-                } else {
-                    Err(UserNotFound)
-                }
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.get_settings_mut().remove_admin(removed_key);
+            Ok(SuccessNoData)
+        });
     }
 
     /// Adds an admin to a given database, requires super admin permissions to perform.
@@ -767,36 +526,11 @@ impl DBList {
         }
 
         let list_lock = self.list.read().unwrap();
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            let mut db_lock = db.write().unwrap();
-            db_lock.update_access_time();
 
-            db_lock.get_settings_mut().add_admin(hash);
-            drop(db_lock);
-            return Ok(SuccessNoData);
-        }
-
-        return if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-            db.get_settings_mut().add_admin(hash);
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.get_settings_mut().add_admin(hash.clone());
             Ok(SuccessNoData)
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        };
+        });
     }
 
     /// Removes all caches which last access time exceeds their invalidation time.
@@ -1091,146 +825,50 @@ impl DBList {
         Ok(db)
     }
 
-    pub fn remove_from_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
+    pub fn remove_from_db_list_content(
+        &self,
+        p_info: &DBPacketInfo,
+        location: &DBKeyedListLocation,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            db.write().unwrap().update_access_time();
-
-            let mut db_lock = db.write().unwrap();
-
-            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                db_lock.get_content_mut().remove_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(SuccessReply(s.to_string())))
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = if db.has_write_permissions(client_key, &super_admin_list) {
-                db.get_content_mut().remove_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(SuccessReply(s.to_string())))
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            return Err(DBNotFound);
-        }
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.get_content_mut()
+                .remove_data_from_list(location)
+                .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s.to_string())))
+        });
     }
 
-    pub fn read_from_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
+    pub fn read_from_db_list_content(
+        &self,
+        p_info: &DBPacketInfo,
+        location: &DBKeyedListLocation,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            db.write().unwrap().update_access_time();
-
-            let db_lock = db.read().unwrap();
-
-            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
-                db_lock.get_content().get_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(DBSuccessResponse::SuccessReply(s.to_string())))
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = if db.has_read_permissions(client_key, &super_admin_list) {
-                db.get_content_mut().get_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(DBSuccessResponse::SuccessReply(s.to_string())))
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            return Err(DBNotFound);
-        }
+        return self.load_and_read_database(p_info, &*list_lock, client_key, false, |cont, _| {
+            cont.get_data_from_list(location)
+                .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s.to_string())))
+        });
     }
 
-    pub fn add_to_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation, data: DBData,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
+    pub fn add_to_db_list_content(
+        &self,
+        p_info: &DBPacketInfo,
+        location: &DBKeyedListLocation,
+        data: DBData,
+        client_key: &String,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            let mut db_lock = db.write().unwrap();
-
-            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                db_lock.update_access_time();
-                if db_lock.get_content_mut().add_data_to_list(location,data) {
-                    Ok(SuccessNoData)
-                } else {
-                    Err(ListNotFound)
-                }
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = if db.has_write_permissions(client_key, &super_admin_list) {
-                if db.get_content_mut().add_data_to_list(location,data) {
-                    Ok(SuccessNoData)
-                } else {
-                    Err(ListNotFound)
-                }
-
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            return Err(DBNotFound);
-        }
+        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+            db.get_content_mut()
+                .add_data_to_list(location, data.clone());
+            Ok(SuccessNoData)
+        });
     }
-
 
     /// Reads a database given a packet, returns the value if it was found.
     #[tracing::instrument(skip(self))]
@@ -1240,57 +878,20 @@ impl DBList {
         p_location: &DBLocation,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
         let list_lock = self.list.read().unwrap();
 
-        if let Some(db) = self.cache.read().unwrap().get(p_info) {
-            info!("DB Cache hit");
-            // cache was hit
-            db.write().unwrap().update_access_time();
-
-            let db_lock = db.read().unwrap();
-
-            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
-                db_lock
-                    .get_content()
+        return self.load_and_read_database(
+            p_info,
+            &*list_lock,
+            client_key,
+            false,
+            |content, _| {
+                content
                     .read_from_db(p_location.as_key())
                     .map(|value| SuccessReply(value.to_string()))
                     .ok_or(ValueNotFound)
-            } else {
-                Err(InvalidPermissions)
-            };
-        }
-
-        if list_lock.contains(p_info) {
-            info!("DB Cache missed");
-            // cache was missed but the db exists on the file system
-
-            let mut db = Self::read_db_from_file(p_info)?;
-
-            db.update_access_time();
-
-            let response = if db.has_read_permissions(client_key, &super_admin_list) {
-                let return_value = db
-                    .get_content()
-                    .read_from_db(p_location.as_key())
-                    .expect("RETURN VALUE DID NOT EXIST")
-                    .clone();
-                Ok(SuccessReply(return_value))
-            } else {
-                Err(InvalidPermissions)
-            };
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(p_info.clone(), RwLock::from(db));
-
-            response
-        } else {
-            // cache was neither hit, nor did the db exist on the file system
-            Err(DBNotFound)
-        }
+            },
+        );
     }
 
     /// Writes to a db given a `DBPacket`
@@ -1302,66 +903,18 @@ impl DBList {
         db_data: &DBData,
         client_key: &String,
     ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
-        let super_admin_list = self.get_super_admin_list();
-
         let list_lock = self.list.read().unwrap();
 
-        {
-            // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
-            let cache_lock = self.cache.read().unwrap();
-
-            if let Some(db) = cache_lock.get(db_info) {
-                info!("DB Cache hit");
-                // cache is hit, db is currently loaded
-
-                let mut db_lock = db.write().unwrap();
-
-                return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                    db_lock.update_access_time();
-                    Ok(db_lock
-                        .get_content_mut()
-                        .content
-                        .insert(
-                            db_location.as_key().to_string(),
-                            db_data.get_data().to_string(),
-                        )
-                        .map_or(SuccessNoData, SuccessReply))
-                } else {
-                    Err(InvalidPermissions)
-                };
-            }
-        }
-
-        if list_lock.contains(db_info) {
-            info!("DB Cache missed");
-            // cache was missed, but the requested database did in fact exist
-
-            let mut cache_lock = self.cache.write().unwrap();
-
-            let mut db = Self::read_db_from_file(db_info)?;
-
-            db.update_access_time();
-
-            if db.has_write_permissions(client_key, &super_admin_list) {
-                let returned_value = db
-                    .get_content_mut()
-                    .content
-                    .insert(
-                        db_location.as_key().to_string(),
-                        db_data.get_data().to_string(),
-                    )
-                    .map_or(SuccessNoData, SuccessReply);
-
-                cache_lock.insert(db_info.clone(), RwLock::from(db));
-
-                Ok(returned_value)
-            } else {
-                cache_lock.insert(db_info.clone(), RwLock::from(db));
-                Err(InvalidPermissions)
-            }
-        } else {
-            Err(DBNotFound)
-        }
+        return self.load_and_write_database(db_info, &*list_lock, client_key, |db| {
+            Ok(db
+                .get_content_mut()
+                .content
+                .insert(
+                    db_location.as_key().to_string(),
+                    db_data.get_data().to_string(),
+                )
+                .map_or(SuccessNoData, SuccessReply))
+        });
     }
 
     /// Returns the db list in a serialized form of Vec : `DBPacketInfo`
@@ -1388,59 +941,17 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        {
-            // scope the cache lock so it goes out of scope faster, allowing us to get a write lock later.
-            let cache_lock = self.cache.read().unwrap();
-
-            if let Some(db) = cache_lock.get(db_info) {
-                info!("DB Cache hit");
-                // cache is hit, db is currently loaded
-
-                let mut db_lock = db.write().unwrap();
-
-                return if db_lock.has_list_permissions(client_key, &super_admin_list)
-                    || self.is_super_admin(client_key)
-                {
-                    db_lock.update_access_time();
-
-                    serde_json::to_string(&db_lock.get_content().content)
-                        .map(SuccessReply)
-                        .map_err(|_| SerializationError)
-                } else {
-                    Err(InvalidPermissions)
-                };
-            }
-        }
-
-        if list_lock.contains(db_info) {
-            info!("DB Cache missed");
-            // cache was missed, but the requested database did in fact exist
-
-            let mut cache_lock = self.cache.write().unwrap();
-
-            let mut db = Self::read_db_from_file(db_info)?;
-
-            if db.has_list_permissions(client_key, &super_admin_list) {
-                db.update_access_time();
-
-                let returned_value = &db.get_content().content;
-
-                let output_response = serde_json::to_string(returned_value)
+        return self.load_and_read_database(db_info, &*list_lock, client_key, false, |cont, db| {
+            if db.has_list_permissions(client_key, &super_admin_list)
+                || self.is_super_admin(client_key)
+            {
+                serde_json::to_string(&cont.content)
                     .map(SuccessReply)
-                    .map_err(|_| SerializationError);
-                cache_lock.insert(db_info.clone(), RwLock::from(db));
-
-                output_response
+                    .map_err(|_| SerializationError)
             } else {
-                db.update_access_time();
-
-                cache_lock.insert(db_info.clone(), RwLock::from(db));
-
                 Err(InvalidPermissions)
             }
-        } else {
-            Err(DBNotFound)
-        }
+        });
     }
 }
 

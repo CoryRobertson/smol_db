@@ -1,9 +1,6 @@
 use crate::prelude::SmolDbClient;
-use smol_db_common::{
-    prelude::DBPacketResponseError,
-    prelude::DBSuccessResponse
-};
 use smol_db_common::prelude::DBPacket;
+use smol_db_common::{prelude::DBPacketResponseError, prelude::DBSuccessResponse};
 use std::io::{Read, Write};
 use tracing::{debug, info};
 
@@ -13,7 +10,7 @@ pub struct DBListIter<'a>(pub(crate) &'a mut SmolDbClient);
 impl Drop for DBListIter<'_> {
     fn drop(&mut self) {
         debug!("DB list iter dropped");
-            let _ = self.0.send_packet(&DBPacket::EndStreamRead); // attempt to end the read stream when the table iter is dropped
+        let _ = self.0.send_packet(&DBPacket::EndStreamRead); // attempt to end the read stream when the table iter is dropped
     }
 }
 
@@ -40,7 +37,7 @@ impl Iterator for DBListIter<'_> {
         if serde_json::from_str::<Result<DBSuccessResponse<String>, DBPacketResponseError>>(
             &key[0..read_len1],
         )
-            .is_ok()
+        .is_ok()
         {
             info!("DB list iter returned none in key read");
             return None;

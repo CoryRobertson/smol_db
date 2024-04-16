@@ -2,8 +2,8 @@
 
 mod client;
 pub mod client_error;
-mod table_iter;
 mod db_list_iter;
+mod table_iter;
 pub use smol_db_common::{
     db::Role, db_packets::db_packet_response::DBPacketResponseError,
     db_packets::db_packet_response::DBSuccessResponse, db_packets::db_settings,

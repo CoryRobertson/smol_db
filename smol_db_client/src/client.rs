@@ -4,9 +4,9 @@ use crate::client_error::ClientError::{
     PacketEncryptionError, PacketSerializationError, SocketReadError, SocketWriteError,
     UnableToConnect,
 };
+use crate::prelude::DBResponseError;
 #[cfg(not(feature = "async"))]
 use crate::prelude::TableIter;
-use crate::prelude::{DBResponseError};
 use serde::{Deserialize, Serialize};
 use smol_db_common::db::Role;
 use smol_db_common::encryption::client_encrypt::ClientKey;
@@ -27,13 +27,13 @@ use std::net::SocketAddr;
 
 #[cfg(feature = "async")]
 use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::TcpStream};
-use tracing::{error, info, warn};
 #[cfg(not(feature = "async"))]
 use tracing::debug;
+use tracing::{error, info, warn};
 
+use crate::db_list_iter::DBListIter;
 #[cfg(not(feature = "async"))]
 use std::net::TcpStream;
-use crate::db_list_iter::DBListIter;
 
 #[derive(Debug)]
 /// `SmolDbClient` struct used for communicating to the database.
@@ -44,7 +44,6 @@ pub struct SmolDbClient {
 }
 
 impl SmolDbClient {
-
     #[allow(dead_code)]
     pub(crate) fn get_socket(&mut self) -> &mut TcpStream {
         &mut self.socket
@@ -64,8 +63,13 @@ impl SmolDbClient {
         Ok(table_iter)
     }
 
-    pub fn stream_db_list_content(&mut self, db_name: &str, list_name: &str,start_idx: Option<usize>) -> Result<DBListIter, ClientError> {
-        let packet = DBPacket::new_stream_db_list(db_name,list_name,start_idx);
+    pub fn stream_db_list_content(
+        &mut self,
+        db_name: &str,
+        list_name: &str,
+        start_idx: Option<usize>,
+    ) -> Result<DBListIter, ClientError> {
+        let packet = DBPacket::new_stream_db_list(db_name, list_name, start_idx);
 
         debug!("Sending packet");
 
@@ -77,18 +81,34 @@ impl SmolDbClient {
         Ok(list_iter)
     }
 
-    pub fn add_item_to_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>, data: &str) -> Result<DBSuccessResponse<String>, ClientError> {
-        let packet = DBPacket::new_add_db_list(db_name,list_name,index,data);
+    pub fn add_item_to_list(
+        &mut self,
+        db_name: &str,
+        list_name: &str,
+        index: Option<usize>,
+        data: &str,
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_add_db_list(db_name, list_name, index, data);
         self.send_packet(&packet)
     }
 
-    pub fn remove_item_from_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>) -> Result<DBSuccessResponse<String>, ClientError> {
-        let packet = DBPacket::new_remove_from_db_list(db_name,list_name,index);
+    pub fn remove_item_from_list(
+        &mut self,
+        db_name: &str,
+        list_name: &str,
+        index: Option<usize>,
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_remove_from_db_list(db_name, list_name, index);
         self.send_packet(&packet)
     }
 
-    pub fn read_item_from_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>) -> Result<DBSuccessResponse<String>, ClientError> {
-        let packet = DBPacket::new_read_from_db_list(db_name,list_name,index);
+    pub fn read_item_from_list(
+        &mut self,
+        db_name: &str,
+        list_name: &str,
+        index: Option<usize>,
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_read_from_db_list(db_name, list_name, index);
         self.send_packet(&packet)
     }
 

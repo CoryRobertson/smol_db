@@ -1,11 +1,11 @@
 use crate::db_data::DBData;
+use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
 use crate::db_packets::db_location::DBLocation;
 use crate::db_packets::db_packet_info::DBPacketInfo;
 use crate::db_packets::db_settings::DBSettings;
 use crate::encryption::encrypted_data::EncryptedData;
 use rsa::RsaPublicKey;
 use serde::{Deserialize, Serialize};
-use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// A packet denoting the operation from client->server that the client wishes to do.
@@ -62,29 +62,77 @@ pub enum DBPacket {
     /// Tell the server that the client wants to stop streaming values from a DB
     EndStreamRead,
 
-    AddToList(DBPacketInfo,DBKeyedListLocation,DBData),
-    ReadFromList(DBPacketInfo,DBKeyedListLocation),
-    RemoveFromList(DBPacketInfo,DBKeyedListLocation),
-    StreamList(DBPacketInfo,DBKeyedListLocation),
+    /// Add data to a named list in a database
+    AddToList(DBPacketInfo, DBKeyedListLocation, DBData),
+    /// Read data from a named list in a database
+    ReadFromList(DBPacketInfo, DBKeyedListLocation),
+    /// Remove data from a named list in a database
+    RemoveFromList(DBPacketInfo, DBKeyedListLocation),
+    /// Stream in order starting from the given index a named list in a database
+    StreamList(DBPacketInfo, DBKeyedListLocation),
+    /// Request the length of a list in a database if it exists
+    GetListLength(DBPacketInfo, DBKeyedListLocation),
+    /// Clear all data from a list in a database if it exists
+    ClearList(DBPacketInfo, DBKeyedListLocation),
 }
 
 impl DBPacket {
+    pub fn new_get_list_length(table_name: &str, list_name: &str) -> Self {
+        Self::GetListLength(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(None, list_name),
+        )
+    }
+
+    pub fn new_clear_list(table_name: &str, list_name: &str) -> Self {
+        Self::ClearList(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(None, list_name),
+        )
+    }
+
     pub fn new_stream_table(dbname: &str) -> Self {
         Self::StreamReadDb(DBPacketInfo::new(dbname))
     }
-    pub fn new_stream_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
-        Self::StreamList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    pub fn new_stream_db_list(table_name: &str, list_name: &str, start_idx: Option<usize>) -> Self {
+        Self::StreamList(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(start_idx, list_name),
+        )
     }
 
-    pub fn new_add_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>, data: &str) -> Self {
-        Self::AddToList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name), DBData::new(data.to_string()))
+    pub fn new_add_db_list(
+        table_name: &str,
+        list_name: &str,
+        start_idx: Option<usize>,
+        data: &str,
+    ) -> Self {
+        Self::AddToList(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(start_idx, list_name),
+            DBData::new(data.to_string()),
+        )
     }
-    pub fn new_read_from_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
-        Self::ReadFromList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    pub fn new_read_from_db_list(
+        table_name: &str,
+        list_name: &str,
+        start_idx: Option<usize>,
+    ) -> Self {
+        Self::ReadFromList(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(start_idx, list_name),
+        )
     }
 
-    pub fn new_remove_from_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
-        Self::RemoveFromList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    pub fn new_remove_from_db_list(
+        table_name: &str,
+        list_name: &str,
+        start_idx: Option<usize>,
+    ) -> Self {
+        Self::RemoveFromList(
+            DBPacketInfo::new(table_name),
+            DBKeyedListLocation::new(start_idx, list_name),
+        )
     }
 
     #[cfg(feature = "statistics")]

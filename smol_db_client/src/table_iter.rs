@@ -1,10 +1,7 @@
 use crate::prelude::SmolDbClient;
-#[cfg(not(feature = "async"))]
-use smol_db_common::{
-    prelude::DBPacketResponseError,
-    prelude::DBSuccessResponse
-};
 use smol_db_common::prelude::DBPacket;
+#[cfg(not(feature = "async"))]
+use smol_db_common::{prelude::DBPacketResponseError, prelude::DBSuccessResponse};
 #[cfg(not(feature = "async"))]
 use std::io::{Read, Write};
 use tracing::{debug, info};

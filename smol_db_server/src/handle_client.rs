@@ -45,31 +45,61 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
 
                         match pack {
-                            DBPacket::AddToList(a,b,c) => {
+                            DBPacket::GetListLength(p_info, location) => {
+                                todo!()
+                            }
+                            DBPacket::ClearList(p_info, location) => {
+                                todo!()
+                            }
+                            DBPacket::AddToList(p_info, location, data) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.add_to_db_list_content(&a, &b, c,&client_key);
-                                info!("{} wrote to list in {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                let resp = lock.add_to_db_list_content(
+                                    &p_info,
+                                    &location,
+                                    data,
+                                    &client_key,
+                                );
+                                info!(
+                                    "{} wrote to list in {} using {:?}, response: {:?} ",
+                                    client_name, p_info, location, resp
+                                );
                                 resp
                             }
-                            DBPacket::RemoveFromList(a,b) => {
+                            DBPacket::RemoveFromList(p_info, location) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.remove_from_db_list_content(&a, &b,&client_key);
-                                info!("{} removed item from list in {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                let resp = lock.remove_from_db_list_content(
+                                    &p_info,
+                                    &location,
+                                    &client_key,
+                                );
+                                info!(
+                                    "{} removed item from list in {} using {:?}, response: {:?} ",
+                                    client_name, p_info, location, resp
+                                );
                                 resp
                             }
-                            DBPacket::ReadFromList(a,b) => {
+                            DBPacket::ReadFromList(p_info, location) => {
                                 let lock = db_list.read().unwrap();
-                                let resp = lock.read_from_db_list_content(&a, &b, &client_key);
-                                info!("{} read list from {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                let resp =
+                                    lock.read_from_db_list_content(&p_info, &location, &client_key);
+                                info!(
+                                    "{} read list from {} using {:?}, response: {:?} ",
+                                    client_name, p_info, location, resp
+                                );
                                 resp
                             }
-                            DBPacket::StreamList(a,b) => {
+                            DBPacket::StreamList(p_info, location) => {
                                 let lock = db_list.read().unwrap();
                                 info!("Client beginning stream");
-                                let resp = lock.stream_table_list(&a,&b, &client_key, &mut stream);
+                                let resp = lock.stream_table_list(
+                                    &p_info,
+                                    &location,
+                                    &client_key,
+                                    &mut stream,
+                                );
                                 info!(
                                     "{} streamed \"{}\" list: {:?}, response: {:?}",
-                                    client_name, a,b ,resp
+                                    client_name, p_info, location, resp
                                 );
 
                                 resp
@@ -297,7 +327,10 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                     }
                     Err(err) => {
                         let packet_text = String::from_utf8_lossy(&buf[0..read]);
-                        error!("packet serialization error: {}, packet string: {}", err,packet_text);
+                        error!(
+                            "packet serialization error: {}, packet string: {}",
+                            err, packet_text
+                        );
                         Err(BadPacket)
                         // continue;
                     }
