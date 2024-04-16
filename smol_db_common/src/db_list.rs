@@ -84,7 +84,7 @@ impl DBList {
 
             db.update_access_time();
 
-            let resp = if db.has_read_permissions(client_key, &super_admin_list) {
+            let resp = if db.has_read_permissions(client_key, &super_admin_list) || needs_any_permissions {
                 let db_table = db.get_content();
 
                 f(&db_table, &db)

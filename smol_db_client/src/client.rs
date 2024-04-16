@@ -1185,7 +1185,7 @@ impl SmolDbClient {
         match serde_json::to_string(&data) {
             Ok(ser_data) => match self.write_db(db_name, db_location, &ser_data) {
                 Ok(response) => match response {
-                    SuccessNoData => Ok(smol_db_common::prelude::SuccessNoData),
+                    SuccessNoData => Ok(SuccessNoData),
                     SuccessReply(data_string) => match serde_json::from_str::<T>(&data_string) {
                         Ok(thing) => Ok(SuccessReply(thing)),
                         Err(err) => Err(PacketDeserializationError(Error::from(err))),
