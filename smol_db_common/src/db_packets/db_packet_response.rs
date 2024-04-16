@@ -128,6 +128,8 @@ pub enum DBPacketResponseError {
     UserNotFound,
 
     StreamClosedUnexpectedly,
+
+    ListNotFound,
 }
 
 #[allow(deprecated)]

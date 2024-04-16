@@ -7,10 +7,10 @@ pub struct DBKeyedListLocation {
 }
 
 impl DBKeyedListLocation {
-    pub fn new(index: usize, location: &str) -> Self {
+    pub fn new(index: Option<usize>, location: &str) -> Self {
         Self {
             location: location.to_string(),
-            index: Some(index),
+            index,
         }
     }
 

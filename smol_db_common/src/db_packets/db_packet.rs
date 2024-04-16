@@ -72,6 +72,20 @@ impl DBPacket {
     pub fn new_stream_table(dbname: &str) -> Self {
         Self::StreamReadDb(DBPacketInfo::new(dbname))
     }
+    pub fn new_stream_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
+        Self::StreamList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    }
+
+    pub fn new_add_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>, data: &str) -> Self {
+        Self::AddToList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name), DBData::new(data.to_string()))
+    }
+    pub fn new_read_from_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
+        Self::ReadFromList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    }
+
+    pub fn new_remove_from_db_list(table_name: &str,list_name: &str, start_idx: Option<usize>) -> Self {
+        Self::RemoveFromList(DBPacketInfo::new(table_name),DBKeyedListLocation::new(start_idx,list_name))
+    }
 
     #[cfg(feature = "statistics")]
     pub fn new_get_stats(dbname: &str) -> Self {

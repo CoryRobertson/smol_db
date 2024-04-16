@@ -10,6 +10,38 @@ mod tests {
     use tracing::debug;
 
     #[test]
+    fn test_list_stream() {
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response, SuccessNoData);
+        let create_response = client
+            .create_db("stream_list_test", DBSettings::default())
+            .unwrap();
+        assert_eq!(create_response, SuccessNoData);
+
+        for i in 0..10 {
+            let data = format!("{i}");
+            client
+                .add_item_to_list("stream_list_test","stream_listing_test", None,data.as_str()).unwrap();
+        }
+
+        let list_iter = client.stream_db_list_content("stream_list_test", "stream_listing_test", None).unwrap();
+
+        let list = list_iter
+            .collect::<Vec<String>>();
+
+        assert_eq!(list.len(), 10);
+
+        for i in 0..10 {
+            assert!(list.contains(&i.to_string()));
+        }
+
+        let delete_response = client.delete_db("stream_list_test").unwrap();
+        assert_eq!(delete_response, SuccessNoData);
+    }
+
+    #[test]
     fn test_stream() {
         let mut client = SmolDbClient::new("localhost:8222").unwrap();
 

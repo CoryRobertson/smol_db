@@ -25,6 +25,8 @@ use std::net::TcpStream;
 use std::sync::RwLock;
 use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
+use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
+use crate::prelude::DBPacketResponseError::ListNotFound;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// `DBList` represents a server that takes requests and handles them on a given `smol_db` server.
@@ -46,6 +48,64 @@ pub struct DBList {
 }
 
 impl DBList {
+
+
+    #[tracing::instrument(skip(self, db_table))]
+    fn handle_stream_list(
+        &self,
+        client_stream: &mut TcpStream,
+        db_table: &DBContent,
+        location: &DBKeyedListLocation
+    ) -> Result<(), DBPacketResponseError> {
+
+        let s = db_table.get_list_from_key(location.get_key());
+        debug!("DB list streamed: {:?}",s);
+        match s {
+            None => {
+                Err(ListNotFound)
+            }
+            Some(list) => {
+
+                let starting_index = location.get_index().unwrap_or(0);
+
+                for item in &list[starting_index..] {
+                    let mut buf: [u8; 1024] = [0; 1024];
+                    debug!("Waiting for client to await next item");
+                    let read_len = client_stream.read(&mut buf).unwrap();
+
+                    let read_client = String::from_utf8(buf.to_vec()).unwrap();
+
+                    match serde_json::from_str::<DBPacket>(&read_client[0..read_len]) {
+                        Ok(packet) => {
+                            debug!("Packet read: {:?}", packet);
+
+                            // two cases where packets come during a stream, ending the stream, and asking for the next item
+                            if matches!(packet, DBPacket::EndStreamRead) {
+                                info!("Stream ended early intentionally.");
+                                break;
+                            } else if !matches!(packet, DBPacket::ReadyForNextItem) {
+                                return Err(BadPacket);
+                            }
+                        }
+                        Err(err) => {
+                            error!("err: {} {}", read_client, err);
+                        }
+                    }
+
+                    debug!("Client requested next item");
+
+                    let _ = client_stream.write(item.as_bytes()).map_err(|err| {
+                        error!("{}", err);
+                        DBPacketResponseError::StreamClosedUnexpectedly
+                    })?;
+
+                    info!("Wrote key value pair to stream");
+                }
+                Ok(())
+            }
+        }
+    }
+
     #[tracing::instrument(skip(self, db_table))]
     fn handle_stream(
         &self,
@@ -155,6 +215,73 @@ impl DBList {
             Err(DBNotFound)
         };
     }
+
+    #[tracing::instrument(skip(self))]
+    pub fn stream_table_list(
+        &self,
+        packet: &DBPacketInfo,
+        location: &DBKeyedListLocation,
+        client_key: &String,
+        client_stream: &mut TcpStream,
+    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(packet) {
+            info!("DB Cache hit");
+            // cache was hit
+            db.write().unwrap().update_access_time();
+
+            let db_lock = db.read().unwrap();
+
+            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
+                let db_table = db_lock.get_content().clone();
+                drop(db_lock);
+
+                let _ = self
+                    .send_stream_starting_packet(client_stream)
+                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
+
+                self.handle_stream_list(client_stream, &db_table,location)?;
+
+                Ok(SuccessNoData)
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        return if list_lock.contains(packet) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(packet)?;
+
+            db.update_access_time();
+
+            if db.has_read_permissions(client_key, &super_admin_list) {
+                let db_table = db.get_content();
+
+                let _ = self
+                    .send_stream_starting_packet(client_stream)
+                    .inspect_err(|err| error!("Error sending stream starting packet: {}", err));
+
+                self.handle_stream_list(client_stream, db_table,location)?;
+            } else {
+                return Err(InvalidPermissions);
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(packet.clone(), RwLock::from(db));
+
+            Ok(SuccessNoData)
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            Err(DBNotFound)
+        };
+    }
+
 
     fn send_stream_starting_packet(&self, client_stream: &mut TcpStream) -> std::io::Result<()> {
         let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
@@ -963,6 +1090,147 @@ impl DBList {
         let db: DB = serde_json::from_str(&db_content_string).unwrap_or_default();
         Ok(db)
     }
+
+    pub fn remove_from_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
+            db.write().unwrap().update_access_time();
+
+            let mut db_lock = db.write().unwrap();
+
+            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
+                db_lock.get_content_mut().remove_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(SuccessReply(s.to_string())))
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        if list_lock.contains(p_info) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(p_info)?;
+
+            db.update_access_time();
+
+            let response = if db.has_write_permissions(client_key, &super_admin_list) {
+                db.get_content_mut().remove_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(SuccessReply(s.to_string())))
+            } else {
+                Err(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            return Err(DBNotFound);
+        }
+    }
+
+    pub fn read_from_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
+            db.write().unwrap().update_access_time();
+
+            let db_lock = db.read().unwrap();
+
+            return if db_lock.has_read_permissions(client_key, &super_admin_list) {
+                db_lock.get_content().get_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(DBSuccessResponse::SuccessReply(s.to_string())))
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        if list_lock.contains(p_info) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(p_info)?;
+
+            db.update_access_time();
+
+            let response = if db.has_read_permissions(client_key, &super_admin_list) {
+                db.get_content_mut().get_data_from_list(location).map_or(Err(ValueNotFound),|s| Ok(DBSuccessResponse::SuccessReply(s.to_string())))
+            } else {
+                Err(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            return Err(DBNotFound);
+        }
+    }
+
+    pub fn add_to_db_list_content(&self,p_info: &DBPacketInfo,location: &DBKeyedListLocation, data: DBData,client_key: &String) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        let super_admin_list = self.get_super_admin_list();
+
+        let list_lock = self.list.read().unwrap();
+
+        if let Some(db) = self.cache.read().unwrap().get(p_info) {
+            info!("DB Cache hit");
+            let mut db_lock = db.write().unwrap();
+
+            return if db_lock.has_write_permissions(client_key, &super_admin_list) {
+                db_lock.update_access_time();
+                if db_lock.get_content_mut().add_data_to_list(location,data) {
+                    Ok(SuccessNoData)
+                } else {
+                    Err(ListNotFound)
+                }
+            } else {
+                Err(InvalidPermissions)
+            };
+        }
+
+        if list_lock.contains(p_info) {
+            info!("DB Cache missed");
+            // cache was missed but the db exists on the file system
+
+            let mut db = Self::read_db_from_file(p_info)?;
+
+            db.update_access_time();
+
+            let response = if db.has_write_permissions(client_key, &super_admin_list) {
+                if db.get_content_mut().add_data_to_list(location,data) {
+                    Ok(SuccessNoData)
+                } else {
+                    Err(ListNotFound)
+                }
+
+            } else {
+                Err(InvalidPermissions)
+            };
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(p_info.clone(), RwLock::from(db));
+
+            response
+        } else {
+            // cache was neither hit, nor did the db exist on the file system
+            return Err(DBNotFound);
+        }
+    }
+
 
     /// Reads a database given a packet, returns the value if it was found.
     #[tracing::instrument(skip(self))]

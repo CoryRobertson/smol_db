@@ -33,6 +33,7 @@ use tracing::debug;
 
 #[cfg(not(feature = "async"))]
 use std::net::TcpStream;
+use crate::db_list_iter::DBListIter;
 
 #[derive(Debug)]
 /// `SmolDbClient` struct used for communicating to the database.
@@ -61,6 +62,34 @@ impl SmolDbClient {
         let table_iter = TableIter(self);
 
         Ok(table_iter)
+    }
+
+    pub fn stream_db_list_content(&mut self, db_name: &str, list_name: &str,start_idx: Option<usize>) -> Result<DBListIter, ClientError> {
+        let packet = DBPacket::new_stream_db_list(db_name,list_name,start_idx);
+
+        debug!("Sending packet");
+
+        let resp = self.send_packet(&packet)?;
+
+        debug!("Sent packet: {}", resp);
+        let list_iter = DBListIter(self);
+
+        Ok(list_iter)
+    }
+
+    pub fn add_item_to_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>, data: &str) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_add_db_list(db_name,list_name,index,data);
+        self.send_packet(&packet)
+    }
+
+    pub fn remove_item_from_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_remove_from_db_list(db_name,list_name,index);
+        self.send_packet(&packet)
+    }
+
+    pub fn read_item_from_list(&mut self, db_name: &str, list_name: &str, index: Option<usize>) -> Result<DBSuccessResponse<String>, ClientError> {
+        let packet = DBPacket::new_read_from_db_list(db_name,list_name,index);
+        self.send_packet(&packet)
     }
 
     /// Creates a new `SmolDBClient` struct connected to the ip address given.

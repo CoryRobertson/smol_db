@@ -46,16 +46,33 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
 
                         match pack {
                             DBPacket::AddToList(a,b,c) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.add_to_db_list_content(&a, &b, c,&client_key);
+                                info!("{} wrote to list in {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                resp
                             }
                             DBPacket::RemoveFromList(a,b) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.remove_from_db_list_content(&a, &b,&client_key);
+                                info!("{} removed item from list in {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                resp
                             }
                             DBPacket::ReadFromList(a,b) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.read_from_db_list_content(&a, &b, &client_key);
+                                info!("{} read list from {} using {:?}, response: {:?} ", client_name,a,b, resp);
+                                resp
                             }
                             DBPacket::StreamList(a,b) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                info!("Client beginning stream");
+                                let resp = lock.stream_table_list(&a,&b, &client_key, &mut stream);
+                                info!(
+                                    "{} streamed \"{}\" list: {:?}, response: {:?}",
+                                    client_name, a,b ,resp
+                                );
+
+                                resp
                             }
                             DBPacket::EndStreamRead => {
                                 warn!("Client requested to end stream when no stream was active: {}, {:?}", client_name, pack);
@@ -279,7 +296,8 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                         }
                     }
                     Err(err) => {
-                        error!("packet serialization error: {}", err);
+                        let packet_text = String::from_utf8_lossy(&buf[0..read]);
+                        error!("packet serialization error: {}, packet string: {}", err,packet_text);
                         Err(BadPacket)
                         // continue;
                     }
