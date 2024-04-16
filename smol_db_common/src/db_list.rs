@@ -15,8 +15,8 @@ use crate::db_packets::db_packet_response::DBSuccessResponse::{SuccessNoData, Su
 use crate::db_packets::db_packet_response::{DBPacketResponseError, DBSuccessResponse};
 use crate::db_packets::db_settings::DBSettings;
 use crate::encryption::server_encrypt::ServerKey;
-use crate::prelude::{DBPacket, UserNotFound};
 use crate::prelude::DBPacketResponseError::ListNotFound;
+use crate::prelude::{DBPacket, UserNotFound};
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -47,15 +47,18 @@ pub struct DBList {
     pub server_key: ServerKey,
 }
 
+pub type DBResult = Result<DBSuccessResponse<String>, DBPacketResponseError>;
+
 impl DBList {
+    #[tracing::instrument(skip(self, list_lock, f))]
     fn load_and_read_database(
         &self,
         db_name: &DBPacketInfo,
         list_lock: &Vec<DBPacketInfo>,
         client_key: &String,
-        needs_any_permissions: bool, // This is a hacky way to allow get_role() to work, since that needs to return even if the user does not have any permissions
-        f: impl Fn(&DBContent, &DB) -> Result<DBSuccessResponse<String>, DBPacketResponseError>,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        override_read_permission: bool, // This is a hacky way to allow get_role() to work, since that needs to return even if the user does not have any permissions
+        f: impl Fn(&DBContent, &DB) -> DBResult,
+    ) -> DBResult {
         let super_admin_list = self.get_super_admin_list();
 
         if let Some(db) = self.cache.read().unwrap().get(db_name) {
@@ -66,7 +69,7 @@ impl DBList {
             let db_lock = db.read().unwrap();
 
             return if db_lock.has_read_permissions(client_key, &super_admin_list)
-                || needs_any_permissions
+                || override_read_permission
             {
                 let db_table = db_lock.get_content();
 
@@ -84,7 +87,9 @@ impl DBList {
 
             db.update_access_time();
 
-            let resp = if db.has_read_permissions(client_key, &super_admin_list) || needs_any_permissions {
+            let resp = if db.has_read_permissions(client_key, &super_admin_list)
+                || override_read_permission
+            {
                 let db_table = db.get_content();
 
                 f(&db_table, &db)
@@ -104,13 +109,14 @@ impl DBList {
         };
     }
 
+    #[tracing::instrument(skip(self, list_lock, f))]
     fn load_and_write_database(
         &self,
         db_name: &DBPacketInfo,
         list_lock: &Vec<DBPacketInfo>,
         client_key: &String,
-        f: impl Fn(&mut DB) -> Result<DBSuccessResponse<String>, DBPacketResponseError>,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+        f: impl Fn(&mut DB) -> DBResult,
+    ) -> DBResult {
         let super_admin_list = self.get_super_admin_list();
 
         if let Some(db) = self.cache.read().unwrap().get(db_name) {
@@ -252,13 +258,45 @@ impl DBList {
         Ok(())
     }
 
+    /// Removes a list from a database if it exists, if not it returns a `ListNotFound`
+    #[tracing::instrument(skip(self))]
+    pub fn clear_db_list(
+        &self,
+        packet: &DBPacketInfo,
+        list_location: &DBKeyedListLocation,
+        client_key: &String,
+    ) -> DBResult {
+        let list_lock = self.list.read().unwrap();
+        return self.load_and_write_database(packet, &*list_lock, client_key, |db| {
+            if db.get_content_mut().clear_list(list_location) {
+                Ok(SuccessNoData)
+            } else {
+                Err(ListNotFound)
+            }
+        });
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn get_db_list_length(
+        &self,
+        packet: &DBPacketInfo,
+        list_location: &DBKeyedListLocation,
+        client_key: &String,
+    ) -> DBResult {
+        let list_lock = self.list.read().unwrap();
+        return self.load_and_read_database(packet, &*list_lock, client_key, false, |db, _| {
+            db.get_length_of_list(list_location)
+                .map_or(Err(ListNotFound), |len| Ok(SuccessReply(len.to_string())))
+        });
+    }
+
     #[tracing::instrument(skip(self))]
     pub fn stream_table(
         &self,
         packet: &DBPacketInfo,
         client_key: &String,
         client_stream: &mut TcpStream,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
@@ -282,7 +320,7 @@ impl DBList {
         location: &DBKeyedListLocation,
         client_key: &String,
         client_stream: &mut TcpStream,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
@@ -300,7 +338,7 @@ impl DBList {
     }
 
     fn send_stream_starting_packet(&self, client_stream: &mut TcpStream) -> std::io::Result<()> {
-        let s: Result<DBSuccessResponse<String>, DBPacketResponseError> = Ok(SuccessNoData);
+        let s: DBResult = Ok(SuccessNoData);
         let starting_packet = serde_json::to_string(&s)?;
         let _ = client_stream.write(starting_packet.as_bytes())?;
         Ok(())
@@ -322,11 +360,7 @@ impl DBList {
     #[allow(clippy::ptr_arg)]
     /// Returns the db stats used for a given database when permissions allow the user to read them
     #[tracing::instrument(skip(self))]
-    pub fn get_stats(
-        &self,
-        p_info: &DBPacketInfo,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn get_stats(&self, p_info: &DBPacketInfo, client_key: &String) -> DBResult {
         #[cfg(not(feature = "statistics"))]
         {
             warn!("Statistics packet received, however statistics is not enabled on this server");
@@ -364,7 +398,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         db_location: &DBLocation,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
@@ -378,11 +412,7 @@ impl DBList {
 
     /// Responds with the role of the client key inside a given db, if they are a super admin, the result is always a super admin role.
     #[tracing::instrument(skip(self))]
-    pub fn get_role(
-        &self,
-        p_info: &DBPacketInfo,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn get_role(&self, p_info: &DBPacketInfo, client_key: &String) -> DBResult {
         let super_admin_list = self.get_super_admin_list();
 
         if super_admin_list.contains(client_key) {
@@ -409,7 +439,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         new_db_settings: DBSettings,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         if !self.is_super_admin(client_key) {
             // change settings requires super admin, early return if the user is not a super admin
             info!("User was not super admin");
@@ -427,11 +457,7 @@ impl DBList {
     /// Returns the `DBSettings` serialized as a string
     /// Only super admins can get the db settings
     #[tracing::instrument(skip(self))]
-    pub fn get_db_settings(
-        &self,
-        p_info: &DBPacketInfo,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn get_db_settings(&self, p_info: &DBPacketInfo, client_key: &String) -> DBResult {
         if !self.is_super_admin(client_key) {
             info!("Client is not super admin");
             // change settings requires super admin, early return if the user is not a super admin
@@ -454,7 +480,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         new_key: String,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
@@ -474,7 +500,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         removed_key: &str,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
@@ -497,7 +523,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         removed_key: &str,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         if !self.is_super_admin(client_key) {
             // change settings requires super admin, early return if the user is not a super admin
             return Err(InvalidPermissions);
@@ -513,12 +539,7 @@ impl DBList {
 
     /// Adds an admin to a given database, requires super admin permissions to perform.
     #[tracing::instrument(skip(self))]
-    pub fn add_admin(
-        &self,
-        p_info: &DBPacketInfo,
-        hash: String,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn add_admin(&self, p_info: &DBPacketInfo, hash: String, client_key: &String) -> DBResult {
         if !self.is_super_admin(client_key) {
             info!("User is not a super admin");
             // to add an admin, you must be a super admin first, else you have invalid permissions
@@ -709,7 +730,7 @@ impl DBList {
         db_name: &str,
         db_settings: DBSettings,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         if !self.is_super_admin(client_key) {
             // to create a db you must be a super admin
             return Err(InvalidPermissions);
@@ -757,11 +778,7 @@ impl DBList {
     /// Handles deleting a db, given a name for the db. Removes the database given a name, and deletes the corresponding file.
     /// If the file is successfully removed, the db is also removed from the cache, and list.
     #[tracing::instrument(skip(self))]
-    pub fn delete_db(
-        &self,
-        db_name: &str,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn delete_db(&self, db_name: &str, client_key: &String) -> DBResult {
         if !self.is_super_admin(client_key) {
             // to delete a db, you must be a super admin no matter what.
             return Err(InvalidPermissions);
@@ -830,7 +847,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         location: &DBKeyedListLocation,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
@@ -845,7 +862,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         location: &DBKeyedListLocation,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_read_database(p_info, &*list_lock, client_key, false, |cont, _| {
@@ -860,7 +877,7 @@ impl DBList {
         location: &DBKeyedListLocation,
         data: DBData,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
@@ -877,7 +894,7 @@ impl DBList {
         p_info: &DBPacketInfo,
         p_location: &DBLocation,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_read_database(
@@ -902,7 +919,7 @@ impl DBList {
         db_location: &DBLocation,
         db_data: &DBData,
         client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
         return self.load_and_write_database(db_info, &*list_lock, client_key, |db| {
@@ -919,7 +936,7 @@ impl DBList {
 
     /// Returns the db list in a serialized form of Vec : `DBPacketInfo`
     #[tracing::instrument(skip(self))]
-    pub fn list_db(&self) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn list_db(&self) -> DBResult {
         let list = self.list.read().unwrap();
         serde_json::to_string(&list.clone())
             .map(SuccessReply)
@@ -928,11 +945,7 @@ impl DBList {
 
     /// Returns the db contents in a serialized form of HashMap<String, String>
     #[tracing::instrument(skip(self))]
-    pub fn list_db_contents(
-        &self,
-        db_info: &DBPacketInfo,
-        client_key: &String,
-    ) -> Result<DBSuccessResponse<String>, DBPacketResponseError> {
+    pub fn list_db_contents(&self, db_info: &DBPacketInfo, client_key: &String) -> DBResult {
         if !self.db_name_exists(db_info.get_db_name()) {
             return Err(DBNotFound);
         }

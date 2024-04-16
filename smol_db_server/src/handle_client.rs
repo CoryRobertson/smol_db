@@ -46,10 +46,22 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
 
                         match pack {
                             DBPacket::GetListLength(p_info, location) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.get_db_list_length(&p_info, &location, &client_key);
+                                info!(
+                                    "{} got list length in {} using {:?}, response: {:?} ",
+                                    client_name, p_info, location, resp
+                                );
+                                resp
                             }
                             DBPacket::ClearList(p_info, location) => {
-                                todo!()
+                                let lock = db_list.read().unwrap();
+                                let resp = lock.clear_db_list(&p_info, &location, &client_key);
+                                info!(
+                                    "{} cleared list in {} using {:?}, response: {:?} ",
+                                    client_name, p_info, location, resp
+                                );
+                                resp
                             }
                             DBPacket::AddToList(p_info, location, data) => {
                                 let lock = db_list.read().unwrap();

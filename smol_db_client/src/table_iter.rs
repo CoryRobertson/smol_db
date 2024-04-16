@@ -1,8 +1,6 @@
 use crate::prelude::SmolDbClient;
 use smol_db_common::prelude::DBPacket;
-#[cfg(not(feature = "async"))]
 use smol_db_common::{prelude::DBPacketResponseError, prelude::DBSuccessResponse};
-#[cfg(not(feature = "async"))]
 use std::io::{Read, Write};
 use tracing::{debug, info};
 
@@ -18,7 +16,6 @@ impl Drop for TableIter<'_> {
     }
 }
 
-#[cfg(not(feature = "async"))]
 impl Iterator for TableIter<'_> {
     type Item = (String, String);
 

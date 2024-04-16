@@ -1,13 +1,81 @@
 #[cfg(test)]
 #[allow(unused_imports, clippy::bool_assert_comparison)]
-#[cfg(not(feature = "async"))]
 mod tests {
     use serde::{Deserialize, Serialize};
+    use smol_db_client::client_error::ClientError;
     use smol_db_client::prelude::*;
+    use smol_db_common::prelude::DBPacketResponseError;
     use std::fs::read;
     use std::thread;
     use std::time::Duration;
     use tracing::debug;
+
+    #[test]
+    fn test_list_add_remove() {
+        let mut client = SmolDbClient::new("localhost:8222").unwrap();
+
+        let db_name = "list_test_add_remove";
+        let list_name = "cool_list";
+
+        let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();
+        assert_eq!(set_key_response, SuccessNoData);
+        let create_response = client.create_db(db_name, DBSettings::default()).unwrap();
+        assert_eq!(create_response, SuccessNoData);
+
+        let d1 = "abc";
+        let d2 = "123";
+
+        assert_eq!(
+            client.get_list_length(db_name, list_name).unwrap_err(),
+            DBResponseError(ListNotFound)
+        );
+
+        let add_response1 = client
+            .add_item_to_list(db_name, list_name, None, d1)
+            .unwrap();
+        assert_eq!(add_response1, SuccessNoData);
+
+        assert_eq!(
+            client.get_list_length(db_name, list_name).unwrap(),
+            SuccessReply(1)
+        );
+
+        let add_response2 = client
+            .add_item_to_list(db_name, list_name, None, d2)
+            .unwrap();
+
+        assert_eq!(add_response2, SuccessNoData);
+        assert_eq!(
+            client.get_list_length(db_name, list_name).unwrap(),
+            SuccessReply(2)
+        );
+
+        let first_item = client
+            .read_item_from_list(db_name, list_name, 0)
+            .unwrap();
+        let second_item = client
+            .read_item_from_list(db_name, list_name,1)
+            .unwrap();
+        assert_eq!(first_item, SuccessReply(d1.to_string()));
+        assert_eq!(second_item, SuccessReply(d2.to_string()));
+
+        let remove_response1 = client
+            .remove_item_from_list(db_name, list_name, None)
+            .unwrap();
+        assert_eq!(remove_response1, SuccessReply(d2.to_string()));
+        let remove_response2 = client
+            .remove_item_from_list(db_name, list_name, None)
+            .unwrap();
+        assert_eq!(remove_response2, SuccessReply(d1.to_string()));
+
+        let no_item = client
+            .read_item_from_list(db_name, list_name, 0)
+            .unwrap_err();
+        assert_eq!(no_item, DBResponseError(ListNotFound));
+
+        let delete_response = client.delete_db(db_name).unwrap();
+        assert_eq!(delete_response, SuccessNoData);
+    }
 
     #[test]
     fn test_list_stream() {

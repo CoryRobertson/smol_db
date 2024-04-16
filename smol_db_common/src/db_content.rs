@@ -3,7 +3,7 @@ use crate::db_data::DBData;
 use crate::db_packets::db_keyed_list_location::DBKeyedListLocation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Struct denoting the content structure itself of a database. Which is a hash map.
@@ -85,21 +85,21 @@ impl DBContent {
 
     #[tracing::instrument(skip(self))]
     pub fn clear_list(&mut self, key: &DBKeyedListLocation) -> bool {
-        match self.keyed_list.get_mut(key.get_key()) {
+        match self.keyed_list.remove(key.get_key()) {
             None => {
                 warn!("Could not clear list, as it did not exist");
                 false
             }
             Some(list) => {
-                list.clear();
+                debug!("{:?}", list);
                 true
             }
         }
     }
 
     #[tracing::instrument(skip(self))]
-    pub fn get_length_of_list(&mut self, key: &DBKeyedListLocation) -> Option<usize> {
-        self.keyed_list.get_mut(key.get_key()).map(|l| l.len())
+    pub fn get_length_of_list(&self, key: &DBKeyedListLocation) -> Option<usize> {
+        self.keyed_list.get(key.get_key()).map(|l| l.len())
     }
 
     /// Reads from the db using the key, returning an optional of either the retrieved content, or nothing.
