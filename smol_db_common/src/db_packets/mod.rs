@@ -1,4 +1,4 @@
-//! Sub-module that contains the modules for all the various packet types and implementations.
+//! Submodule that contains the modules for all the various packet types and implementations.
 pub mod db_keyed_list_location;
 pub mod db_location;
 pub mod db_packet;

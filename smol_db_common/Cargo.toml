@@ -19,6 +19,7 @@ chrono-tz = { version = "0.9.0", features = ["serde"]}
 rsa = { version = "0.10.0-pre.1", features = ["serde"] }
 rand = "0.8.5"
 tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["fmt"] }
 
 
 [features]

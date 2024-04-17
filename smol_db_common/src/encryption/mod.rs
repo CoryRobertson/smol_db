@@ -3,7 +3,7 @@
 use rsa::rand_core::OsRng;
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 
-/// The length of bits an rsa key will be
+/// The length of bits a rsa key will be
 const BIT_LENGTH: usize = 2048;
 pub mod client_encrypt;
 pub mod encrypted_data;

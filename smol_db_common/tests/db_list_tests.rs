@@ -2,6 +2,7 @@
 #[allow(unused_imports, clippy::bool_assert_comparison)]
 mod tests {
 
+    use smol_db_common::db_packets::db_keyed_list_location::DBKeyedListLocation;
     use smol_db_common::prelude::*;
     use std::collections::HashMap;
     use std::fs::File;
@@ -32,6 +33,71 @@ mod tests {
             server_key: Default::default(),
         }
     }
+
+    #[test]
+    fn test_list_functions() {
+        tracing_subscriber::fmt::init();
+
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+
+        let db_name = "test_list_functions";
+        let db_name_packet = DBPacketInfo::new(db_name);
+        let location = DBKeyedListLocation::new(None, "test_list_db_list");
+        let data_1 = "cool_data";
+
+        assert_eq!(
+            db_list
+                .create_db(
+                    db_name,
+                    get_db_test_settings(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        assert_eq!(
+            db_list
+                .add_to_db_list_content(
+                    &db_name_packet,
+                    &location,
+                    &data_1.into(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        assert_eq!(
+            db_list
+                .read_from_db_list_content(
+                    &db_name_packet,
+                    &DBKeyedListLocation::new(Some(0), location.get_key()),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessReply(data_1.to_string())
+        );
+
+        assert_eq!(
+            db_list
+                .delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string())
+                .unwrap(),
+            SuccessNoData
+        );
+    }
+
+    // TODO: test clearing a list with items, as well as getting the list length, and removing items from a list and checking the output
 
     #[test]
     fn test_is_super_admin() {

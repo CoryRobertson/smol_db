@@ -140,7 +140,7 @@ pub async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                 resp
                             }
                             DBPacket::SetupEncryption => {
-                                // non standard conforming implementation of sending a response back, the client is expected to understand this given they requested to establish encryption
+                                // non-standard conforming implementation of sending a response back, the client is expected to understand this given they requested to establish encryption
                                 let key = db_list.read().unwrap().server_key.get_pub_key().clone();
                                 let ser = serde_json::to_string(&key).unwrap();
                                 let resp = Ok(SuccessReply(ser));

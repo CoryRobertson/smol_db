@@ -51,9 +51,9 @@ pub enum DBPacket {
     GetStats(DBPacketInfo),
     /// Encrypted packet, used to allow the server to identify when data needs to be decrypted
     Encrypted(EncryptedData),
-    /// Packet used in establishing end to end encryption, requests the server to store the sent public key
+    /// Packet used in establishing end-to-end encryption, requests the server to store the sent public key
     PubKey(RsaPublicKey),
-    /// Request the server to setup end to end encryption
+    /// Request the server to set up end-to-end encryption
     SetupEncryption,
     /// Request the server to begin streaming values from a given DB to the user
     StreamReadDb(DBPacketInfo),
@@ -78,102 +78,113 @@ pub enum DBPacket {
 
 impl DBPacket {
     #[must_use]
-    pub fn new_get_list_length(table_name: &str, list_name: &str) -> Self {
-        Self::GetListLength(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(None, list_name),
-        )
+    pub fn new_get_list_length(
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<DBKeyedListLocation>,
+    ) -> Self {
+        Self::GetListLength(table_name.into(), list_name.into())
     }
 
     #[must_use]
-    pub fn new_clear_list(table_name: &str, list_name: &str) -> Self {
-        Self::ClearList(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(None, list_name),
-        )
+    pub fn new_clear_list(
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<DBKeyedListLocation>,
+    ) -> Self {
+        Self::ClearList(table_name.into(), list_name.into())
     }
 
     #[must_use]
-    pub fn new_stream_table(dbname: &str) -> Self {
-        Self::StreamReadDb(DBPacketInfo::new(dbname))
+    pub fn new_stream_table(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::StreamReadDb(dbname.into())
     }
 
     #[must_use]
-    pub fn new_stream_db_list(table_name: &str, list_name: &str, start_idx: Option<usize>) -> Self {
+    pub fn new_stream_db_list<'a>(
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
+        start_idx: Option<usize>,
+    ) -> Self {
         Self::StreamList(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(start_idx, list_name),
+            table_name.into(),
+            DBKeyedListLocation::new(start_idx, list_name.into()),
         )
     }
 
     #[must_use]
     pub fn new_add_db_list(
-        table_name: &str,
-        list_name: &str,
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         start_idx: Option<usize>,
-        data: &str,
+        data: impl Into<DBData>,
     ) -> Self {
         Self::AddToList(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(start_idx, list_name),
-            DBData::new(data.to_string()),
+            table_name.into(),
+            DBKeyedListLocation::new(start_idx, list_name.into()),
+            data.into(),
         )
     }
 
     #[must_use]
-    pub fn new_read_from_db_list(table_name: &str, list_name: &str, start_idx: usize) -> Self {
+    pub fn new_read_from_db_list(
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
+        start_idx: usize,
+    ) -> Self {
         Self::ReadFromList(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(Some(start_idx), list_name),
+            table_name.into(),
+            DBKeyedListLocation::new(Some(start_idx), list_name.into()),
         )
     }
 
     #[must_use]
     pub fn new_remove_from_db_list(
-        table_name: &str,
-        list_name: &str,
+        table_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         start_idx: Option<usize>,
     ) -> Self {
         Self::RemoveFromList(
-            DBPacketInfo::new(table_name),
-            DBKeyedListLocation::new(start_idx, list_name),
+            table_name.into(),
+            DBKeyedListLocation::new(start_idx, list_name.into()),
         )
     }
 
     #[cfg(feature = "statistics")]
     #[must_use]
-    pub fn new_get_stats(dbname: &str) -> Self {
-        Self::GetStats(DBPacketInfo::new(dbname))
+    pub fn new_get_stats(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::GetStats(dbname.into())
     }
 
     /// Creates a new Read `DBPacket` from a name of a database and location string to read from.
     #[must_use]
-    pub fn new_read(dbname: &str, location: &str) -> Self {
-        Self::Read(DBPacketInfo::new(dbname), DBLocation::new(location))
+    pub fn new_read(dbname: impl Into<DBPacketInfo>, location: impl Into<DBLocation>) -> Self {
+        Self::Read(dbname.into(), location.into())
     }
 
     /// Creates a new Delete Data `DBPacket`. This packet when sent to the server requests the server to delete the given location in the given database name.
     #[must_use]
-    pub fn new_delete_data(dbname: &str, location: &str) -> Self {
-        Self::DeleteData(DBPacketInfo::new(dbname), DBLocation::new(location))
+    pub fn new_delete_data(
+        dbname: impl Into<DBPacketInfo>,
+        location: impl Into<DBLocation>,
+    ) -> Self {
+        Self::DeleteData(dbname.into(), location.into())
     }
 
     /// Creates a new `GetRole` `DBPacket`, this packet when sent to the server will request the server to respond with the role of the given client.
     #[must_use]
-    pub fn new_get_role(dbname: &str) -> Self {
-        Self::GetRole(DBPacketInfo::new(dbname))
+    pub fn new_get_role(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::GetRole(dbname.into())
     }
 
     /// Creates a new `GetDBSettings` packet, this packet when sent to the server will request the db settings of a database, requires super admin privileges.
     #[must_use]
-    pub fn new_get_db_settings(dbname: &str) -> Self {
-        Self::GetDBSettings(DBPacketInfo::new(dbname))
+    pub fn new_get_db_settings(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::GetDBSettings(dbname.into())
     }
 
     /// Creates a new `SetDBSettings` packet which when sent to the server, will change the db settings of a database, requires super admin privileges.
     #[must_use]
-    pub fn new_set_db_settings(dbname: &str, db_settings: DBSettings) -> Self {
-        Self::ChangeDBSettings(DBPacketInfo::new(dbname), db_settings)
+    pub fn new_set_db_settings(dbname: impl Into<DBPacketInfo>, db_settings: DBSettings) -> Self {
+        Self::ChangeDBSettings(dbname.into(), db_settings)
     }
 
     /// Creates a new `SetKey` `DBPacket` from a key. This represents the users key which determines their permissions on the server.
@@ -186,26 +197,26 @@ impl DBPacket {
     /// Creates a new Write `DBPacket` from a name of a database and location string to write to.
     /// This packet when sent to the server will request to write the data to the given location, requires permissions to operate potentially.
     #[must_use]
-    pub fn new_write(dbname: &str, location: &str, data: &str) -> Self {
-        Self::Write(
-            DBPacketInfo::new(dbname),
-            DBLocation::new(location),
-            DBData::new(data.to_string()),
-        )
+    pub fn new_write(
+        dbname: impl Into<DBPacketInfo>,
+        location: impl Into<DBLocation>,
+        data: impl Into<DBData>,
+    ) -> Self {
+        Self::Write(dbname.into(), location.into(), data.into())
     }
 
     /// Creates a new `CreateDB` `DBPacket` from a name of a database.
     /// Creates a DB on the server with the given name and settings, requires super admin privileges.
     #[must_use]
-    pub fn new_create_db(dbname: &str, db_settings: DBSettings) -> Self {
-        Self::CreateDB(DBPacketInfo::new(dbname), db_settings)
+    pub fn new_create_db(dbname: impl Into<DBPacketInfo>, db_settings: DBSettings) -> Self {
+        Self::CreateDB(dbname.into(), db_settings)
     }
 
     /// Creates a new `DeleteDB` `DBPacket` from a name of a database.
     /// Deletes the given db from the server, requires super admin privileges.
     #[must_use]
-    pub fn new_delete_db(dbname: &str) -> Self {
-        Self::DeleteDB(DBPacketInfo::new(dbname))
+    pub fn new_delete_db(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::DeleteDB(dbname.into())
     }
 
     /// Creates a `ListDB` packet.
@@ -218,8 +229,8 @@ impl DBPacket {
     /// Creates a `ListDBContents` packet
     /// When sent to the server, lists the contents of a given db, requires permission to do so, which depends on the given database.
     #[must_use]
-    pub fn new_list_db_contents(db_name: &str) -> Self {
-        Self::ListDBContents(DBPacketInfo::new(db_name))
+    pub fn new_list_db_contents(dbname: impl Into<DBPacketInfo>) -> Self {
+        Self::ListDBContents(dbname.into())
     }
 
     /// Serializes a `DBPacket` into a string to be sent over the internet.

@@ -14,6 +14,22 @@ impl Display for DBLocation {
     }
 }
 
+impl From<String> for DBLocation {
+    fn from(value: String) -> Self {
+        Self::new(value.as_str())
+    }
+}
+impl From<&String> for DBLocation {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&str> for DBLocation {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
 impl DBLocation {
     /// Function to create a new `DBLocation` struct from a given location.
     #[must_use]

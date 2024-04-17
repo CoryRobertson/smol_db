@@ -2,7 +2,9 @@
   <configuration default="false" name="test" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
     <option name="command" value="test" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-    <envs />
+    <envs>
+      <env name="RUST_LOG" value="debug" />
+    </envs>
     <option name="emulateTerminal" value="false" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />

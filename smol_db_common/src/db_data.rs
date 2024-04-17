@@ -15,6 +15,22 @@ impl Display for DBData {
     }
 }
 
+impl From<String> for DBData {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&str> for DBData {
+    fn from(value: &str) -> Self {
+        Self::from(value.to_string())
+    }
+}
+impl From<&String> for DBData {
+    fn from(value: &String) -> Self {
+        Self::from(value.to_string())
+    }
+}
+
 impl DBData {
     /// Function to create a new `DBData` struct for a `DBPacket::Write` packet.
     #[must_use]

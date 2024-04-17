@@ -112,7 +112,7 @@ pub enum DBPacketResponseError {
     BadPacket,
     /// DBNotFound represents a request to a database that does not exist.
     DBNotFound,
-    /// DBFileSystemError represents an issue loading or reading the file that contains a given database, not necessarily it not existing.
+    /// DBFileSystemError represents an issue loading or reading the file that contains a given database, not necessarily it's not existing.
     DBFileSystemError,
     /// ValueNotFound represents when a given value in a database does not exist.
     ValueNotFound,

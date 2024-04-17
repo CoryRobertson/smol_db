@@ -24,6 +24,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::RwLock;
 use std::time::SystemTime;
@@ -44,7 +45,7 @@ pub struct DBList {
     pub super_admin_hash_list: RwLock<Vec<String>>,
 
     #[serde(skip)]
-    /// Server key used for encryption when the user requests end to end encryption
+    /// Server key used for encryption when the user requests end-to-end encryption
     pub server_key: ServerKey,
 }
 
@@ -752,7 +753,8 @@ impl DBList {
             }
             Err(_) => {
                 // db file was not found
-                match File::create(format!("./data/{}", db_name)) {
+                let path = PathBuf::from(format!("./data/{}", db_name));
+                match File::create(&path) {
                     Ok(mut file) => {
                         let mut cache_write_lock = self.cache.write().unwrap();
                         let db_packet_info = DBPacketInfo::new(db_name);
@@ -769,8 +771,20 @@ impl DBList {
                     }
                     Err(e) => {
                         // db file was unable to be created
-                        error!("Unable to create DB file: {}", e);
-                        Err(DBFileSystemError)
+                        error!("Unable to create DB file: {} in path: {:?}, attempting to create data folder...", e, path);
+
+                        match fs::create_dir_all(path.parent().unwrap()) {
+                            Ok(_) => {
+                                info!("Successfully created data folder");
+                                drop(list_write_lock); // drop list write lock to prevent a deadlock
+                                self.create_db(db_name, db_settings, client_key)
+                                // use recursion since we just created all the necessary things to make a DB
+                            }
+                            Err(err) => {
+                                error!("Still unable to create directory to database: {}", err);
+                                Err(DBFileSystemError)
+                            }
+                        }
                     }
                 }
             }

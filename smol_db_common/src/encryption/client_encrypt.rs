@@ -9,7 +9,7 @@ use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use tracing::{error, info};
 
 #[derive(Debug)]
-/// A client rsa key pair, along with a server public key used for end to end encryption
+/// A client rsa key pair, along with a server public key used for end-to-end encryption
 pub struct ClientKey {
     pri_key: RsaPrivateKey,
     pub_key: RsaPublicKey,

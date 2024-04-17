@@ -9,19 +9,21 @@ use crate::prelude::DBResponseError;
 use crate::prelude::TableIter;
 use serde::{Deserialize, Serialize};
 use smol_db_common::db::Role;
+use smol_db_common::db_packets::db_keyed_list_location::DBKeyedListLocation;
 use smol_db_common::encryption::client_encrypt::ClientKey;
 use smol_db_common::prelude::{
-    DBPacket, DBPacketInfo, DBPacketResponseError, DBSettings, DBSuccessResponse, RsaPublicKey,
-    SuccessNoData, SuccessReply,
+    DBData, DBLocation, DBPacket, DBPacketInfo, DBPacketResponseError, DBSettings,
+    DBSuccessResponse, RsaPublicKey, SuccessNoData, SuccessReply,
 };
 #[cfg(feature = "statistics")]
 use smol_db_common::statistics::DBStatistics;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::io::Error;
 use std::io::{Read, Write};
-use std::net::Shutdown;
 use std::net::SocketAddr;
 use std::net::TcpStream;
+use std::net::{Shutdown, ToSocketAddrs};
 use tracing::debug;
 use tracing::{error, info, warn};
 
@@ -39,7 +41,7 @@ impl SmolDbClient {
         &mut self.socket
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     /// Returns an iterator that iterates through every item in a given list in a database
     /// starting from the given start index, or 0 if no index is given
     /// ```rust
@@ -71,7 +73,10 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    pub fn stream_table(&mut self, table_name: &str) -> Result<TableIter, ClientError> {
+    pub fn stream_table(
+        &mut self,
+        table_name: impl Into<DBPacketInfo>,
+    ) -> Result<TableIter, ClientError> {
         let packet = DBPacket::new_stream_table(table_name);
 
         debug!("Sending packet");
@@ -84,7 +89,7 @@ impl SmolDbClient {
         Ok(table_iter)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     /// Returns an iterator that iterates through every item in a given list in a database
     /// starting from the given start index, or 0 if no index is given
     /// ```rust
@@ -128,8 +133,8 @@ impl SmolDbClient {
     /// ```
     pub fn stream_db_list_content(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         start_idx: Option<usize>,
     ) -> Result<DBListIter, ClientError> {
         let packet = DBPacket::new_stream_db_list(db_name, list_name, start_idx);
@@ -144,7 +149,7 @@ impl SmolDbClient {
         Ok(list_iter)
     }
 
-    /// Adds a given data element to a ordered list in the given database inside the given list name within that database
+    /// Adds a given data element to an ordered list in the given database inside the given list name within that database
     /// The structure is Server -> Specific Database -> Specific List
     /// ```rust
     /// use smol_db_client::prelude::SmolDbClient;
@@ -165,13 +170,13 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn add_item_to_list(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         index: Option<usize>,
-        data: &str,
+        data: impl Into<DBData>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_add_db_list(db_name, list_name, index, data);
         self.send_packet(&packet)
@@ -200,11 +205,11 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn remove_item_from_list(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         index: Option<usize>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_remove_from_db_list(db_name, list_name, index);
@@ -234,11 +239,11 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn read_item_from_list(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<String>,
         index: usize,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_read_from_db_list(db_name, list_name, index);
@@ -271,11 +276,11 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     pub fn clear_list(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<DBKeyedListLocation>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_clear_list(db_name, list_name);
         self.send_packet(&packet)
@@ -313,12 +318,11 @@ impl SmolDbClient {
     ///
     /// assert_eq!(client.delete_db(db_name).unwrap(),SuccessNoData);
     /// ```
-    #[tracing::instrument(skip(self))]
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn get_list_length(
         &mut self,
-        db_name: &str,
-        list_name: &str,
+        db_name: impl Into<DBPacketInfo>,
+        list_name: impl Into<DBKeyedListLocation>,
     ) -> Result<DBSuccessResponse<usize>, ClientError> {
         let packet = DBPacket::new_get_list_length(db_name, list_name);
         self.send_packet(&packet).and_then(|success| match success {
@@ -344,8 +348,8 @@ impl SmolDbClient {
     /// let mut client = SmolDbClient::new("localhost:8222").unwrap();
     /// // client should be functional provided a database server was able to be connected to at the given location
     /// ```
-    #[tracing::instrument]
-    pub fn new(ip: &str) -> Result<Self, ClientError> {
+    #[tracing::instrument(skip_all)]
+    pub fn new<T: ToSocketAddrs>(ip: T) -> Result<Self, ClientError> {
         info!("Creating new client");
         let socket = TcpStream::connect(ip);
         match socket {
@@ -374,7 +378,7 @@ impl SmolDbClient {
     /// client.create_db("docsetup_encryption_test",DBSettings::default()).unwrap();
     /// let _ = client.delete_db("docsetup_encryption_test").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn setup_encryption(&mut self) -> Result<DBSuccessResponse<String>, ClientError> {
         info!("Setting up encryption on client");
         let server_pub_key_ser = self
@@ -399,7 +403,7 @@ impl SmolDbClient {
     }
 
     /// Returns true if end-to-end encryption is enabled
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn is_encryption_enabled(&self) -> bool {
         self.encryption.is_some()
     }
@@ -419,7 +423,7 @@ impl SmolDbClient {
     /// client.reconnect().unwrap();
     ///
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn reconnect(&mut self) -> Result<(), ClientError> {
         info!("Reconnecting client to database");
         let ip = self.socket.peer_addr().map_err(UnableToConnect)?;
@@ -429,7 +433,7 @@ impl SmolDbClient {
     }
 
     /// Returns a result containing the peer address of this client
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn get_connected_ip(&self) -> std::io::Result<SocketAddr> {
         self.socket.peer_addr()
     }
@@ -443,7 +447,7 @@ impl SmolDbClient {
     /// // disconnect the client
     /// let _ = client.disconnect().expect("Failed to disconnect socket");
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn disconnect(&self) -> std::io::Result<()> {
         info!("Disconnecting client from database");
         self.socket.shutdown(Shutdown::Both)
@@ -471,11 +475,11 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_delete_data").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn delete_data(
         &mut self,
-        db_name: &str,
-        db_location: &str,
+        db_name: impl Into<DBPacketInfo>,
+        db_location: impl Into<DBLocation>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_data(db_name, db_location);
         self.send_packet(&packet)
@@ -483,8 +487,11 @@ impl SmolDbClient {
 
     /// Returns the `DBStatistics` struct if permissions allow it on a given db
     #[cfg(feature = "statistics")]
-    #[tracing::instrument]
-    pub fn get_stats(&mut self, db_name: &str) -> Result<DBStatistics, ClientError> {
+    #[tracing::instrument(skip_all)]
+    pub fn get_stats(
+        &mut self,
+        db_name: impl Into<DBPacketInfo>,
+    ) -> Result<DBStatistics, ClientError> {
         let packet = DBPacket::new_get_stats(db_name);
         let resp = self.send_packet(&packet)?;
 
@@ -514,8 +521,8 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_get_role").unwrap();
     /// ```
-    #[tracing::instrument]
-    pub fn get_role(&mut self, db_name: &str) -> Result<Role, ClientError> {
+    #[tracing::instrument(skip_all)]
+    pub fn get_role(&mut self, db_name: impl Into<DBPacketInfo>) -> Result<Role, ClientError> {
         let packet = DBPacket::new_get_role(db_name);
 
         let resp = self.send_packet(&packet)?;
@@ -546,8 +553,11 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_get_db_settings").unwrap();
     /// ```
-    #[tracing::instrument]
-    pub fn get_db_settings(&mut self, db_name: &str) -> Result<DBSettings, ClientError> {
+    #[tracing::instrument(skip_all)]
+    pub fn get_db_settings(
+        &mut self,
+        db_name: impl Into<DBPacketInfo>,
+    ) -> Result<DBSettings, ClientError> {
         let packet = DBPacket::new_get_db_settings(db_name);
 
         let resp = self.send_packet(&packet)?;
@@ -581,10 +591,10 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_set_db_settings").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn set_db_settings(
         &mut self,
-        db_name: &str,
+        db_name: impl Into<DBPacketInfo>,
         db_settings: DBSettings,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_set_db_settings(db_name, db_settings);
@@ -601,7 +611,7 @@ impl SmolDbClient {
     /// // sets the access key of the given client
     /// let _ = client.set_access_key("test_key_123".to_string()).unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn set_access_key(
         &mut self,
         key: String,
@@ -611,7 +621,7 @@ impl SmolDbClient {
     }
 
     /// Sends a packet to the clients currently connected database and returns the result
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub(crate) fn send_packet(
         &mut self,
         sent_packet: &DBPacket,
@@ -763,10 +773,10 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_create_db").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn create_db(
         &mut self,
-        db_name: &str,
+        db_name: impl Into<DBPacketInfo>,
         db_settings: DBSettings,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_create_db(db_name, db_settings);
@@ -795,12 +805,12 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_write_data").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn write_db(
         &mut self,
-        db_name: &str,
-        db_location: &str,
-        data: &str,
+        db_name: impl Into<DBPacketInfo>,
+        db_location: impl Into<DBLocation>,
+        data: impl Into<DBData>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_write(db_name, db_location, data);
 
@@ -827,11 +837,11 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_read_db").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn read_db(
         &mut self,
-        db_name: &str,
-        db_location: &str,
+        db_name: impl Into<DBPacketInfo>,
+        db_location: impl Into<DBLocation>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_read(db_name, db_location);
 
@@ -852,8 +862,11 @@ impl SmolDbClient {
     /// // delete the db with the given name
     /// let _ = client.delete_db("doctest_delete_db").unwrap();
     /// ```
-    #[tracing::instrument]
-    pub fn delete_db(&mut self, db_name: &str) -> Result<DBSuccessResponse<String>, ClientError> {
+    #[tracing::instrument(skip_all)]
+    pub fn delete_db(
+        &mut self,
+        db_name: impl Into<DBPacketInfo>,
+    ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_delete_db(db_name);
 
         self.send_packet(&packet)
@@ -886,7 +899,7 @@ impl SmolDbClient {
     /// let _ = client.delete_db("doctest_list_db1").unwrap();
     /// let _ = client.delete_db("doctest_list_db2").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn list_db(&mut self) -> Result<Vec<DBPacketInfo>, ClientError> {
         let packet = DBPacket::new_list_db();
 
@@ -920,10 +933,10 @@ impl SmolDbClient {
     ///
     /// let _ = client.delete_db("doctest_list_cont_db").unwrap();
     /// ```
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn list_db_contents(
         &mut self,
-        db_name: &str,
+        db_name: impl Into<DBPacketInfo>,
     ) -> Result<HashMap<String, String>, ClientError> {
         let packet = DBPacket::new_list_db_contents(db_name);
 
@@ -939,10 +952,10 @@ impl SmolDbClient {
     }
 
     /// Lists the given db's contents, deserializing the contents into a hash map.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn list_db_contents_generic<T>(
         &mut self,
-        db_name: &str,
+        db_name: impl Into<DBPacketInfo>,
     ) -> Result<HashMap<String, T>, ClientError>
     where
         for<'a> T: Serialize + Deserialize<'a>,
@@ -963,11 +976,11 @@ impl SmolDbClient {
     }
 
     /// Writes to the db while serializing the given data, returning the data at the location given and deserialized to the same type.
-    #[tracing::instrument(skip(data))]
+    #[tracing::instrument(skip_all)]
     pub fn write_db_generic<T>(
         &mut self,
-        db_name: &str,
-        db_location: &str,
+        db_name: impl Into<DBPacketInfo>,
+        db_location: impl Into<DBLocation>,
         data: T,
     ) -> Result<DBSuccessResponse<T>, ClientError>
     where
@@ -989,11 +1002,11 @@ impl SmolDbClient {
     }
 
     /// Reads from db and tries to deserialize the content at the location to the given generic
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn read_db_generic<T>(
         &mut self,
-        db_name: &str,
-        db_location: &str,
+        db_name: impl Into<DBPacketInfo>,
+        db_location: impl Into<DBLocation>,
     ) -> Result<DBSuccessResponse<T>, ClientError>
     where
         for<'a> T: Serialize + Deserialize<'a>,

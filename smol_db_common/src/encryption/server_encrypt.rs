@@ -7,7 +7,7 @@ use rsa::{RsaPrivateKey, RsaPublicKey};
 use tracing::info;
 
 #[derive(Debug)]
-/// Struct containing a server encryption key pair used to encrypt data sent from the server and to the server for end to end encryption
+/// Struct containing a server encryption key pair used to encrypt data sent from the server and to the server for end-to-end encryption
 pub struct ServerKey {
     pri_key: RsaPrivateKey,
     pub_key: RsaPublicKey,

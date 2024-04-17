@@ -109,7 +109,7 @@ impl DBContent {
     }
 }
 
-#[allow(clippy::derivable_impls)] // This lint is allowed so we can later make default not simply have the default impl
+#[allow(clippy::derivable_impls)] // This lint is allowed, so we can later make default not simply have the default impl
 impl Default for DBContent {
     /// Returns a default empty `HashMap`.
     #[tracing::instrument]
