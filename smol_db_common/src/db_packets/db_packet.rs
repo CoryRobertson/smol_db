@@ -113,11 +113,7 @@ impl DBPacket {
             DBData::new(data.to_string()),
         )
     }
-    pub fn new_read_from_db_list(
-        table_name: &str,
-        list_name: &str,
-        start_idx: usize,
-    ) -> Self {
+    pub fn new_read_from_db_list(table_name: &str, list_name: &str, start_idx: usize) -> Self {
         Self::ReadFromList(
             DBPacketInfo::new(table_name),
             DBKeyedListLocation::new(Some(start_idx), list_name),

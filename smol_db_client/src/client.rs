@@ -4,6 +4,7 @@ use crate::client_error::ClientError::{
     PacketEncryptionError, PacketSerializationError, SocketReadError, SocketWriteError,
     UnableToConnect,
 };
+use crate::db_list_iter::DBListIter;
 use crate::prelude::DBResponseError;
 use crate::prelude::TableIter;
 use serde::{Deserialize, Serialize};
@@ -20,10 +21,9 @@ use std::io::Error;
 use std::io::{Read, Write};
 use std::net::Shutdown;
 use std::net::SocketAddr;
+use std::net::TcpStream;
 use tracing::debug;
 use tracing::{error, info, warn};
-use crate::db_list_iter::DBListIter;
-use std::net::TcpStream;
 
 #[derive(Debug)]
 /// `SmolDbClient` struct used for communicating to the database.
@@ -321,21 +321,18 @@ impl SmolDbClient {
         list_name: &str,
     ) -> Result<DBSuccessResponse<usize>, ClientError> {
         let packet = DBPacket::new_get_list_length(db_name, list_name);
-        self.send_packet(&packet).and_then(|success| {
-            match success {
-                SuccessNoData => {
-                    error!("Received bad packet from server when reading list length");
-                    Err(BadPacket)
-                }
-                SuccessReply(data) => {
-                    data.parse::<usize>()
-                        .map_err(|err| {
-                            error!("Unable to parse int from reply from server: {err}");
-                            BadPacket
-                        })
-                        .map(|len| SuccessReply(len))
-                }
+        self.send_packet(&packet).and_then(|success| match success {
+            SuccessNoData => {
+                error!("Received bad packet from server when reading list length");
+                Err(BadPacket)
             }
+            SuccessReply(data) => data
+                .parse::<usize>()
+                .map_err(|err| {
+                    error!("Unable to parse int from reply from server: {err}");
+                    BadPacket
+                })
+                .map(SuccessReply),
         })
     }
 

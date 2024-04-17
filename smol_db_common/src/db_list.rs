@@ -24,7 +24,8 @@ use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, RwLock};
+use std::rc::Rc;
+use std::sync::RwLock;
 use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
 
@@ -54,7 +55,7 @@ impl DBList {
     fn load_and_read_database(
         &self,
         db_name: &DBPacketInfo,
-        list_lock: &Vec<DBPacketInfo>,
+        list_lock: &[DBPacketInfo],
         client_key: &String,
         override_read_permission: bool, // This is a hacky way to allow get_role() to work, since that needs to return even if the user does not have any permissions
         f: impl Fn(&DBContent, &DB) -> DBResult,
@@ -73,7 +74,7 @@ impl DBList {
             {
                 let db_table = db_lock.get_content();
 
-                f(&db_table, &*db_lock)
+                f(db_table, &db_lock)
             } else {
                 Err(InvalidPermissions)
             };
@@ -92,7 +93,7 @@ impl DBList {
             {
                 let db_table = db.get_content();
 
-                f(&db_table, &db)
+                f(db_table, &db)
             } else {
                 Err(InvalidPermissions)
             };
@@ -113,7 +114,7 @@ impl DBList {
     fn load_and_write_database(
         &self,
         db_name: &DBPacketInfo,
-        list_lock: &Vec<DBPacketInfo>,
+        list_lock: &[DBPacketInfo],
         client_key: &String,
         f: impl Fn(&mut DB) -> DBResult,
     ) -> DBResult {
@@ -127,7 +128,7 @@ impl DBList {
             let mut db_lock = db.write().unwrap();
 
             return if db_lock.has_write_permissions(client_key, &super_admin_list) {
-                f(&mut *db_lock)
+                f(&mut db_lock)
             } else {
                 Err(InvalidPermissions)
             };
@@ -267,7 +268,7 @@ impl DBList {
         client_key: &String,
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
-        return self.load_and_write_database(packet, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(packet, &list_lock, client_key, |db| {
             if db.get_content_mut().clear_list(list_location) {
                 Ok(SuccessNoData)
             } else {
@@ -284,7 +285,7 @@ impl DBList {
         client_key: &String,
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
-        return self.load_and_read_database(packet, &*list_lock, client_key, false, |db, _| {
+        return self.load_and_read_database(packet, &list_lock, client_key, false, |db, _| {
             db.get_length_of_list(list_location)
                 .map_or(Err(ListNotFound), |len| Ok(SuccessReply(len.to_string())))
         });
@@ -299,9 +300,9 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
+        let arc = Rc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
 
-        return self.load_and_read_database(packet, &*list_lock, client_key, false, |cont, _| {
+        return self.load_and_read_database(packet, &list_lock, client_key, false, |cont, _| {
             let s = arc.take().unwrap();
             let _ = self
                 .send_stream_starting_packet(s)
@@ -323,9 +324,9 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        let arc = Arc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
+        let arc = Rc::new(Cell::new(Some(client_stream))); // Cell shenanigans since closures don't like doing this a ton, probably a better way exists?
 
-        return self.load_and_read_database(packet, &*list_lock, client_key, false, |cont, _| {
+        return self.load_and_read_database(packet, &list_lock, client_key, false, |cont, _| {
             let s = arc.take().unwrap();
             let _ = self
                 .send_stream_starting_packet(s)
@@ -375,7 +376,7 @@ impl DBList {
 
             return self.load_and_read_database(
                 p_info,
-                &*list_lock,
+                &list_lock,
                 client_key,
                 false,
                 |db_content, db| {
@@ -401,7 +402,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_content_mut()
                 .content
                 .remove(db_location.as_key())
@@ -423,11 +424,11 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_read_database(p_info, &*list_lock, client_key, true, |_cont, db| {
+        return self.load_and_read_database(p_info, &list_lock, client_key, true, |_cont, db| {
             let serialized_role =
                 serde_json::to_string(&db.get_role(client_key, &super_admin_list)).unwrap();
 
-            return Ok(SuccessReply(serialized_role));
+            Ok(SuccessReply(serialized_role))
         });
     }
 
@@ -448,7 +449,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.set_settings(new_db_settings.clone());
             Ok(SuccessNoData)
         });
@@ -466,7 +467,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_read_database(p_info, &*list_lock, client_key, false, |_, db| {
+        return self.load_and_read_database(p_info, &list_lock, client_key, false, |_, db| {
             serde_json::to_string(&db.get_settings())
                 .map(SuccessReply)
                 .map_err(|_| SerializationError)
@@ -483,7 +484,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             return if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
                 db.get_settings_mut().add_user(new_key.clone());
                 Ok(SuccessNoData)
@@ -503,8 +504,8 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
-            return if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
+            if db.get_settings().is_admin(client_key) || self.is_super_admin(client_key) {
                 if db.get_settings_mut().remove_user(removed_key) {
                     Ok(SuccessNoData)
                 } else {
@@ -512,7 +513,7 @@ impl DBList {
                 }
             } else {
                 Err(InvalidPermissions)
-            };
+            }
         });
     }
 
@@ -531,7 +532,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_settings_mut().remove_admin(removed_key);
             Ok(SuccessNoData)
         });
@@ -548,7 +549,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_settings_mut().add_admin(hash.clone());
             Ok(SuccessNoData)
         });
@@ -850,7 +851,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_content_mut()
                 .remove_data_from_list(location)
                 .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s.to_string())))
@@ -865,7 +866,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_read_database(p_info, &*list_lock, client_key, false, |cont, _| {
+        return self.load_and_read_database(p_info, &list_lock, client_key, false, |cont, _| {
             cont.get_data_from_list(location)
                 .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s.to_string())))
         });
@@ -880,7 +881,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(p_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_content_mut()
                 .add_data_to_list(location, data.clone());
             Ok(SuccessNoData)
@@ -897,18 +898,12 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_read_database(
-            p_info,
-            &*list_lock,
-            client_key,
-            false,
-            |content, _| {
-                content
-                    .read_from_db(p_location.as_key())
-                    .map(|value| SuccessReply(value.to_string()))
-                    .ok_or(ValueNotFound)
-            },
-        );
+        return self.load_and_read_database(p_info, &list_lock, client_key, false, |content, _| {
+            content
+                .read_from_db(p_location.as_key())
+                .map(|value| SuccessReply(value.to_string()))
+                .ok_or(ValueNotFound)
+        });
     }
 
     /// Writes to a db given a `DBPacket`
@@ -922,7 +917,7 @@ impl DBList {
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_write_database(db_info, &*list_lock, client_key, |db| {
+        return self.load_and_write_database(db_info, &list_lock, client_key, |db| {
             Ok(db
                 .get_content_mut()
                 .content
@@ -954,7 +949,7 @@ impl DBList {
 
         let list_lock = self.list.read().unwrap();
 
-        return self.load_and_read_database(db_info, &*list_lock, client_key, false, |cont, db| {
+        return self.load_and_read_database(db_info, &list_lock, client_key, false, |cont, db| {
             if db.has_list_permissions(client_key, &super_admin_list)
                 || self.is_super_admin(client_key)
             {

@@ -50,12 +50,8 @@ mod tests {
             SuccessReply(2)
         );
 
-        let first_item = client
-            .read_item_from_list(db_name, list_name, 0)
-            .unwrap();
-        let second_item = client
-            .read_item_from_list(db_name, list_name,1)
-            .unwrap();
+        let first_item = client.read_item_from_list(db_name, list_name, 0).unwrap();
+        let second_item = client.read_item_from_list(db_name, list_name, 1).unwrap();
         assert_eq!(first_item, SuccessReply(d1.to_string()));
         assert_eq!(second_item, SuccessReply(d2.to_string()));
 
