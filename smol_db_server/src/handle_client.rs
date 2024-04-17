@@ -271,7 +271,11 @@ pub async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
                                     // if there are no super admins, the first person to log in is the super admin.
                                     let mut super_admin_list_lock =
                                         lock.super_admin_hash_list.write().unwrap();
-                                    super_admin_list_lock.push(key.clone());
+                                    // its possible a key gets added between both of these locks, so we deduplicate them,
+                                    // this will only ever occur on startup for a database server, so its inconsequential
+                                    if super_admin_list_lock.is_empty() {
+                                        super_admin_list_lock.push(key.clone());
+                                    }
                                 }
 
                                 info!("{} set key to \"{}\"", client_name, key);

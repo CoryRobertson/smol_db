@@ -114,6 +114,8 @@ mod tests {
 
     #[test]
     fn test_stream() {
+        tracing_subscriber::fmt::init();
+
         let mut client = SmolDbClient::new("localhost:8222").unwrap();
 
         let set_key_response = client.set_access_key("test_key_123".to_string()).unwrap();

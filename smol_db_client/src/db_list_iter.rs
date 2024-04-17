@@ -10,6 +10,7 @@ pub struct DBListIter<'a>(pub(crate) &'a mut SmolDbClient);
 impl Drop for DBListIter<'_> {
     fn drop(&mut self) {
         debug!("DB list iter dropped");
+        // let _ = self.0.get_socket().set_read_timeout(None);
         let _ = self.0.send_packet(&DBPacket::EndStreamRead); // attempt to end the read stream when the table iter is dropped
     }
 }
@@ -19,6 +20,9 @@ impl Iterator for DBListIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buf: [u8; 1024] = [0; 1024];
+
+        // I have not had unit testing issues with tests relating to this iterator, but this solves it for talbe iter, though taking an inbetween packet solves it as well for now
+        // self.0.get_socket().set_read_timeout(Some(Duration::from_secs(5))).ok()?;
 
         let request_new_packet = serde_json::to_string(&DBPacket::ReadyForNextItem).unwrap();
 

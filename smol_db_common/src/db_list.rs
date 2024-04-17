@@ -247,10 +247,35 @@ impl DBList {
 
             debug!("Client requested next item");
 
+            // send first item
             let _ = client_stream.write(item.0.as_bytes()).map_err(|err| {
                 error!("{}", err);
                 DBPacketResponseError::StreamClosedUnexpectedly
             })?;
+
+            // wait for client to recieve it
+            let read_len = client_stream.read(&mut buf).unwrap();
+
+            let read_client = String::from_utf8(buf.to_vec()).unwrap();
+
+            match serde_json::from_str::<DBPacket>(&read_client[0..read_len]) {
+                Ok(packet) => {
+                    debug!("Packet read: {:?}", packet);
+
+                    // two cases where packets come during a stream, ending the stream, and asking for the next item
+                    if matches!(packet, DBPacket::EndStreamRead) {
+                        info!("Stream ended early intentionally.");
+                        break;
+                    } else if !matches!(packet, DBPacket::ReadyForNextItem) {
+                        return Err(BadPacket);
+                    }
+                }
+                Err(err) => {
+                    error!("err: {} {}", read_client, err);
+                }
+            }
+
+            // send second item
             let _ = client_stream.write(item.1.as_bytes()).map_err(|err| {
                 error!("{}", err);
                 DBPacketResponseError::StreamClosedUnexpectedly
