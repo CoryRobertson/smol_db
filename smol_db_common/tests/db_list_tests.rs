@@ -2,8 +2,11 @@
 #[allow(unused_imports, clippy::bool_assert_comparison)]
 mod tests {
 
+    use serde_json::to_string;
     use smol_db_common::db_packets::db_keyed_list_location::DBKeyedListLocation;
     use smol_db_common::prelude::*;
+    #[cfg(feature = "statistics")]
+    use smol_db_common::statistics::DBStatistics;
     use std::collections::HashMap;
     use std::fs::File;
     use std::hash::Hash;
@@ -11,6 +14,7 @@ mod tests {
     use std::sync::RwLock;
     use std::time::Duration;
     use std::{fs, thread};
+    use tracing::info;
 
     static TEST_SUPER_ADMIN_KEY: &str = "test_admin_key";
     static TEST_USER_KEY: &str = "test_user_key";
@@ -33,11 +37,116 @@ mod tests {
             server_key: Default::default(),
         }
     }
+    #[test]
+    fn test_list_clear_fail() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+
+        let db_name = "test_clear_fail";
+        let db_name_packet = DBPacketInfo::new(db_name);
+        let location = DBKeyedListLocation::new(None, "clear_fail");
+
+        assert_eq!(
+            db_list
+                .create_db(
+                    db_name,
+                    get_db_test_settings(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        assert_eq!(
+            db_list
+                .clear_db_list(
+                    &db_name_packet,
+                    &location,
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap_err(),
+            DBPacketResponseError::ListNotFound
+        );
+
+        assert_eq!(
+            db_list
+                .delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string())
+                .unwrap(),
+            SuccessNoData
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "statistics")]
+    fn get_stats_test() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+
+        let db_name = "test_stats_function";
+        let db_name_packet = DBPacketInfo::new(db_name);
+
+        assert_eq!(
+            db_list
+                .create_db(
+                    db_name,
+                    get_db_test_settings(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        let write_resp1 = db_list
+            .write_db(
+                &db_name_packet,
+                &"location1".into(),
+                &"data1".into(),
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap();
+        assert_eq!(write_resp1, SuccessNoData);
+
+        let stats = db_list
+            .get_stats(&db_name_packet, &TEST_SUPER_ADMIN_KEY.to_string())
+            .unwrap()
+            .as_option()
+            .map(|s| serde_json::from_str::<DBStatistics>(s).unwrap())
+            .unwrap();
+        assert_eq!(stats.get_total_req(), 2);
+
+        let stats_fail = db_list
+            .get_stats(&db_name_packet, &"this key is not an admin key".to_string())
+            .unwrap_err();
+        assert_eq!(stats_fail, InvalidPermissions);
+
+        assert_eq!(
+            db_list
+                .delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string())
+                .unwrap(),
+            SuccessNoData
+        );
+    }
 
     #[test]
     fn test_list_functions() {
-        tracing_subscriber::fmt::init();
-
         let db_list = get_db_list_for_testing();
         db_list
             .super_admin_hash_list
@@ -97,7 +206,195 @@ mod tests {
         );
     }
 
-    // TODO: test clearing a list with items, as well as getting the list length, and removing items from a list and checking the output
+    #[test]
+    fn test_removing_list_items() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+
+        let db_name = "test_removing_func";
+        let db_name_packet = DBPacketInfo::new(db_name);
+        let location = DBKeyedListLocation::new(None, "removing");
+
+        assert_eq!(
+            db_list
+                .create_db(
+                    db_name,
+                    get_db_test_settings(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        for i in 0..10 {
+            let resp = db_list
+                .add_to_db_list_content(
+                    &db_name_packet,
+                    &location,
+                    &i.to_string().into(),
+                    &TEST_SUPER_ADMIN_KEY.to_string(),
+                )
+                .unwrap();
+            assert_eq!(resp, SuccessNoData);
+        }
+
+        let length_resp = db_list
+            .get_db_list_length(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap()
+            .as_option()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+
+        assert_eq!(length_resp, 10);
+
+        for i in 0..5 {
+            let resp = db_list
+                .remove_from_db_list_content(
+                    &db_name_packet,
+                    &DBKeyedListLocation::new(Some(0), location.get_key()),
+                    &TEST_SUPER_ADMIN_KEY.to_string(),
+                )
+                .unwrap();
+            assert_eq!(resp, SuccessReply((i).to_string()), "index: {i}");
+        }
+
+        let length_resp = db_list
+            .get_db_list_length(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap()
+            .as_option()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+
+        assert_eq!(length_resp, 5);
+
+        for i in 0..5 {
+            let resp = db_list
+                .read_from_db_list_content(
+                    &db_name_packet,
+                    &DBKeyedListLocation::new(Some(i), location.get_key()),
+                    &TEST_SUPER_ADMIN_KEY.to_string(),
+                )
+                .unwrap();
+            assert_eq!(resp, SuccessReply((i + 5).to_string()));
+        }
+
+        let clear_resp = db_list
+            .clear_db_list(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap();
+        assert_eq!(clear_resp, SuccessNoData);
+
+        let length_resp = db_list
+            .get_db_list_length(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap_err();
+
+        assert_eq!(length_resp, DBPacketResponseError::ListNotFound);
+
+        assert_eq!(
+            db_list
+                .delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string())
+                .unwrap(),
+            SuccessNoData
+        );
+    }
+
+    #[test]
+    fn test_clearing_list_functions() {
+        let db_list = get_db_list_for_testing();
+        db_list
+            .super_admin_hash_list
+            .write()
+            .unwrap()
+            .push(TEST_SUPER_ADMIN_KEY.to_string());
+
+        assert_eq!(
+            db_list.is_super_admin(&TEST_SUPER_ADMIN_KEY.to_string()),
+            true
+        );
+
+        let db_name = "test_clearing_func";
+        let db_name_packet = DBPacketInfo::new(db_name);
+        let location = DBKeyedListLocation::new(None, "clearing");
+
+        assert_eq!(
+            db_list
+                .create_db(
+                    db_name,
+                    get_db_test_settings(),
+                    &TEST_SUPER_ADMIN_KEY.to_string()
+                )
+                .unwrap(),
+            SuccessNoData
+        );
+
+        for i in 0..10 {
+            let resp = db_list
+                .add_to_db_list_content(
+                    &db_name_packet,
+                    &location,
+                    &i.to_string().into(),
+                    &TEST_SUPER_ADMIN_KEY.to_string(),
+                )
+                .unwrap();
+            assert_eq!(resp, SuccessNoData);
+        }
+
+        let length_resp = db_list
+            .get_db_list_length(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap()
+            .as_option()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+
+        assert_eq!(length_resp, 10);
+
+        let clear_resp = db_list
+            .clear_db_list(
+                &db_name_packet,
+                &location,
+                &TEST_SUPER_ADMIN_KEY.to_string(),
+            )
+            .unwrap();
+        assert_eq!(clear_resp, SuccessNoData);
+
+        assert_eq!(
+            db_list
+                .delete_db(db_name, &TEST_SUPER_ADMIN_KEY.to_string())
+                .unwrap(),
+            SuccessNoData
+        );
+    }
 
     #[test]
     fn test_is_super_admin() {
