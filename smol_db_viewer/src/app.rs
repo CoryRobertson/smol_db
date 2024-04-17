@@ -162,7 +162,7 @@ impl ApplicationState {
                     let ip = ip_clone;
                     let key = key_set_clone;
 
-                    match SmolDbClient::new(&ip) {
+                    match SmolDbClient::new(ip) {
                         // connect the client to the server.
                         Ok(mut client_connection) => {
                             if set_key && !key.is_empty() {
@@ -757,7 +757,7 @@ impl eframe::App for ApplicationState {
                                 let client_mutex = client_clone;
                                 let ip = ip_clone;
 
-                                match SmolDbClient::new(&ip) {
+                                match SmolDbClient::new(ip) {
                                     // connect the client to the server.
                                     Ok(client_connection) => {
                                         // if client connection successful, move the client to the programs state.

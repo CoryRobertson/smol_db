@@ -99,7 +99,7 @@ impl DBPacket {
     }
 
     #[must_use]
-    pub fn new_stream_db_list<'a>(
+    pub fn new_stream_db_list(
         table_name: impl Into<DBPacketInfo>,
         list_name: impl Into<String>,
         start_idx: Option<usize>,

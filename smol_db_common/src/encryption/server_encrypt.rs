@@ -4,13 +4,14 @@ use crate::encryption::encrypted_data::EncryptedData;
 use crate::encryption::{decrypt, EncryptionError, BIT_LENGTH};
 use rsa::rand_core::OsRng;
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use std::sync::OnceLock;
 use tracing::info;
 
 #[derive(Debug)]
 /// Struct containing a server encryption key pair used to encrypt data sent from the server and to the server for end-to-end encryption
 pub struct ServerKey {
-    pri_key: RsaPrivateKey,
-    pub_key: RsaPublicKey,
+    pri_key: OnceLock<RsaPrivateKey>,
+    pub_key: OnceLock<RsaPublicKey>,
     rng: OsRng,
 }
 
@@ -25,21 +26,29 @@ impl ServerKey {
     /// Create a new server key
     #[tracing::instrument]
     pub fn new() -> Result<Self, rsa::Error> {
-        info!("Generating server key");
-        let mut rng = OsRng;
-        let pri_key = RsaPrivateKey::new(&mut rng, BIT_LENGTH)?;
-        let pub_key = pri_key.to_public_key();
         Ok(Self {
-            pri_key,
-            pub_key,
-            rng,
+            pri_key: OnceLock::new(),
+            pub_key: OnceLock::new(),
+            rng: OsRng,
         })
     }
 
-    /// Gets public key of server
+    /// Gets public key of server with lazy initialization
     #[tracing::instrument]
     pub fn get_pub_key(&self) -> &RsaPublicKey {
-        &self.pub_key
+        self.pub_key.get_or_init(|| {
+            info!("First time getting public key, generating one now.");
+            self.get_pri_key().to_public_key()
+        })
+    }
+
+    /// Gets private key of server with lazy initialization
+    #[tracing::instrument]
+    pub fn get_pri_key(&self) -> &RsaPrivateKey {
+        self.pri_key.get_or_init(|| {
+            info!("First time getting private key, generating one now.");
+            RsaPrivateKey::new(&mut self.rng.clone(), BIT_LENGTH).unwrap()
+        })
     }
 
     /// Encrypt data using the clients public key
@@ -71,8 +80,8 @@ impl ServerKey {
         &self,
         client_packet: &EncryptedData,
     ) -> Result<DBPacket, EncryptionError> {
-        let msg =
-            decrypt(&self.pri_key, client_packet.get_data()).map_err(EncryptionError::RSAError)?;
+        let msg = decrypt(self.get_pri_key(), client_packet.get_data())
+            .map_err(EncryptionError::RSAError)?;
         match serde_json::from_slice::<DBPacket>(&msg) {
             Ok(packet) => Ok(packet),
             Err(_) => Err(EncryptionError::SerializationError),
@@ -83,6 +92,6 @@ impl ServerKey {
     /// This function is used when decrypting data sent from client -> server
     #[tracing::instrument]
     pub fn decrypt(&self, enc_data: &[u8]) -> rsa::Result<Vec<u8>> {
-        decrypt(&self.pri_key, enc_data)
+        decrypt(self.get_pri_key(), enc_data)
     }
 }
