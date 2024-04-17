@@ -572,12 +572,13 @@ impl DBList {
                     let invalidation_time = db_lock.get_settings().get_invalidation_time();
                     drop(db_lock);
 
-                    match SystemTime::now().duration_since(last_access_time) {
-                        // invalidate them based on their duration since access and invalidation time
-                        Ok(duration_since_access) => duration_since_access >= invalidation_time,
-                        // if there is some sort of duration error, simply don't invalidate them
-                        Err(_) => false,
-                    }
+                    // invalidate them based on their duration since access and invalidation time
+                    // if there is some sort of duration error, simply don't invalidate them
+                    SystemTime::now()
+                        .duration_since(last_access_time)
+                        .map_or(false, |duration_since_access| {
+                            duration_since_access >= invalidation_time
+                        })
                 })
                 .map(|(db_name, _)| db_name.clone()) // there has to be a way to get rid of this clone -_-
                 .collect()
@@ -854,7 +855,7 @@ impl DBList {
         return self.load_and_write_database(p_info, &list_lock, client_key, |db| {
             db.get_content_mut()
                 .remove_data_from_list(location)
-                .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s.to_string())))
+                .map_or(Err(ValueNotFound), |s| Ok(SuccessReply(s)))
         });
     }
 
@@ -876,7 +877,7 @@ impl DBList {
         &self,
         p_info: &DBPacketInfo,
         location: &DBKeyedListLocation,
-        data: DBData,
+        data: &DBData,
         client_key: &String,
     ) -> DBResult {
         let list_lock = self.list.read().unwrap();

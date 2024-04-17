@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 
 #[allow(clippy::let_and_return)]
 #[tracing::instrument(skip(db_list))]
-pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
+pub async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSafe) {
     info!("New client connected");
     let ip_address = stream.peer_addr().unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
@@ -68,7 +68,7 @@ pub(crate) async fn handle_client(mut stream: TcpStream, db_list: DBListThreadSa
                                 let resp = lock.add_to_db_list_content(
                                     &p_info,
                                     &location,
-                                    data,
+                                    &data,
                                     &client_key,
                                 );
                                 info!(

@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use tracing::info;
 
 #[tracing::instrument(skip_all)]
-pub(crate) async fn cache_invalidator(db_list: Arc<RwLock<DBList>>) {
+pub async fn cache_invalidator(db_list: Arc<RwLock<DBList>>) {
     info!("Cache invalidator spawned");
     loop {
         let invalidated_caches = db_list.read().unwrap().sleep_caches();

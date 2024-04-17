@@ -16,6 +16,7 @@ impl Display for DBLocation {
 
 impl DBLocation {
     /// Function to create a new `DBLocation` struct from a given location.
+    #[must_use]
     pub fn new(location: &str) -> Self {
         Self {
             location: location.to_string(),
@@ -23,6 +24,7 @@ impl DBLocation {
     }
 
     /// Function to retrieve the location as a key from the struct.
+    #[must_use]
     pub fn as_key(&self) -> &str {
         &self.location
     }

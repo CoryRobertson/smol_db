@@ -20,6 +20,7 @@ pub struct DBSettings {
 
 impl DBSettings {
     /// Returns a new `DBSettings` given a duration
+    #[must_use]
     pub const fn new(
         invalidation_time: Duration,
         can_others_rwx: (bool, bool, bool),
@@ -37,11 +38,13 @@ impl DBSettings {
     }
 
     /// Get a list of the keys who are marked as admins of this database, admins have permission to change any piece of data in the database, and view all of it.
+    #[must_use]
     pub fn get_admin_list(&self) -> &Vec<String> {
         &self.admins
     }
 
     /// Get a list of the keys who are marked as users of this database, users commonly have slightly elevated privileges compared to non-users (others).
+    #[must_use]
     pub fn get_user_list(&self) -> &Vec<String> {
         &self.users
     }
@@ -95,16 +98,19 @@ impl DBSettings {
     }
 
     /// Returns the permissions of the database regarding the users
+    #[must_use]
     pub fn get_user_rwx(&self) -> (bool, bool, bool) {
         self.can_users_rwx
     }
 
     /// Returns the permissions of the database regarding the others
+    #[must_use]
     pub fn get_other_rwx(&self) -> (bool, bool, bool) {
         self.can_others_rwx
     }
 
     /// Returns the invalidation time duration
+    #[must_use]
     pub fn get_invalidation_time(&self) -> Duration {
         self.invalidation_time
     }

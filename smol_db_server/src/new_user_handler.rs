@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 use tracing::{debug, info};
 
 #[tracing::instrument(skip(db_list))]
-pub(crate) async fn user_listener(
+pub async fn user_listener(
     listener: TcpListener,
     db_list: Arc<RwLock<DBList>>,
     thread_pool: &ThreadPool,

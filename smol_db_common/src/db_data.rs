@@ -17,6 +17,7 @@ impl Display for DBData {
 
 impl DBData {
     /// Function to create a new `DBData` struct for a `DBPacket::Write` packet.
+    #[must_use]
     pub const fn new(data: String) -> Self {
         Self { data }
     }

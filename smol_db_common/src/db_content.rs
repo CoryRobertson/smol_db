@@ -21,7 +21,7 @@ impl DBContent {
 
     #[tracing::instrument(skip(self))]
     pub fn get_list_from_key(&self, key: &str) -> Option<&[String]> {
-        self.keyed_list.get(key).map(|list| list.as_slice())
+        self.keyed_list.get(key).map(Vec::as_slice)
     }
 
     #[tracing::instrument(skip(self))]
@@ -55,7 +55,7 @@ impl DBContent {
             || self
                 .keyed_list
                 .get(key.get_key())
-                .is_some_and(|list| list.is_empty())
+                .is_some_and(Vec::is_empty)
         {
             info!("Database list deleted since it was made empty");
             self.keyed_list.remove(key.get_key());
@@ -85,21 +85,21 @@ impl DBContent {
 
     #[tracing::instrument(skip(self))]
     pub fn clear_list(&mut self, key: &DBKeyedListLocation) -> bool {
-        match self.keyed_list.remove(key.get_key()) {
-            None => {
+        self.keyed_list.remove(key.get_key()).map_or_else(
+            || {
                 warn!("Could not clear list, as it did not exist");
                 false
-            }
-            Some(list) => {
+            },
+            |list| {
                 debug!("{:?}", list);
                 true
-            }
-        }
+            },
+        )
     }
 
     #[tracing::instrument(skip(self))]
     pub fn get_length_of_list(&self, key: &DBKeyedListLocation) -> Option<usize> {
-        self.keyed_list.get(key.get_key()).map(|l| l.len())
+        self.keyed_list.get(key.get_key()).map(Vec::len)
     }
 
     /// Reads from the db using the key, returning an optional of either the retrieved content, or nothing.
@@ -116,7 +116,7 @@ impl Default for DBContent {
     fn default() -> Self {
         Self {
             content: HashMap::default(),
-            keyed_list: Default::default(),
+            keyed_list: HashMap::default(),
         }
     }
 }
