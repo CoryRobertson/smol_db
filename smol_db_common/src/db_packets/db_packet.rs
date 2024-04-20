@@ -190,8 +190,8 @@ impl DBPacket {
     /// Creates a new `SetKey` `DBPacket` from a key. This represents the users key which determines their permissions on the server.
     /// This packet when sent to the server will set the key of the client regarding its permission status.
     #[must_use]
-    pub const fn new_set_key(key: String) -> Self {
-        Self::SetKey(key)
+    pub fn new_set_key(key: impl Into<String>) -> Self {
+        Self::SetKey(key.into())
     }
 
     /// Creates a new Write `DBPacket` from a name of a database and location string to write to.

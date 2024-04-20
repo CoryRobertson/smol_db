@@ -614,7 +614,7 @@ impl SmolDbClient {
     #[tracing::instrument(skip_all)]
     pub fn set_access_key(
         &mut self,
-        key: String,
+        key: impl Into<String>,
     ) -> Result<DBSuccessResponse<String>, ClientError> {
         let packet = DBPacket::new_set_key(key);
         self.send_packet(&packet)
